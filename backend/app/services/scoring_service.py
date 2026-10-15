@@ -4,7 +4,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import UTC, datetime, timedelta
+import time
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
@@ -12,7 +13,9 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models import Alert, Company, ComponentCalculation, IndexScore, ModelVersion, Pair
+from app.research.market_calendar import last_completed_session, trading_days_between
 from app.scoring.params import SI_V2_PARAMS
+from app.scoring.pit import close_timestamp
 from app.scoring.si_v1 import compute_si_v1
 from app.scoring.si_v2 import NAMES, compute_si_v2
 from app.scoring.types import PairInputs
@@ -99,7 +102,7 @@ def score_pair(db: Session, pair: Pair, cutoff: datetime | None = None, trigger:
                 confidence_breakdown=_jsonable(r2.confidence_breakdown), explanation=r2.explanation + tr_note,
                 supporting_event_ids=r2.supporting_event_ids,
                 components=[(k, r2.components[k], r2.weights[k]) for k in NAMES])
-    if s2 is not None:
+    if s2 is not None and trigger != "backfill":  # reconstructed history never raises alerts
         check_alerts(db, pair, s2)
     db.commit()
     return {"pair": pair.slug, "si_v1": r1.value, "si_v2": r2.value, "si_v2_status": r2.status, "stored": s2 is not None or s1 is not None}
@@ -139,3 +142,39 @@ def score_all(db: Session, trigger: str = "scheduled", pair_ids: list[int] | Non
             log.exception("scoring failed", extra={"pair": p.slug})
             out["errors"].append(f"{p.slug}: {type(e).__name__}: {e}")
     return out
+
+
+def backfill_history(db: Session, start: date, end: date | None = None, max_seconds: float | None = None) -> dict:
+    """Reconstruct weekly score history (last session of each week, scored after its close) from
+    stored data, using the same point-in-time inputs as a live run: prices, filings and analysed news
+    known at that cutoff. Rows are marked trigger="backfill"; they are research history, never
+    predictions, and never raise alerts. Weeks that already have a score for a pair are skipped, so
+    the job is incremental and safe to re-run."""
+    started = time.monotonic()
+    end = end or last_completed_session(datetime.now(UTC))
+    weeks: dict[tuple[int, int], date] = {}
+    for d in trading_days_between(start, end):
+        weeks[d.isocalendar()[:2]] = d  # last session of each ISO week
+    pairs = db.scalars(select(Pair).where(Pair.status == "active").order_by(Pair.slug)).all()
+    have = {(pid, t.date().isocalendar()[:2]) for pid, t in db.execute(
+        select(IndexScore.pair_id, IndexScore.as_of).where(IndexScore.index_name == "si_v1")).all()}
+    out = {"weeks": len(weeks), "scored": 0, "skipped": 0, "errors": 0, "first_errors": [], "complete": True}
+    # newest weeks first, all pairs together, so a time-limited run fills every chart evenly
+    for wk, d in sorted(weeks.items(), reverse=True):
+        for p in pairs:
+            if (p.id, wk) in have:
+                out["skipped"] += 1
+                continue
+            if max_seconds is not None and time.monotonic() - started > max_seconds:
+                out["complete"] = False
+                return out
+            try:
+                score_pair(db, p, close_timestamp(d) + timedelta(hours=2), trigger="backfill")
+                out["scored"] += 1
+            except Exception as e:  # keep going; one bad week must not stop the history
+                db.rollback()
+                out["errors"] += 1
+                if len(out["first_errors"]) < 5:
+                    out["first_errors"].append(f"{p.slug} {d}: {type(e).__name__}: {e}")
+    return out
+

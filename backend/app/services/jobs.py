@@ -79,6 +79,14 @@ def _compute_scores(db: Session, params: dict) -> dict:
     return scoring_service.score_all(db, trigger=params.get("trigger", "scheduled"), pair_ids=params.get("pair_ids"))
 
 
+def _backfill_scores(db: Session, params: dict) -> dict:
+    from datetime import date
+
+    from app.services import scoring_service
+    return scoring_service.backfill_history(db, date.fromisoformat(params.get("start", "2014-01-01")),
+                                            max_seconds=params.get("max_seconds"))
+
+
 def _snapshot(db: Session, params: dict) -> dict:
     from app.services import predictions_service
     return predictions_service.snapshot_predictions(db)
@@ -114,6 +122,7 @@ JOBS: dict[str, JobDef] = {j.name: j for j in [
     JobDef("ingest_fundamentals", _ingest_fundamentals, "0 6 * * *", "SEC XBRL company facts (point-in-time)"),
     JobDef("sync_reference", _sync_reference, "0 5 * * 1", "Verify CIKs and SIC codes with SEC"),
     JobDef("compute_scores", _compute_scores, "0 18 * * *", "Daily SI-v1/SI-v2 recalculation for all active pairs"),
+    JobDef("backfill_scores", _backfill_scores, None, "Rebuild weekly score history from stored prices (manual, incremental)", max_attempts=1, timeout_seconds=7200),
     JobDef("snapshot_predictions", _snapshot, "30 18 * * 1-5", "Immutable daily prediction snapshots", trading_days_only=True),
     JobDef("evaluate_outcomes", _evaluate, "0 19 * * 1-5", "Resolve matured predictions against realised prices", trading_days_only=True),
     JobDef("backup_database", _backup, "0 2 * * *", "pg_dump backup with retention", max_attempts=2),

@@ -125,7 +125,7 @@ def direction(d: str | None, a: str, b: str) -> str:
 # ---------------------------------------------------------------- charts (inline SVG)
 
 def line_chart(series: list[tuple[str, list[tuple[str, float | None]]]], height=220, y_label="", y_range=None,
-               bands: list[tuple[float, float, str]] | None = None) -> str:
+               bands: list[tuple[float, float, str]] | None = None, marks: list[tuple[str, str]] | None = None) -> str:
     """series: [(css class, [(iso date, value)])]. Dates are spaced by position of the union of dates."""
     dates = sorted({d for _, pts in series for d, v in pts if v is not None})
     if len(dates) < 2:
@@ -156,6 +156,12 @@ def line_chart(series: list[tuple[str, list[tuple[str, float | None]]]], height=
         d = date.fromordinal(t0 + round(span * k / 3)).isoformat()
         anchor = "start" if k == 0 else "end" if k == 3 else "middle"
         out.append(f'<text class="axis" x="{x(d):.1f}" y="{H - 6}" text-anchor="{anchor}">{d[:7]}</text>')
+    for d, label in marks or []:
+        if dates[0] <= d <= dates[-1]:
+            anchor = "end" if x(d) > W * 0.7 else "start"
+            dx = -4 if anchor == "end" else 4
+            out.append(f'<line class="mark" x1="{x(d):.1f}" x2="{x(d):.1f}" y1="{T}" y2="{H - B}"/>'
+                       f'<text class="axis" x="{x(d) + dx:.1f}" y="{T + 12}" text-anchor="{anchor}">{e(label)}</text>')
     for cls, pts in series:
         segs, cur = [], []
         for d, v in pts:
@@ -175,6 +181,33 @@ def line_chart(series: list[tuple[str, list[tuple[str, float | None]]]], height=
                 out.append(f'<polyline class="{cls}" points="{" ".join(sgm)}"/>')
     out.append("</svg>")
     return "".join(out)
+
+
+def sparkline(pts: list[tuple[str, float | None]], W=120, H=28) -> str:
+    """Tiny SI-v1 trend for the pairs table, on the fixed 0–100 scale so pairs compare."""
+    pts = [(d, v) for d, v in pts if v is not None]
+    if len(pts) < 2:
+        return '<span class="muted">—</span>'
+    t0, t1 = date.fromisoformat(pts[0][0]).toordinal(), date.fromisoformat(pts[-1][0]).toordinal()
+    span = max(1, t1 - t0)
+    xy = " ".join(f"{1 + (W - 2) * (date.fromisoformat(d).toordinal() - t0) / span:.1f},{1 + (H - 2) * (1 - v / 100):.1f}" for d, v in pts)
+    return (f'<svg viewBox="0 0 {W} {H}" class="spark" role="img" aria-label="SI-v1 from {pts[0][0][:7]} to {pts[-1][0][:7]}">'
+            f'<polyline points="{xy}"/></svg>')
+
+
+def history(scores: list[dict], index_name: str) -> list[tuple[str, float | None]]:
+    """One point per day (the latest score that day), oldest first."""
+    by_day = {}
+    for s in scores:
+        if s["index_name"] == index_name:
+            by_day[s["as_of"][:10]] = s["value"]
+    return sorted(by_day.items())
+
+
+def live_start(scores: list[dict]) -> str | None:
+    """First day scored by the live pipeline rather than rebuilt from past prices."""
+    live = [s["as_of"][:10] for s in scores if s.get("trigger") != "backfill"]
+    return min(live) if live else None
 
 
 def bar(v: float | None, cls="") -> str:
@@ -216,7 +249,8 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .bar span{display:block;height:100%;background:var(--accent)}
 .chart{width:100%;height:auto;display:block}.chart .grid{stroke:var(--line);stroke-width:1}.chart .axis{fill:var(--muted);font-size:11px}
 .chart polyline{fill:none;stroke-width:1.8}.chart .sa{stroke:var(--a)}.chart .sb{stroke:var(--b)}.chart circle.sa{fill:var(--a)}.chart circle.sb{fill:var(--b)}
-.chart .band-hi{fill:var(--hi-bg)}.chart .band-md{fill:var(--md-bg)}
+.chart .band-hi{fill:var(--hi-bg)}.chart .band-md{fill:var(--md-bg)}.chart .mark{stroke:var(--muted);stroke-dasharray:4 3}
+.spark{width:120px;height:28px;display:block}.spark polyline{fill:none;stroke:var(--a);stroke-width:1.5}
 .legend span{display:inline-block;margin-right:14px;font-size:13px}.legend i{display:inline-block;width:12px;height:3px;vertical-align:middle;margin-right:5px}
 .quote{border-left:3px solid var(--line);padding:2px 10px;margin:6px 0;color:var(--muted)}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
@@ -254,7 +288,7 @@ def freshness_banner(status: dict) -> str:
     return "".join(f'<div class="banner warn">{e(b)}</div>' for b in bits)
 
 
-def index_page(status: dict, pairs: list[dict], ctx: dict) -> str:
+def index_page(status: dict, pairs: list[dict], ctx: dict, sparks: dict[str, str] | None = None) -> str:
     p = status.get("pairs", {})
     tiles = f"""<div class="tiles">
 <div class="tile"><div class="k">Pairs monitored</div><div class="v">{p.get("monitored", 0)}</div></div>
@@ -267,11 +301,11 @@ def index_page(status: dict, pairs: list[dict], ctx: dict) -> str:
     for x in sorted(pairs, key=lambda q: -((q.get("si_v2") or {}).get("value") or -1)):
         a, b = x["company_a"]["ticker"], x["company_b"]["ticker"]
         rows.append(f"""<tr><td><a href="pairs/{e(x["slug"])}.html"><b>{e(a)} / {e(b)}</b></a><div class="muted">{e(x.get("industry") or "")}</div></td>
-<td class="n">{score_cell(x.get("si_v1"))}</td><td class="n">{score_cell(x.get("si_v2"))}</td>
+<td class="n">{score_cell(x.get("si_v1"))}</td><td>{(sparks or {}).get(x["slug"], "")}</td><td class="n">{score_cell(x.get("si_v2"))}</td>
 <td class="n">{change((x.get("si_v2") or {}).get("change_7d"))}</td><td>{direction(x.get("direction"), a, b)}</td>
 <td class="n">{num(x.get("confidence"), 2)}</td><td class="muted">{day(x.get("last_update"))}</td></tr>""")
-    table = f"""<div class="scroll"><table><thead><tr><th>Pair</th><th class="n">SI-v1</th><th class="n">SI-v2</th><th class="n">7-day change</th>
-<th>Direction</th><th class="n">Confidence</th><th>Updated</th></tr></thead><tbody>{"".join(rows) or '<tr><td colspan="7" class="muted">No pairs yet.</td></tr>'}</tbody></table></div>"""
+    table = f"""<div class="scroll"><table><thead><tr><th>Pair</th><th class="n">SI-v1</th><th>SI-v1 history</th><th class="n">SI-v2</th><th class="n">7-day change</th>
+<th>Direction</th><th class="n">Confidence</th><th>Updated</th></tr></thead><tbody>{"".join(rows) or '<tr><td colspan="8" class="muted">No pairs yet.</td></tr>'}</tbody></table></div>"""
     body = f"""<h1>Pairs</h1><p class="sub">Risk that each pair's prices drift apart, on a 0–100 scale (higher is riskier). SI-v1 uses market data only;
 SI-v2 adds news, fundamentals and structure. "n/a" means there is not enough data to score honestly, never zero risk.</p>
 {freshness_banner(status)}{tiles}{table}"""
@@ -288,11 +322,17 @@ def pair_page(pr: dict, scores: list[dict], detail: dict | None, prices: dict, p
 <div class="tile"><div class="k">Evidence confidence</div><div class="v">{num(pr.get("confidence"), 2)}</div></div></div>
 <div class="card">{e(pr.get("explanation") or "No score yet.")}</div>"""
 
-    v1 = [(s["as_of"][:10], s["value"]) for s in scores if s["index_name"] == "si_v1"]
-    v2 = [(s["as_of"][:10], s["value"]) for s in scores if s["index_name"] == "si_v2"]
+    v1, v2, start = history(scores, "si_v1"), history(scores, "si_v2"), live_start(scores)
+    rebuilt = any(s.get("trigger") == "backfill" for s in scores)
+    note = (f'Before {day(start)} the scores are rebuilt weekly from past prices, using only data available on each date; '
+            f'from {day(start)} on they are the daily scores the dashboard recorded live.' if rebuilt and start else
+            "Weekly scores rebuilt from past prices, using only data available on each date." if rebuilt else
+            "Daily scores recorded by the dashboard.")
     hist = f"""<h2>Score history</h2><div class="card"><div class="legend"><span><i style="background:var(--a)"></i>SI-v1</span>
 <span><i style="background:var(--b)"></i>SI-v2</span></div>{line_chart([("sa", v1), ("sb", v2)], y_label="score", y_range=(0, 100),
-                                                                    bands=[(70, 100, "band-hi"), (40, 70, "band-md")])}</div>"""
+                                                                    bands=[(70, 100, "band-hi"), (40, 70, "band-md")],
+                                                                    marks=[(start, "live tracking starts")] if rebuilt and start else None)}
+<p class="muted">{note} SI-v2 shows only where news and fundamentals give enough coverage.</p></div>"""
 
     if prices.get("available"):
         norm = prices.get("normalized") or []
@@ -449,10 +489,11 @@ def build(out: Path, allow_demo: bool) -> dict:
             shutil.rmtree(out)
         (out / "pairs").mkdir(parents=True)
         (out / "data").mkdir()
-        by_pair = {}
+        by_pair, sparks = {}, {}
         for pr in pairs:
             slug = pr["slug"]
-            scores = api.get(f"/pairs/{slug}/scores", days=730)
+            scores = api.get(f"/pairs/{slug}/scores", days=7300, limit=10000)
+            sparks[slug] = sparkline(history(scores, "si_v1"))
             v2 = [s for s in scores if s["index_name"] == "si_v2"]
             detail = api.get(f"/pairs/{slug}/scores/{v2[-1]['id']}") if v2 else None
             prices = api.get(f"/pairs/{slug}/prices")
@@ -461,7 +502,7 @@ def build(out: Path, allow_demo: bool) -> dict:
             by_pair[slug] = (pr, preds)
             (out / "pairs" / f"{slug}.html").write_text(pair_page(pr, scores, detail, prices, preds, news, ctx))
         perf = api.get("/performance")
-        (out / "index.html").write_text(index_page(status, pairs, ctx))
+        (out / "index.html").write_text(index_page(status, pairs, ctx, sparks))
         (out / "predictions.html").write_text(predictions_page(by_pair, ctx))
         (out / "performance.html").write_text(performance_page(perf, ctx))
         (out / "about.html").write_text(about_page(status, ctx))

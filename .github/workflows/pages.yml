@@ -109,6 +109,12 @@ jobs:
           print("\n**Prices stored:** " + ("; ".join(f"{p}: {n} rows for {c} tickers, last {d}" for p, n, c, d in rows) or "none"))
           PY
 
+      - name: Rebuild past score history (weekly; continues where the last run stopped)
+        run: |
+          out=$(python -m app.cli run-job backfill_scores --params '{"max_seconds": 2400}' 2>&1 || true)
+          printf '%s\n' "$out" | grep -oE '"(status|weeks|scored|skipped|errors|complete)": [^,}]+' | tr '\n' ' ' | tee -a "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "$out" | grep -A6 '"first_errors"' | head -8 || true
+
       - name: Walk-forward backtest (until one has data, or on request)
         run: |
           has=$(python -c 'from sqlalchemy import select, func
