@@ -1,7 +1,8 @@
 name: Update dashboard
 
 # Runs the research pipeline after each US market close and publishes the read-only dashboard to
-# GitHub Pages. The database lives only for the length of a run: it is restored from the latest
+# GitHub Pages. The site root is an experiments hub; Experiment 1 (this pipeline) is under /exp1/ and
+# Experiment 2 (built by exp2.yml) under /exp2/. The database lives only for the length of a run: it is restored from the latest
 # dump in the "state" release, updated, dumped back, and the site is rebuilt from it.
 #
 # Optional repository secrets (Settings > Secrets and variables > Actions). Each one turns on a data source;
@@ -165,7 +166,19 @@ jobs:
           fi
 
       - name: Build the site
-        run: python -m app.static_site --out "$GITHUB_WORKSPACE/_site"
+        run: python -m app.static_site --out "$GITHUB_WORKSPACE/_site/exp1"
+
+      - name: Add Experiment 2 and the experiments hub
+        working-directory: ${{ github.workspace }}
+        run: |
+          # Experiment 2 runs in its own workflow (exp2.yml) and saves its pages to the "exp2-state" release.
+          mkdir -p _site/exp2
+          if gh release download exp2-state --repo "$GITHUB_REPOSITORY" --pattern exp2-site.tar.gz --dir /tmp/exp2 2>/dev/null; then
+            tar xzf /tmp/exp2/exp2-site.tar.gz -C _site/exp2
+          else
+            echo "Experiment 2 has no pages yet; the hub shows it as not published." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          python experiments/hub/build_hub.py --site _site | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Save the database for the next run
         run: |
