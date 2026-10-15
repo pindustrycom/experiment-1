@@ -134,7 +134,7 @@ jobs:
               use = db.execute(select(ProviderUsage.provider, func.count(), func.sum(ProviderUsage.cost_usd))
                                .where(ProviderUsage.ts >= since).group_by(ProviderUsage.provider)).all()
               print("\n**Provider calls this run:** " + ("; ".join(f"{p}: {n} calls, ${c or 0:.3f}" for p, n, c in use) or "none"))
-              print("\n| Pair | SI-v1 | SI-v2 | SI-v2 status | coverage |\n|---|---|---|---|---|")
+              print("\n| Pair | SI-v1 | SI-v2 | SI-v2 status | coverage | why |\n|---|---|---|---|---|---|")
               for pr in db.scalars(select(Pair).where(Pair.status == "active").order_by(Pair.slug)):
                   last = {}
                   for name in ("si_v1", "si_v2"):
@@ -142,7 +142,8 @@ jobs:
                                              .order_by(IndexScore.as_of.desc(), IndexScore.id.desc()).limit(1))
                   v1, v2 = last["si_v1"], last["si_v2"]
                   f = lambda x: "n/a" if x is None or x.value is None else f"{x.value:.1f}"
-                  print(f"| {pr.slug} | {f(v1)} | {f(v2)} | {v2.status if v2 else '-'} | {v2.coverage if v2 else 0:.2f} |")
+                  why = "" if v2 is None else " ".join(v2.explanation.split())[:220].replace("|", "/")
+                  print(f"| {pr.slug} | {f(v1)} | {f(v2)} | {v2.status if v2 else '-'} | {v2.coverage if v2 else 0:.2f} | {why} |")
           PY
 
       - name: Rebuild past score history (weekly; continues where the last run stopped)
