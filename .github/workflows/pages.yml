@@ -56,7 +56,6 @@ jobs:
       ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
       SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
       GH_TOKEN: ${{ github.token }}
-      PG: docker exec -i ${{ job.services.postgres.id }}
     defaults:
       run:
         working-directory: backend
@@ -70,7 +69,9 @@ jobs:
       - run: pip install -r requirements.txt && pip install -e . --no-deps
 
       - name: Session secret for this run only
-        run: echo "SECRET_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+        run: |
+          echo "SECRET_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "PG=docker exec -i ${{ job.services.postgres.id }}" >> "$GITHUB_ENV"
 
       - name: Restore the database from the last run
         run: |
