@@ -61,6 +61,15 @@ class ModelConfig:
     spectrum_seg: int = 256    # periodogram segment length (frequency grid) for the resonance index
     finetune_steps: int = 150
     retrain_every: int = 5     # sessions between retrains (weekly)
+    # EKF + SSM (exp2/ekf.py): latent sector state filtered from the daily vector
+    ekf: bool = True
+    ekf_d_state: int = 8
+    ekf_d_hidden: int = 16
+    ekf_steps: int = 150
+    ekf_window: int = 128
+    ekf_batch: int = 8
+    ekf_lr: float = 1e-2
+    ekf_context: int = 512     # sessions the filter runs over before the predicted day
 
 
 @dataclass(frozen=True)

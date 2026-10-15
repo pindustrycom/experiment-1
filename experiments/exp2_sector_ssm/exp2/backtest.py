@@ -32,11 +32,14 @@ def run(df: pd.DataFrame, cfg: Config, start: str = "2016-01-04", every: int = 1
         f = fit(df, i, cfg, seeds=(0,), steps=steps, prune=prune)
         j1 = min(i + every - 1, last)
         mu, sd = f.ssm_outputs(df, j1, j1 - i + 1)
+        emu, esd = f.ekf_outputs(df, j1, j1 - i + 1) if f.ekf is not None else (None, None)
         X = df[f.cols].to_numpy(float)
         for r, j in enumerate(range(i, j1 + 1)):
             for k, tgt in enumerate(TARGETS):
                 y = float(df[tgt].iloc[j])
                 preds = {"ssm": (float(mu[r, k]), float(sd[r, k]))}
+                if emu is not None:
+                    preds["ekf"] = (float(emu[r, k]), float(esd[r, k]))
                 for name, p in f.baselines[tgt].items():
                     preds[name] = (baseline_predict(name, p, X[j], f.cols), p["sd"])
                 for model, (m, s) in preds.items():

@@ -12,6 +12,7 @@ import pandas as pd
 import torch
 
 from .config import Config
+from .ekf import EKFSSM, target_nll
 from .features import TARGETS, Scaler, feature_columns
 from .model import SectorSSM, gaussian_nll
 
@@ -27,14 +28,14 @@ def _norm_cdf(x):
 class Fitted:
     """Everything needed to predict: the ensemble, the scalers and the baselines."""
 
-    def __init__(self, cfg: Config, cols, scaler, y_mu, y_sd, models, baselines, info):
+    def __init__(self, cfg: Config, cols, scaler, y_mu, y_sd, models, baselines, info, ekf=None):
         self.cfg, self.cols, self.scaler, self.y_mu, self.y_sd = cfg, cols, scaler, np.asarray(y_mu), np.asarray(y_sd)
-        self.models, self.baselines, self.info = models, baselines, info
+        self.models, self.baselines, self.info, self.ekf = models, baselines, info, ekf
 
     def to_state(self) -> dict:
         return {"cols": self.cols, "scaler": self.scaler.state(), "y_mu": self.y_mu.tolist(), "y_sd": self.y_sd.tolist(),
                 "models": [m.state_dict() for m in self.models], "n_features": len(self.cols),
-                "baselines": self.baselines, "info": self.info}
+                "baselines": self.baselines, "info": self.info, "ekf": self.ekf.state_dict() if self.ekf is not None else None}
 
     @classmethod
     def from_state(cls, s: dict, cfg: Config) -> Fitted:
@@ -44,7 +45,12 @@ class Fitted:
             m.load_state_dict(sd)
             m.eval()
             models.append(m)
-        return cls(cfg, s["cols"], Scaler.from_state(s["scaler"]), s["y_mu"], s["y_sd"], models, s["baselines"], s["info"])
+        ekf = None
+        if s.get("ekf") is not None:
+            ekf = EKFSSM(len(ekf_columns(s["cols"])), len(TARGETS), cfg.model.ekf_d_state, cfg.model.ekf_d_hidden)
+            ekf.load_state_dict(s["ekf"])
+            ekf.eval()
+        return cls(cfg, s["cols"], Scaler.from_state(s["scaler"]), s["y_mu"], s["y_sd"], models, s["baselines"], s["info"], ekf)
 
     # ------------------------------------------------------------ prediction
 
@@ -65,18 +71,91 @@ class Fitted:
         sd = np.sqrt(vars_.mean(0) + mus.var(0)) * self.y_sd
         return mu, sd
 
+    @torch.no_grad()
+    def ekf_outputs(self, df: pd.DataFrame, end: int, length: int) -> tuple[np.ndarray, np.ndarray]:
+        """EKF + SSM readout mean and sd (target units) for rows end-length+1..end, each filtered
+        over at least `ekf_context` sessions."""
+        lo = max(0, end - length + 1 - self.cfg.model.ekf_context)
+        z, msk = ekf_obs(df.iloc[lo:end + 1], self.cols, self.scaler)
+        mu, var, _, _ = self.ekf(z[None], msk[None])
+        mu, var = mu[0, -length:].numpy(), var[0, -length:].numpy()
+        return mu * self.y_sd + self.y_mu, np.sqrt(var) * self.y_sd
+
     def predict_row(self, df: pd.DataFrame, i: int) -> list[dict]:
         out = []
         mu, sd = self.ssm_outputs(df, i, 1)
+        emu, esd = self.ekf_outputs(df, i, 1) if self.ekf is not None else (None, None)
         x = df[self.cols].iloc[i].to_numpy(float)
         for k, tgt in enumerate(TARGETS):
             preds = {"ssm": (float(mu[0, k]), float(sd[0, k]))}
+            if emu is not None:
+                preds["ekf"] = (float(emu[0, k]), float(esd[0, k]))
             for name, p in self.baselines[tgt].items():
                 preds[name] = (baseline_predict(name, p, x, self.cols), p["sd"])
             for model, (m, s) in preds.items():
                 out.append({"model": model, "target": tgt, "pred": m, "sd": s, "p_up": _norm_cdf(m / s) if s > 0 else 0.5,
                             "lo80": m - Z80 * s, "hi80": m + Z80 * s})
         return out
+
+
+# ---------------------------------------------------------------- EKF + SSM
+
+def ekf_columns(cols: list[str]) -> list[str]:
+    """Measured features: everything except the news-availability flag, which becomes the mask."""
+    return [c for c in cols if c != "news_avail"]
+
+
+def ekf_obs(df: pd.DataFrame, cols: list[str], scaler: Scaler) -> tuple[torch.Tensor, torch.Tensor]:
+    """Standardised measurements and their mask: news features count as missing before news collection began."""
+    X = scaler.transform(df[cols].to_numpy(float))
+    keep = [i for i, c in enumerate(cols) if c != "news_avail"]
+    z = torch.from_numpy(X[:, keep])
+    msk = torch.ones_like(z)
+    if "news_avail" in cols:
+        avail = torch.from_numpy(df["news_avail"].to_numpy(np.float32))
+        news = [j for j, i in enumerate(keep) if cols[i].startswith("news_")]
+        msk[:, news] = avail[:, None]
+    return z, msk
+
+
+def fit_ekf(df: pd.DataFrame, cols, scaler, Y: torch.Tensor, tr_end: int, v0: int, v1: int, mc, seed: int = 0):
+    torch.manual_seed(seed)
+    rng = np.random.default_rng(seed)
+    z, msk = ekf_obs(df, cols, scaler)
+    m = EKFSSM(z.shape[1], Y.shape[1], mc.ekf_d_state, mc.ekf_d_hidden)
+    opt = torch.optim.Adam(m.parameters(), lr=mc.ekf_lr)
+    w, burn = min(mc.ekf_window, tr_end + 1), min(32, mc.ekf_window // 4)
+
+    def val_loss():
+        with torch.no_grad():
+            lo = max(0, v0 - mc.ekf_context)
+            mu, var, _, _ = m(z[None, lo:v1 + 1], msk[None, lo:v1 + 1])
+            k = v1 - v0 + 1
+            return float(target_nll(mu[0, -k:], var[0, -k:], Y[v0:v1 + 1]))
+
+    best, best_state, since = math.inf, copy.deepcopy(m.state_dict()), 0
+    for step in range(mc.ekf_steps):
+        starts = rng.integers(0, max(1, tr_end + 2 - w), size=mc.ekf_batch)
+        zb = torch.stack([z[s:s + w] for s in starts])
+        mb = torch.stack([msk[s:s + w] for s in starts])
+        yb = torch.stack([Y[s:s + w] for s in starts])
+        mu, var, obs_nll, _ = m(zb, mb)
+        loss = obs_nll + target_nll(mu[:, burn:], var[:, burn:], yb[:, burn:])
+        opt.zero_grad()
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0)
+        opt.step()
+        if step % 10 == 9 or step == mc.ekf_steps - 1:
+            vl = val_loss()
+            if vl < best - 1e-5:
+                best, best_state, since = vl, copy.deepcopy(m.state_dict()), 0
+            else:
+                since += 10
+            if since >= mc.patience:
+                break
+    m.load_state_dict(best_state)
+    m.eval()
+    return m, best
 
 
 # ---------------------------------------------------------------- baselines
@@ -246,20 +325,24 @@ def fit(df: pd.DataFrame, as_of: int, cfg: Config, seeds=None, steps: int | None
                          "criterion": mc.prune_criterion, "prune_compare": compare})
 
     baselines = fit_baselines(df, cols, tr, va)
-    info = {"prune_compare": mean_compare([p["prune_compare"] for p in per_seed]),
+    ekf, ekf_val = (fit_ekf(df, cols, scaler, Y, tr_end, v0, v1, mc) if mc.ekf else (None, None))
+    info = {"ekf_val_nll": ekf_val, "prune_compare": mean_compare([p["prune_compare"] for p in per_seed]),
             "val_nll_full": float(np.mean([p["val_nll_full"] for p in per_seed])), "as_of": df.index[as_of].strftime("%Y-%m-%d"), "train_start": df.index[0].strftime("%Y-%m-%d"),
             "train_end": df.index[tr_end].strftime("%Y-%m-%d"), "val_start": df.index[v0].strftime("%Y-%m-%d"),
             "val_end": df.index[v1].strftime("%Y-%m-%d"), "n_train": int(tr.sum()), "n_val": int(va.sum()),
             "n_features": len(cols), "seeds": per_seed, "config": asdict(cfg.model), "config_digest": cfg.digest(),
             "seconds": round(time.time() - t0, 1)}
-    fitted = Fitted(cfg, cols, scaler, y_mu, y_sd, models, baselines, info)
+    fitted = Fitted(cfg, cols, scaler, y_mu, y_sd, models, baselines, info, ekf)
     # Validation scores of every model, on the same rows, in target units.
     mu, _ = fitted.ssm_outputs(df, v1, v1 - v0 + 1)
     yv = Yraw[v0:v1 + 1]
     X_np = df[cols].to_numpy(float)
+    emu = fitted.ekf_outputs(df, v1, v1 - v0 + 1)[0] if ekf is not None else None
     val = {}
     for k, tgt in enumerate(TARGETS):
         val[tgt] = {"ssm": float(np.mean((yv[:, k] - mu[:, k]) ** 2))}
+        if emu is not None:
+            val[tgt]["ekf"] = float(np.mean((yv[:, k] - emu[:, k]) ** 2))
         for name, p in baselines[tgt].items():
             pr = np.array([baseline_predict(name, p, X_np[i], cols) for i in range(v0, v1 + 1)])
             val[tgt][name] = float(np.mean((yv[:, k] - pr) ** 2))

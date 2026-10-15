@@ -10,7 +10,7 @@ from synth import prices
 from test_news import FakeScorer
 
 TINY = Config(model=ModelConfig(d_model=8, n_modes=8, steps=30, seeds=(0,), window=256, burn_in=64, val_sessions=100,
-                                finetune_steps=10, patience=30))
+                                finetune_steps=10, patience=30, ekf_steps=10, ekf_window=64, ekf_context=128, ekf_d_state=4))
 
 
 def write_state(state, n=2200):
@@ -35,7 +35,7 @@ def test_end_to_end_offline(tmp_path):
     assert s["steps"]["news_score"]["scored"] > 0
     assert s["steps"]["backtest"]["status"] == "ok", s["steps"]["backtest"]
     led = pd.read_csv(state / "ledger" / "predictions.csv")
-    assert set(led["model"]) == {"ssm", "zero", "drift", "momentum", "ridge"} and len(led) == 10
+    assert set(led["model"]) == {"ssm", "ekf", "zero", "drift", "momentum", "ridge"} and len(led) == 12
     html = (site / "index.html").read_text()
     assert "Forward test" in html and "Backtest" in html and "Chip export curbs" in html
     assert (site / "data" / "summary.json").exists() and (site / "method.html").exists()
@@ -57,7 +57,7 @@ def test_ssm_learns_a_planted_lead_lag():
     p["XLK"] = p["XLK"].assign(adj_close=px, close=px)
     df = features.build(p, None, TINY)
     cfg = Config(model=ModelConfig(d_model=16, n_modes=16, steps=250, seeds=(0,), window=256, burn_in=64, val_sessions=200,
-                                   finetune_steps=40, patience=100))
+                                   finetune_steps=40, patience=100, ekf=False))
     f = train.fit(df, len(df) - 1, cfg)
     v = f.info["val_mse"]["y_sector"]
     assert v["ssm"] < 0.8 * v["zero"], v

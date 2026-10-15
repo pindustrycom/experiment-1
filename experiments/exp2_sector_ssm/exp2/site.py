@@ -13,7 +13,7 @@ from . import config
 
 e = html.escape
 REPO_URL = "https://github.com/pindustrycom/experiment-1"
-MODEL_LABEL = {"ssm": "Pruned S4D (this model)", "zero": "No change", "drift": "Average drift", "momentum": "20-day momentum",
+MODEL_LABEL = {"ssm": "Pruned S4D (this model)", "ekf": "EKF + SSM (filtered latent state)", "zero": "No change", "drift": "Average drift", "momentum": "20-day momentum",
                "ridge": "Ridge regression, same inputs"}
 TARGET_LABEL = {"y_sector": f"{config.TARGET} return", "y_relative": f"{config.TARGET} minus {config.BENCHMARK}"}
 
@@ -164,11 +164,11 @@ def score_table(card: dict, note: str) -> str:
         if not rows:
             continue
         body = ""
-        for model in ("ssm", "ridge", "momentum", "drift", "zero"):
+        for model in ("ssm", "ekf", "ridge", "momentum", "drift", "zero"):
             m = rows.get(model)
             if not m or not m.get("n"):
                 continue
-            body += (f'<tr class="{"me" if model == "ssm" else ""}"><td>{e(MODEL_LABEL[model])}</td><td class="n">{m["n"]}</td>'
+            body += (f'<tr class="{"me" if model in ("ssm", "ekf") else ""}"><td>{e(MODEL_LABEL[model])}</td><td class="n">{m["n"]}</td>'
                      f'<td class="n">{num(m.get("mae"))}</td><td class="n">{num(m.get("skill"), 3)}</td>'
                      f'<td class="n">{pct(100 * m["hit"], 0, False) if m.get("hit") is not None else "—"}</td>'
                      f'<td class="n">{num(m.get("ic"), 3)}</td><td class="n">{num(m.get("brier"), 3)}</td>'
@@ -328,6 +328,13 @@ The network is pruned to the highest-scoring {", ".join(f"{100 * k:g}%" for k in
 the sparsest level whose validation loss is within {mc.prune_tolerance} of the best level is used. As in the paper, every retrain also
 records how each criterion does when pruning without retraining: the resonance index, its flat-spectrum control, H2 energy, H-infinity
 gain, the kernel L1 bound and random.</p>
+<h3>EKF + SSM</h3><p>A second model treats the daily vector as noisy measurements of a {mc.ekf_d_state}-dimensional latent
+sector state instead of as an input. The state evolves as x<sub>t</sub> = A x<sub>t−1</sub> + U tanh(V x<sub>t−1</sub> + c) + w, where A holds
+damped 2×2 rotations (the real form of S4D's complex diagonal modes); measurements are z<sub>t</sub> = H x<sub>t</sub> + b + v with diagonal
+noise. An extended Kalman filter predicts and updates the state every session, linearising the dynamics with their Jacobian; news
+features are left out of the update before news collection began. The 5-session targets are read out from the filtered state, with
+variance from the state covariance. Dynamics, noise levels, measurement map and readout are fitted together by backpropagating through
+the filter (one-step measurement likelihood plus target likelihood), with the same training, validation and retraining schedule.</p>
 <h3>Training and validation</h3><p>The model is retrained every {mc.retrain_every} sessions on every session whose outcome was already
 known. The last {mc.val_sessions} of those are held out for early stopping and the pruning check, with a {config.HORIZON}-session gap.
 {len(mc.seeds)} seeds are averaged; the spread combines their predicted variance and their disagreement.</p>
