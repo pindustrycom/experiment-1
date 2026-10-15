@@ -27,7 +27,7 @@ restored schema.
    | Name | Kind | Enables |
    |---|---|---|
    | `SEC_USER_AGENT` | variable | SEC filings and fundamentals (F, part of S, filing news). Value like `SplittabilityMonitor research you@example.com`; SEC requires a contact address. |
-   | `TIINGO_API_KEY` | secret | Dividend-adjusted prices (free key at tiingo.com). Without it, Stooq is used (no key, price return only). |
+   | `TIINGO_API_KEY` | secret | **Needed for prices.** Dividend-adjusted daily prices; the free key at tiingo.com is enough. Stooq is still tried as a fallback, but on 2026-10-15 its download endpoint returned HTTP 404 for every ticker from GitHub's runners. |
    | `ANTHROPIC_API_KEY` | secret | Claude reads the news (N and P). Costs money per call; capped by the monthly budget (default $50). |
    | `FINNHUB_API_KEY`, `ALPHAVANTAGE_API_KEY` | secret | Company news feeds (free keys). |
 
@@ -36,7 +36,7 @@ restored schema.
 
 SI-v2 needs at least 60% of its weight available, including the market component. Market,
 fundamentals and structure together are 55%, so SI-v2 shows as unavailable until news analysis
-(`ANTHROPIC_API_KEY` plus at least one news source) is on. SI-v1 needs only prices.
+(`ANTHROPIC_API_KEY` plus at least one news source) is on. SI-v1 needs only prices, so with just `TIINGO_API_KEY` set the dashboard shows SI-v1 scores and records predictions.
 
 ## Privacy
 

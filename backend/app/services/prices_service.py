@@ -78,6 +78,10 @@ def ingest_prices(db: Session, provider_names: list[str], history_start: date, n
                 log.warning("price fetch failed", extra={"ticker": c.ticker, "provider": p.name, "error": str(e)})
         if not done:
             report["companies"][c.ticker] = {"status": "failed"}
+    if companies and all(v.get("status") == "failed" for v in report["companies"].values()):
+        # Nothing at all came back: report the run as failed instead of a silent "success".
+        raise ProviderError("prices", f"every price request failed; first error: {report['errors'][0] if report['errors'] else 'unknown'}",
+                            retryable=False)
     return report
 
 

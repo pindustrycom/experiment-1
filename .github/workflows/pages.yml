@@ -109,12 +109,14 @@ jobs:
           print("\n**Prices stored:** " + ("; ".join(f"{p}: {n} rows for {c} tickers, last {d}" for p, n, c, d in rows) or "none"))
           PY
 
-      - name: Walk-forward backtest (first run, or on request)
+      - name: Walk-forward backtest (until one has data, or on request)
         run: |
           has=$(python -c 'from sqlalchemy import select, func
           from app.core.db import session_scope
           from app.models import BacktestRun
-          with session_scope() as db: print(db.scalar(select(func.count()).select_from(BacktestRun).where(BacktestRun.kind=="walk_forward", BacktestRun.is_demo.is_(False))))' 2>/dev/null || echo 0)
+          with session_scope() as db:
+              runs = db.scalars(select(BacktestRun).where(BacktestRun.kind=="walk_forward", BacktestRun.is_demo.is_(False))).all()
+              print(sum(1 for r in runs if (r.metrics or {}).get("n_observations")))' 2>/dev/null || echo 0)
           if [ "${{ inputs.run_backtest }}" = "true" ] || [ "$has" = "0" ]; then
             python -m app.cli run-job run_backtest | head -c 2000 || true
           fi

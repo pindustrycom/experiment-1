@@ -219,3 +219,23 @@ def test_migrations_downgrade_and_upgrade(migrated):
     assert "pairs" not in inspect(get_engine()).get_table_names()
     command.upgrade(cfg, "head")
     assert {"pairs", "prediction_snapshots", "job_runs"} <= set(inspect(get_engine()).get_table_names())
+
+
+@requires_db
+def test_price_ingest_fails_loudly_when_every_request_fails(db, monkeypatch):
+    from datetime import date
+
+    from app.data_sources.base import ProviderError
+    from app.services import prices_service
+
+    class Down:
+        name, is_total_return = "stooq", False
+
+        def configured(self):
+            return True
+
+        def fetch_daily(self, ticker, start, end):
+            raise ProviderError("stooq", "HTTP 404", status=404, retryable=False)
+    monkeypatch.setitem(prices_service.PROVIDERS, "stooq", Down)
+    with pytest.raises(ProviderError, match="every price request failed; first error: .*HTTP 404"):
+        prices_service.ingest_prices(db, ["stooq"], date(2009, 1, 1))
