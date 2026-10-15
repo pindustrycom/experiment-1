@@ -187,6 +187,6 @@ def main(argv=None) -> None:
     s = run(a.state, a.site, a.backtest, a.retrain, not a.no_network)
     bt = s.get("backtest") or {}
     print(json.dumps({"steps": s["steps"], "warnings": s["warnings"], "latest": s.get("latest"), "model": s.get("model"),
-                      "backtest": {k: bt.get(k) for k in ("first", "last", "blocks", "complete", "scorecard_nonoverlap", "vs_zero")}},
+                      "backtest": {k: bt.get(k) for k in ("first", "last", "blocks", "complete", "scorecard_nonoverlap", "vs_zero", "prune_compare", "val_nll_full")}},
                      indent=1, default=str))
     sys.exit(0)

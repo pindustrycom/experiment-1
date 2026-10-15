@@ -171,6 +171,16 @@ def _train(model, X, Y, tr_end, v0, v1, mc, steps, seed, log_every=0):
     return best
 
 
+def mean_compare(items: list[dict]) -> dict:
+    """Average {criterion: {keep: val_nll}} over seeds or backtest blocks."""
+    out: dict = {}
+    for it in items:
+        for crit, levels in (it or {}).items():
+            for keep, v in levels.items():
+                out.setdefault(crit, {}).setdefault(keep, []).append(v)
+    return {c: {k: float(np.mean(v)) for k, v in lv.items()} for c, lv in out.items()}
+
+
 def fit(df: pd.DataFrame, as_of: int, cfg: Config, seeds=None, steps: int | None = None, prune: bool = True) -> Fitted:
     """Train on rows whose targets were already known at row `as_of` (i.e. rows <= as_of - horizon).
     The last `val_sessions` of those are held out for early stopping and the pruning check, with a
@@ -201,14 +211,29 @@ def fit(df: pd.DataFrame, as_of: int, cfg: Config, seeds=None, steps: int | None
         m = SectorSSM(len(cols), len(TARGETS), mc)
         full = _train(m, X, Y, tr_end, v0, v1, mc, steps or mc.steps, seed)
         chosen, chosen_loss, keep_used = m, full, 1.0
-        trials = []
+        trials, compare = [], {}
         if prune:
-            # The experiment is a pruned model: keep the pruning level that validates best, and record
-            # the unpruned network's score next to it so the cost (or gain) of pruning is visible.
+            # Input spectra of each layer over the training rows, for the resonance index.
+            spectra = m.input_spectra(X[None, : tr_end + 1], seg=mc.spectrum_seg)
+            # Compare pruning criteria the way the resonance paper does: prune without retraining and
+            # score the validation loss at each level. Costs one forward pass per (criterion, level).
+            for crit in mc.compare_criteria:
+                for keep in mc.prune_keep:
+                    pm = copy.deepcopy(m)
+                    if crit == "random":
+                        g = torch.Generator().manual_seed(seed)
+                        for layer in pm.layers:
+                            sc = torch.rand(layer.mask.shape, generator=g)
+                            layer.mask.copy_((sc >= sc.flatten().topk(max(1, round(keep * sc.numel()))).values.min()).float())
+                    else:
+                        pm.prune(keep, crit, spectra)
+                    compare.setdefault(crit, {})[str(keep)] = _val_loss(pm, X, Y, v0, v1, mc.window, mc.burn_in)
+            # The experiment is a pruned model: prune with the chosen criterion, fine-tune, keep the level
+            # that validates best, and record the unpruned network's score next to it.
             best = None
             for keep in mc.prune_keep:
                 pm = copy.deepcopy(m)
-                pm.prune(keep)
+                pm.prune(keep, mc.prune_criterion, spectra)
                 pl = _train(pm, X, Y, tr_end, v0, v1, mc, mc.finetune_steps, seed + 1000)
                 trials.append({"keep": keep, "val_nll": pl})
                 if best is None or pl < best[0] - mc.prune_tolerance:
@@ -217,10 +242,12 @@ def fit(df: pd.DataFrame, as_of: int, cfg: Config, seeds=None, steps: int | None
         models.append(chosen)
         active, total = chosen.modes()
         per_seed.append({"seed": seed, "val_nll_full": full, "val_nll": chosen_loss, "keep": keep_used,
-                         "modes_active": active, "modes_total": total, "prune_trials": trials})
+                         "modes_active": active, "modes_total": total, "prune_trials": trials,
+                         "criterion": mc.prune_criterion, "prune_compare": compare})
 
     baselines = fit_baselines(df, cols, tr, va)
-    info = {"as_of": df.index[as_of].strftime("%Y-%m-%d"), "train_start": df.index[0].strftime("%Y-%m-%d"),
+    info = {"prune_compare": mean_compare([p["prune_compare"] for p in per_seed]),
+            "val_nll_full": float(np.mean([p["val_nll_full"] for p in per_seed])), "as_of": df.index[as_of].strftime("%Y-%m-%d"), "train_start": df.index[0].strftime("%Y-%m-%d"),
             "train_end": df.index[tr_end].strftime("%Y-%m-%d"), "val_start": df.index[v0].strftime("%Y-%m-%d"),
             "val_end": df.index[v1].strftime("%Y-%m-%d"), "n_train": int(tr.sum()), "n_val": int(va.sum()),
             "n_features": len(cols), "seeds": per_seed, "config": asdict(cfg.model), "config_digest": cfg.digest(),

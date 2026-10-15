@@ -71,9 +71,47 @@ class S4D(nn.Module):
         return torch.stack(ys, 1)
 
     @torch.no_grad()
-    def importance(self) -> torch.Tensor:
+    def poles(self):
+        """(g, r, theta) per mode: gain g_n = C_n B_n (ZOH), and the discrete pole r_n e^{i theta_n}."""
         dta, cb = self._disc()
-        return cb.abs() / (1 - dta.exp().abs()).clamp_min(1e-4)      # (H,N)
+        lam = dta.exp()
+        return cb, lam.abs(), lam.angle()
+
+    @torch.no_grad()
+    def importance(self) -> torch.Tensor:
+        """Kernel L1 bound |g| / (1 - r)."""
+        g, r, _ = self.poles()
+        return g.abs() / (1 - r).clamp_min(1e-4)      # (H,N)
+
+    @torch.no_grad()
+    def scores(self, criterion: str, spectrum: torch.Tensor | None = None) -> torch.Tensor:
+        """Per-mode pruning scores (H,N), higher = keep.
+
+        resonance: Philco's resonance index, the mode's output power when driven by the measured
+            input spectrum S_h (Eq. 21): |g|^2/L sum_j S_h(nu_j) / (1 + r^2 - 2 r cos(nu_j - theta)),
+            with r clamped to 1 - 1/L.
+        flat: the same with S_h replaced by a flat spectrum of equal power (isolates spectral shape).
+        h2: |g|^2 / (1 - r^2), the white-input special case (AIRE-Prune).
+        hinf: |g|^2 / (1 - r)^2, the worst-case-input special case (LAST).
+        l1: |g| / (1 - r), the kernel L1 bound.
+        """
+        g, r, th = self.poles()
+        g2 = g.abs() ** 2
+        if criterion in ("resonance", "flat"):
+            L = spectrum.shape[-1]
+            r = r.clamp(max=1 - 1 / L)
+            if criterion == "flat":
+                return spectrum.mean(-1, keepdim=True) * g2 / (1 - r ** 2)
+            nu = 2 * math.pi * torch.arange(L) / L
+            denom = 1 + r[..., None] ** 2 - 2 * r[..., None] * torch.cos(nu - th[..., None])   # (H,N,L)
+            return g2 * (spectrum[:, None, :] / denom).sum(-1) / L
+        if criterion == "h2":
+            return g2 / (1 - r ** 2).clamp_min(1e-8)
+        if criterion == "hinf":
+            return g2 / (1 - r).clamp_min(1e-4) ** 2
+        if criterion == "l1":
+            return self.importance()
+        raise ValueError(criterion)
 
 
 class SectorSSM(nn.Module):
@@ -103,13 +141,38 @@ class SectorSSM(nn.Module):
         return [{"params": ssm, "lr": cfg.ssm_lr, "weight_decay": 0.0}, {"params": rest, "lr": cfg.lr, "weight_decay": cfg.weight_decay}]
 
     @torch.no_grad()
-    def prune(self, keep: float) -> None:
-        """Mask all but the strongest `keep` fraction of modes in each layer (already-masked modes stay off)."""
-        for layer in self.layers:
-            imp = layer.importance() * layer.mask
-            k = max(1, int(round(keep * imp.numel())))
-            thresh = imp.flatten().topk(k).values.min()
-            layer.mask.copy_((imp >= thresh).float() * layer.mask)
+    def layer_inputs(self, x: torch.Tensor) -> list[torch.Tensor]:
+        """Each S4D layer's input sequence (B,L,H) for input x, in eval mode."""
+        was = self.training
+        self.eval()
+        z, out = self.enc(x), []
+        for ssm, mix, norm in zip(self.layers, self.mix, self.norms):
+            out.append(z)
+            z = norm(z + mix(nn.functional.gelu(ssm(z))))
+        self.train(was)
+        return out
+
+    @torch.no_grad()
+    def input_spectra(self, x: torch.Tensor, seg: int = 256) -> list[torch.Tensor]:
+        """Per layer, each channel's input power spectrum (H,seg): periodogram averaged over
+        non-overlapping length-`seg` segments of x (step 2 of the resonance-index algorithm)."""
+        out = []
+        for u in self.layer_inputs(x):
+            u = u[0] if u.dim() == 3 else u                       # (L,H)
+            n = u.shape[0] // seg
+            segs = u[: n * seg].reshape(n, seg, -1)               # (B,seg,H)
+            p = (torch.fft.fft(segs, dim=1).abs() ** 2).mean(0) / seg  # (seg,H)
+            out.append(p.T.contiguous())
+        return out
+
+    @torch.no_grad()
+    def prune(self, keep: float, criterion: str = "l1", spectra: list[torch.Tensor] | None = None) -> None:
+        """Mask all but the highest-scoring `keep` fraction of modes in each layer (already-masked modes stay off)."""
+        for k_layer, layer in enumerate(self.layers):
+            sc = layer.scores(criterion, spectra[k_layer] if spectra is not None else None) * layer.mask
+            k = max(1, round(keep * sc.numel()))
+            thresh = sc.flatten().topk(k).values.min()
+            layer.mask.copy_((sc >= thresh).float() * layer.mask)
 
     def modes(self) -> tuple[int, int]:
         active = sum(int(layer.mask.sum()) for layer in self.layers)

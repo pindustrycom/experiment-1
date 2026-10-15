@@ -181,6 +181,27 @@ def score_table(card: dict, note: str) -> str:
     return "".join(parts) or f'<p class="muted">{e(note)}</p>'
 
 
+CRITERION_LABEL = {"resonance": "Resonance index (measured input spectrum)", "flat": "Resonance, flat spectrum (control)",
+                   "h2": "H2 energy (white input)", "hinf": "H-infinity gain (worst-case input)", "l1": "Kernel L1 bound",
+                   "random": "Random"}
+
+
+def prune_table(compare: dict, full: float | None, note: str) -> str:
+    """Validation loss after pruning without retraining, per criterion and level (lower is better)."""
+    if not compare:
+        return ""
+    levels = sorted({k for v in compare.values() for k in v}, key=float)
+    best = {k: min(v[k] for v in compare.values() if k in v) for k in levels}
+    rows = "".join(
+        f'<tr class="{"me" if c == "resonance" else ""}"><td>{e(CRITERION_LABEL.get(c, c))}</td>'
+        + "".join(f'<td class="n">{"<b>" if lv.get(k) == best[k] else ""}{num(lv.get(k), 3)}{"</b>" if lv.get(k) == best[k] else ""}</td>' for k in levels)
+        + "</tr>" for c, lv in compare.items())
+    head = "".join(f'<th class="n">Keep {100 * float(k):g}%</th>' for k in levels)
+    return (f'<h3>Pruning criteria compared</h3><p class="muted">{e(note)} Validation loss (Gaussian NLL, lower is better) after pruning '
+            f'without retraining; best per level in bold. Unpruned: {num(full, 3)}.</p>'
+            f'<div class="scroll"><table><thead><tr><th>Criterion</th>{head}</tr></thead><tbody>{rows}</tbody></table></div>')
+
+
 # ---------------------------------------------------------------- pages
 
 def build(out: Path, s: dict) -> None:
@@ -255,6 +276,7 @@ def index_page(s: dict, built: str) -> str:
 
     bt = s.get("backtest") or {}
     bt_html = (score_table(bt.get("scorecard_nonoverlap") or {}, "Backtest not run yet.") +
+               prune_table(bt.get("prune_compare") or {}, bt.get("val_nll_full"), "Averaged over every retrain in the backtest.") +
                (f'<p class="muted">Walk-forward from {e(bt.get("first") or "—")} to {e(bt.get("last") or "—")}, retrained every '
                 f'{bt.get("every")} sessions on data known at the time; scored on every {config.HORIZON}th session so outcomes don\'t overlap.'
                 f'{"" if bt.get("complete", True) else " Stopped early to stay within the run time limit; it continues on the next run."}</p>'
@@ -268,7 +290,7 @@ and scored against simple baselines.</p>{warn}{tiles}
 <div class="grid2"><div><h2>{config.TARGET}, last year</h2><div class="card">{price_chart}</div></div>
 <div><h2>Tech news tone</h2><div class="card">{news_chart}</div></div></div>
 <h2>Headlines behind the latest prediction</h2><p class="sub">The most relevant stories assigned to the latest session, as scored by Claude Haiku.</p>{heads_html}
-<h2>Current model</h2>{model_card}
+<h2>Current model</h2>{model_card}{prune_table(m.get("prune_compare") or {}, m.get("val_nll_full"), "Current model, averaged over its ensemble members.")}
 <h2>Backtest</h2><p class="sub">How the same method did on past data. This is not a forward test: it shows the method can be fitted, not that it works going forward.
 News only exists for the last year, so most of the backtest runs without it.</p>{bt_html}
 <p class="muted"><a href="data/predictions.csv">Prediction ledger (CSV)</a> · <a href="data/backtest.csv">Backtest predictions (CSV)</a> ·
@@ -298,10 +320,14 @@ comes after it was published. Before news collection began the news inputs are 0
 S4D-Lin initialisation, step sizes {mc.dt_min} to {mc.dt_max} so memories range from days to years), each followed by a GELU, a mixing
 layer, a residual connection and layer norm. A linear head gives a mean and a log-variance for each target, trained with Gaussian
 negative log-likelihood on random {mc.window}-session windows (the first {mc.burn_in} positions only warm up the state).</p>
-<h3>Pruning</h3><p>Each mode's contribution to its channel is bounded by the L1 norm of its convolution kernel,
-|C·B| / (1 − |exp(dt·A)|). After training, the network is pruned to the strongest {", ".join(f"{100 * k:g}%" for k in mc.prune_keep)}
-of modes in each layer and fine-tuned at each level. The sparsest level whose validation loss is within {mc.prune_tolerance} of the best
-level is used. The unpruned network's validation loss is recorded next to it in the run summary, so the cost or gain of pruning is visible.</p>
+<h3>Pruning</h3><p>Modes are ranked by the <b>resonance index</b> (Philco, "From Periodicity to Resonance", 2026): the
+expected output power of a mode when driven by the input its layer actually receives,
+I = |g|² / L · Σ<sub>j</sub> S(ν<sub>j</sub>) / (1 + r² − 2r·cos(ν<sub>j</sub> − θ)), where g is the mode's gain, r·e<sup>iθ</sup> its discrete
+pole and S the channel's input power spectrum, a periodogram over {mc.spectrum_seg}-session segments of the training data.
+The network is pruned to the highest-scoring {", ".join(f"{100 * k:g}%" for k in mc.prune_keep)} of modes in each layer and fine-tuned at each level;
+the sparsest level whose validation loss is within {mc.prune_tolerance} of the best level is used. As in the paper, every retrain also
+records how each criterion does when pruning without retraining: the resonance index, its flat-spectrum control, H2 energy, H-infinity
+gain, the kernel L1 bound and random.</p>
 <h3>Training and validation</h3><p>The model is retrained every {mc.retrain_every} sessions on every session whose outcome was already
 known. The last {mc.val_sessions} of those are held out for early stopping and the pruning check, with a {config.HORIZON}-session gap.
 {len(mc.seeds)} seeds are averaged; the spread combines their predicted variance and their disagreement.</p>

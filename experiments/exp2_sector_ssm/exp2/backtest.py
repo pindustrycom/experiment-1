@@ -12,7 +12,7 @@ import pandas as pd
 from .config import Config
 from .features import TARGETS
 from .ledger import scorecard
-from .train import Z80, _norm_cdf, baseline_predict, fit
+from .train import Z80, _norm_cdf, baseline_predict, fit, mean_compare
 
 log = logging.getLogger("exp2.backtest")
 
@@ -20,7 +20,7 @@ log = logging.getLogger("exp2.backtest")
 def run(df: pd.DataFrame, cfg: Config, start: str = "2016-01-04", every: int = 126, steps: int = 400,
         max_seconds: float = 1800, prune: bool = True) -> tuple[pd.DataFrame, dict]:
     t0 = time.time()
-    rows = []
+    rows, compares, full_nll = [], [], []
     idx = df.index
     i = int(np.searchsorted(idx, pd.Timestamp(start)))
     last = len(df) - 1 - cfg.horizon       # last row whose outcome is known
@@ -44,13 +44,17 @@ def run(df: pd.DataFrame, cfg: Config, start: str = "2016-01-04", every: int = 1
                                  "p_up": _norm_cdf(m / s) if s > 0 else 0.5, "lo80": m - Z80 * s, "hi80": m + Z80 * s,
                                  "realized": y, "trained_through": f.info["train_end"],
                                  "modes": f.info["seeds"][0]["modes_active"]})
+        compares.append(f.info["prune_compare"])
+        full_nll.append(f.info["val_nll_full"])
         blocks += 1
         log.info("backtest block %d: %s..%s", blocks, idx[i].date(), idx[j1].date())
         i = j1 + 1
     bt = pd.DataFrame(rows)
     summary = {"start": start, "every": every, "blocks": blocks, "complete": complete, "seconds": round(time.time() - t0),
                "first": bt["as_of"].min() if len(bt) else None, "last": bt["as_of"].max() if len(bt) else None,
-               "scorecard": scorecard(bt) if len(bt) else {}}
+               "scorecard": scorecard(bt) if len(bt) else {},
+               # validation loss after pruning without retraining, averaged over the backtest's retrains
+               "prune_compare": mean_compare(compares), "val_nll_full": float(np.mean(full_nll)) if full_nll else None}
     # Non-overlapping view: every horizon-th session, so outcomes don't share days.
     if len(bt):
         days = sorted(bt["as_of"].unique())[:: cfg.horizon]

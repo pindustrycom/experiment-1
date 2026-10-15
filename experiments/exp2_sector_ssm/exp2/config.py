@@ -56,6 +56,9 @@ class ModelConfig:
     seeds: tuple = (0, 1, 2)
     prune_keep: tuple = (0.125, 0.25, 0.5)  # fractions of modes to try keeping, smallest first
     prune_tolerance: float = 0.005   # a less pruned network must validate better by this much to be preferred
+    prune_criterion: str = "resonance"  # Philco's resonance index (see model.S4D.scores)
+    compare_criteria: tuple = ("resonance", "flat", "h2", "hinf", "l1", "random")
+    spectrum_seg: int = 256    # periodogram segment length (frequency grid) for the resonance index
     finetune_steps: int = 150
     retrain_every: int = 5     # sessions between retrains (weekly)
 
