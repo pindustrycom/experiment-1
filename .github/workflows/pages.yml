@@ -70,7 +70,7 @@ jobs:
 
       - name: Session secret for this run only
         run: |
-          echo "SECRET_KEY=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          key=$(openssl rand -hex 32); echo "::add-mask::$key"; echo "SECRET_KEY=$key" >> "$GITHUB_ENV"
           echo "PG=docker exec -i ${{ job.services.postgres.id }}" >> "$GITHUB_ENV"
 
       - name: Restore the database from the last run
@@ -96,8 +96,18 @@ jobs:
           print("crashed" if not m else m.group(1) + ("" if m.group(2) == "null" else ": " + m.group(2)[1:-1][:200]))')
             echo "$job: $status"
             echo "| $job | ${status//|/ } |" >> "$GITHUB_STEP_SUMMARY"
-            [ "$status" = "crashed" ] && printf '%s\n' "$out" | tail -30
+            printf '%s\n' "$out" | grep -E '"level": "(WARNING|ERROR)"' | head -3 || true
+            if [ "$status" = "crashed" ]; then printf '%s\n' "$out" | tail -30; fi
           done
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          from sqlalchemy import func, select
+          from app.core.db import session_scope
+          from app.models import PriceObservation
+          with session_scope() as db:
+              rows = db.execute(select(PriceObservation.provider, func.count(), func.count(func.distinct(PriceObservation.company_id)), func.max(PriceObservation.date))
+                                .group_by(PriceObservation.provider)).all()
+          print("\n**Prices stored:** " + ("; ".join(f"{p}: {n} rows for {c} tickers, last {d}" for p, n, c, d in rows) or "none"))
+          PY
 
       - name: Walk-forward backtest (first run, or on request)
         run: |
