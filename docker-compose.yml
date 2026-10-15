@@ -1,0 +1,129 @@
+# Splittability Monitor: production stack for a single VPS.
+#   cp .env.example .env   # then edit
+#   docker compose up -d --build
+# Only Caddy publishes ports (80/443). PostgreSQL, the API, the worker and the web server are
+# reachable only on the internal Docker network.
+
+x-backend-env: &backend-env
+  APP_MODE: ${APP_MODE:-demo}
+  ENVIRONMENT: production
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-sm}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-splittability}
+  SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+  COOKIE_SECURE: ${COOKIE_SECURE:-true}
+  SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-12}
+  BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+  BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  CLAUDE_MODEL: ${CLAUDE_MODEL:-claude-opus-5-5}
+  CLAUDE_EFFORT: ${CLAUDE_EFFORT:-medium}
+  TIINGO_API_KEY: ${TIINGO_API_KEY:-}
+  FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+  ALPHAVANTAGE_API_KEY: ${ALPHAVANTAGE_API_KEY:-}
+  SEC_USER_AGENT: ${SEC_USER_AGENT:-}
+  ENABLE_STOOQ: ${ENABLE_STOOQ:-true}
+  BACKUP_DIR: /backups
+  BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+  TZ: UTC
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-splittability}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    shm_size: 256mb
+
+  # One-shot: apply migrations and idempotent bootstrap (reference data, schedules, admin, demo data).
+  migrate:
+    build: ./backend
+    image: splittability-backend:latest
+    environment: *backend-env
+    command: ["sh", "-c", "alembic upgrade head && python -m app.cli init"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  backend:
+    image: splittability-backend:latest
+    restart: unless-stopped
+    environment: *backend-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health', timeout=4).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  worker:
+    image: splittability-backend:latest
+    restart: unless-stopped
+    environment: *backend-env
+    command: ["python", "-m", "worker.main"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - backups:/backups
+    stop_grace_period: 60s
+    healthcheck:
+      # The worker writes a heartbeat file every poll; stale for 5 minutes = unhealthy.
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/worker-heartbeat') < 300 else 1)"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_INTERNAL_URL: http://backend:8000
+    image: splittability-frontend:latest
+    restart: unless-stopped
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8000
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/login"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./infrastructure/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  pgdata:
+  backups:
+  caddy_data:
+  caddy_config:
