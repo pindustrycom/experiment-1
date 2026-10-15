@@ -185,5 +185,8 @@ def main(argv=None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     torch.set_num_threads(max(1, torch.get_num_threads()))
     s = run(a.state, a.site, a.backtest, a.retrain, not a.no_network)
-    print(json.dumps({"steps": s["steps"], "warnings": s["warnings"], "latest": s.get("latest")}, indent=1, default=str))
+    bt = s.get("backtest") or {}
+    print(json.dumps({"steps": s["steps"], "warnings": s["warnings"], "latest": s.get("latest"), "model": s.get("model"),
+                      "backtest": {k: bt.get(k) for k in ("first", "last", "blocks", "complete", "scorecard_nonoverlap", "vs_zero")}},
+                     indent=1, default=str))
     sys.exit(0)

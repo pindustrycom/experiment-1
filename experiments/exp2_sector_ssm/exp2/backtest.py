@@ -54,5 +54,26 @@ def run(df: pd.DataFrame, cfg: Config, start: str = "2016-01-04", every: int = 1
     # Non-overlapping view: every horizon-th session, so outcomes don't share days.
     if len(bt):
         days = sorted(bt["as_of"].unique())[:: cfg.horizon]
-        summary["scorecard_nonoverlap"] = scorecard(bt[bt["as_of"].isin(days)])
+        no = bt[bt["as_of"].isin(days)]
+        summary["scorecard_nonoverlap"] = scorecard(no)
+        summary["vs_zero"] = vs_zero(no)
     return bt, summary
+
+
+def vs_zero(bt: pd.DataFrame) -> dict:
+    """Is a model's squared error lower than predicting no change, beyond noise? A Diebold-Mariano
+    style t-statistic on the per-session loss difference (negative = model better; |t| > 2 is
+    roughly significant). Use non-overlapping sessions so the differences are close to independent."""
+    out = {}
+    for tgt, g in bt.groupby("target"):
+        y = g[g["model"] == "zero"].set_index("as_of")["realized"]
+        for model, gm in g.groupby("model"):
+            if model == "zero":
+                continue
+            p = gm.set_index("as_of")["pred"].reindex(y.index)
+            d = ((y - p) ** 2 - y ** 2).dropna()
+            if len(d) < 10 or d.std() == 0:
+                continue
+            out.setdefault(tgt, {})[model] = {"n": len(d), "mse_diff": float(d.mean()),
+                                              "t": float(d.mean() / (d.std(ddof=1) / np.sqrt(len(d))))}
+    return out
