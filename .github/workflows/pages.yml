@@ -109,6 +109,42 @@ jobs:
           print("\n**Prices stored:** " + ("; ".join(f"{p}: {n} rows for {c} tickers, last {d}" for p, n, c, d in rows) or "none"))
           PY
 
+      - name: Data check (news, Claude usage, latest scores)
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          from datetime import UTC, datetime, timedelta
+          from sqlalchemy import func, select
+          from app.core.db import session_scope
+          from app.models import ExtractedEvent, IndexScore, NewsArticle, NewsFetchLog, Pair, ProviderUsage
+          with session_scope() as db:
+              since = datetime.now(UTC) - timedelta(hours=6)
+              fetch = db.execute(select(NewsFetchLog.provider, NewsFetchLog.success, func.count(), func.sum(NewsFetchLog.documents_found))
+                                 .where(NewsFetchLog.window_end >= since).group_by(NewsFetchLog.provider, NewsFetchLog.success)).all()
+              print("\n**News fetches this run:** " + ("; ".join(f"{p} {'ok' if ok else 'failed'} x{n} ({d or 0} docs)" for p, ok, n, d in fetch) or "none"))
+              err = db.scalar(select(NewsFetchLog.error).where(NewsFetchLog.window_end >= since, NewsFetchLog.success.is_(False)).limit(1))
+              if err:
+                  print(f"\nFirst fetch error: {err[:300]}")
+              st = db.execute(select(NewsArticle.analysis_status, func.count()).group_by(NewsArticle.analysis_status)).all()
+              print("\n**Stories by analysis status:** " + ("; ".join(f"{a}: {n}" for a, n in st) or "none"))
+              aerr = db.scalar(select(NewsArticle.analysis_error).where(NewsArticle.analysis_error.is_not(None)).limit(1))
+              if aerr:
+                  print(f"\nFirst analysis error: {aerr[:300]}")
+              ev = db.execute(select(ExtractedEvent.is_material, func.count()).group_by(ExtractedEvent.is_material)).all()
+              print("\n**Extracted events (material/not):** " + ("; ".join(f"{m}: {n}" for m, n in ev) or "none"))
+              use = db.execute(select(ProviderUsage.provider, func.count(), func.sum(ProviderUsage.cost_usd))
+                               .where(ProviderUsage.ts >= since).group_by(ProviderUsage.provider)).all()
+              print("\n**Provider calls this run:** " + ("; ".join(f"{p}: {n} calls, ${c or 0:.3f}" for p, n, c in use) or "none"))
+              print("\n| Pair | SI-v1 | SI-v2 | SI-v2 status | coverage |\n|---|---|---|---|---|")
+              for pr in db.scalars(select(Pair).where(Pair.status == "active").order_by(Pair.slug)):
+                  last = {}
+                  for name in ("si_v1", "si_v2"):
+                      last[name] = db.scalar(select(IndexScore).where(IndexScore.pair_id == pr.id, IndexScore.index_name == name)
+                                             .order_by(IndexScore.as_of.desc(), IndexScore.id.desc()).limit(1))
+                  v1, v2 = last["si_v1"], last["si_v2"]
+                  f = lambda x: "n/a" if x is None or x.value is None else f"{x.value:.1f}"
+                  print(f"| {pr.slug} | {f(v1)} | {f(v2)} | {v2.status if v2 else '-'} | {v2.coverage if v2 else 0:.2f} |")
+          PY
+
       - name: Rebuild past score history (weekly; continues where the last run stopped)
         run: |
           out=$(python -m app.cli run-job backfill_scores --params '{"max_seconds": 2400}' 2>&1 || true)
