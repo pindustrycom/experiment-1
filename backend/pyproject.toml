@@ -53,3 +53,4 @@ ignore = ["B008"]  # FastAPI dependency injection uses calls in defaults by desi
 [tool.ruff.lint.per-file-ignores]
 "app/services/demo_service.py" = ["E501"]  # long simulated article texts
 "app/services/reports.py" = ["E501"]
+"app/static_site.py" = ["E501"]  # inline HTML templates

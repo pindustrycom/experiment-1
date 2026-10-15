@@ -44,6 +44,11 @@ add keys and switch to production as described in [docs/DEPLOYMENT.md](docs/DEPL
 also covers the Hostinger VPS setup step by step, HTTPS, health checks, logs, updates, backups and
 restores.
 
+### Free option: GitHub Pages
+
+A scheduled GitHub Actions workflow can run the pipeline every weekday evening and publish a
+read-only dashboard to GitHub Pages, with no server. See [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md).
+
 ## Repository layout
 
 ```

@@ -273,3 +273,16 @@ def test_production_flags_leftover_demo_data(admin_client, db):
     db.add(NewsArticle(cluster_key="demo-1", headline="[SIMULATED] x", first_published_at=datetime.now(UTC), tickers=["KO"], is_demo=True))
     db.commit()
     assert admin_client.get(f"{V1}/system/status").json()["demo_data_present"] is True
+
+
+def test_csv_export_handles_rows_with_different_columns():
+    import asyncio
+
+    from app.api.routes.research import _csv
+    resp = _csv([{"index": "si_v1", "comp_C": 0.1}, {"index": "si_v2", "comp_N": 0.2}], "scores")
+
+    async def body():
+        return "".join([c if isinstance(c, str) else c.decode() async for c in resp.body_iterator])
+    lines = asyncio.run(body()).splitlines()
+    assert lines[0] == "index,comp_C,comp_N"
+    assert lines[1:] == ["si_v1,0.1,", "si_v2,,0.2"]

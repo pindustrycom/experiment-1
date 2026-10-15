@@ -58,7 +58,8 @@ def start_backtest(params: dict, db: Session = Depends(get_db), user: User = Dep
 def _csv(rows: list[dict], name: str) -> StreamingResponse:
     buf = io.StringIO()
     if rows:
-        w = csv.DictWriter(buf, fieldnames=list(rows[0].keys()))
+        # rows can carry different optional columns (e.g. SI-v1 vs SI-v2 components): union, first-seen order
+        w = csv.DictWriter(buf, fieldnames=list(dict.fromkeys(k for r in rows for k in r)), restval="")
         w.writeheader()
         w.writerows(rows)
     return StreamingResponse(iter([buf.getvalue()]), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
