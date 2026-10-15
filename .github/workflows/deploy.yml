@@ -1,0 +1,63 @@
+name: Deploy
+
+# Deploys main to the VPS after CI passes. Does nothing until these repository secrets exist
+# (Settings > Secrets and variables > Actions):
+#   VPS_HOST         server IP or hostname
+#   VPS_USER         SSH user that can run docker (e.g. deploy)
+#   VPS_SSH_KEY      private key whose public half is in that user's ~/.ssh/authorized_keys
+#   VPS_KNOWN_HOSTS  output of `ssh-keyscan -t ed25519 YOUR_SERVER_IP` (pins the server's host key)
+# Optional repository variable VPS_PATH (default /opt/splittability-monitor).
+# The app's own secrets stay in .env on the server; none are stored in GitHub.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PATH: ${{ vars.VPS_PATH || '/opt/splittability-monitor' }}
+    steps:
+      - name: Check deploy secrets
+        id: check
+        run: |
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
+            echo "VPS secrets not set; skipping deploy." >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Configure SSH
+        if: steps.check.outputs.ready == 'true'
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
+            "cd '$VPS_PATH' && git fetch origin main && git checkout main && scripts/deploy.sh"
+      - name: Health check
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST" \
+            "cd '$VPS_PATH' && for i in \$(seq 1 30); do docker compose exec -T backend python -c \"import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health')\" && exit 0; sleep 5; done; docker compose ps; exit 1"

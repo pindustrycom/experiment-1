@@ -200,6 +200,23 @@ It pulls the latest code, takes a backup, rebuilds the images and restarts. Migr
 automatically. Historical data lives in the `pgdata` Docker volume and is untouched by rebuilds.
 **Never** run `docker compose down -v` (the `-v` deletes volumes, including the database).
 
+### Automatic deploys from GitHub
+
+`.github/workflows/ci.yml` runs the backend, frontend and Docker builds on every push.
+`.github/workflows/deploy.yml` then runs `scripts/deploy.sh` on the VPS over SSH whenever CI passes
+on `main` (or on demand from the Actions tab). It does nothing until you add these repository secrets
+under **Settings → Secrets and variables → Actions**:
+
+| Secret | Value |
+|---|---|
+| `VPS_HOST` | the server IP or hostname |
+| `VPS_USER` | the SSH user that runs Docker, e.g. `deploy` |
+| `VPS_SSH_KEY` | a private key made for this purpose (`ssh-keygen -t ed25519 -f gh-deploy`); put `gh-deploy.pub` in that user's `~/.ssh/authorized_keys` |
+| `VPS_KNOWN_HOSTS` | the output of `ssh-keyscan -t ed25519 YOUR_SERVER_IP`, which pins the server's identity |
+
+Set the repository variable `VPS_PATH` if the code is not in `/opt/splittability-monitor`. The
+app's own keys and passwords stay in `.env` on the server and are never stored in GitHub.
+
 ## 13. Back up and restore
 
 Automatic: the worker runs `pg_dump` every night at 02:00 New York time into the `backups` volume and
