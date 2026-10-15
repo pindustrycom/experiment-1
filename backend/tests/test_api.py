@@ -63,7 +63,7 @@ def test_initial_pairs_are_seeded_and_deduplicated(admin_client):
     r = admin_client.get(f"{V1}/pairs?status=all&page_size=100")
     assert r.status_code == 200
     slugs = {p["slug"] for p in r.json()["items"]}
-    assert len(slugs) == 11  # 12 requested pairs; LOW/HD duplicates HD/LOW
+    assert len(slugs) == 10  # 11 requested pairs; LOW/HD duplicates HD/LOW
     assert "KO-PEP" in slugs
     assert sum(1 for s in slugs if set(s.split("-")) == {"HD", "LOW"}) == 1
 

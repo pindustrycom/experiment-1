@@ -32,8 +32,6 @@ SEED_COMPANIES = [
     ("BAC", "Bank of America Corporation", "0000070858", "Financials", "Diversified Banks"),
     ("MS", "Morgan Stanley", "0000895421", "Financials", "Investment Banking & Brokerage"),
     ("GS", "The Goldman Sachs Group, Inc.", "0000886982", "Financials", "Investment Banking & Brokerage"),
-    ("CVS", "CVS Health Corporation", "0000064803", "Health Care", "Pharmacy & Health Services"),
-    ("WBA", "Walgreens Boots Alliance, Inc.", "0001618921", "Consumer Staples", "Pharmacy & Health Services"),
     ("MCD", "McDonald's Corporation", "0000063908", "Consumer Discretionary", "Restaurants"),
     ("YUM", "Yum! Brands, Inc.", "0001041061", "Consumer Discretionary", "Restaurants"),
     ("FDX", "FedEx Corporation", "0001048911", "Industrials", "Air Freight & Logistics"),
@@ -45,7 +43,7 @@ SEED_PAIRS = [
     ("KO", "PEP", "Beverages"), ("WMT", "TGT", "Mass Retail"), ("HD", "LOW", "Home Improvement Retail"),
     ("V", "MA", "Payment Networks"), ("XOM", "CVX", "Integrated Oil & Gas"), ("AMD", "NVDA", "Semiconductors"),
     ("JPM", "BAC", "Diversified Banks"), ("MS", "GS", "Investment Banking & Brokerage"),
-    ("CVS", "WBA", "Pharmacy & Health Services"), ("MCD", "YUM", "Restaurants"), ("FDX", "UPS", "Air Freight & Logistics"),
+    ("MCD", "YUM", "Restaurants"), ("FDX", "UPS", "Air Freight & Logistics"),
     ("LOW", "HD", "Home Improvement Retail"),  # reversed duplicate of HD/LOW: deduplicated on seed
 ]
 

@@ -28,12 +28,12 @@ HORIZON_END = date(2032, 12, 31)
 SECTOR_OF = {
     "KO": "bev", "PEP": "bev", "WMT": "retail", "TGT": "retail", "HD": "home", "LOW": "home", "V": "pay", "MA": "pay",
     "XOM": "oil", "CVX": "oil", "AMD": "semi", "NVDA": "semi", "JPM": "bank", "BAC": "bank", "MS": "ib", "GS": "ib",
-    "CVS": "pharm", "WBA": "pharm", "MCD": "rest", "YUM": "rest", "FDX": "parcel", "UPS": "parcel",
+    "MCD": "rest", "YUM": "rest", "FDX": "parcel", "UPS": "parcel",
 }
 # (start date, daily drift) regimes that make some simulated pairs split apart
 REGIMES = {
     "PEP": [(date(2024, 1, 2), -0.00045, 0.45)], "KO": [(date(2024, 1, 2), 0.00030, 0.9)],
-    "WBA": [(date(2023, 3, 1), -0.0012, 0.4)], "NVDA": [(date(2023, 1, 3), 0.0020, 0.6)],
+    "NVDA": [(date(2023, 1, 3), 0.0020, 0.6)],
     "TGT": [(date(2025, 2, 3), -0.0007, 0.6)], "UPS": [(date(2025, 6, 2), -0.0006, 0.7)],
 }
 
@@ -96,7 +96,6 @@ def insert_fundamentals(db: Session, until: date) -> None:
         for k, q in enumerate(pd.date_range("2012-03-31", until, freq="QE")):
             q_end = q.date()
             shock = -0.03 if (c.ticker == "PEP" and q_end >= date(2024, 3, 1)) else 0.0
-            shock += -0.04 if (c.ticker == "WBA" and q_end >= date(2023, 3, 1)) else 0.0
             rev = base * np.exp((g + shock) * k + 0.02 * r.standard_normal())
             m = margin + (shock * 2) + 0.01 * r.standard_normal()
             filed = q_end + timedelta(days=40)
@@ -125,12 +124,6 @@ DEMO_STORIES = [
     ("KO", "PEP", date(2025, 6, 3), "KO", "industry_shock", "symmetric", "industry_wide", 0.4, 0.15, 60,
      "Aluminium can costs rise for beverage makers after tariff change",
      "Beverage makers face higher aluminium can costs after a tariff change. Analysts said the cost increase affects the entire beverage industry."),
-    ("CVS", "WBA", date(2023, 6, 27), "WBA", "guidance_change", "b_disadvantaged", "company_specific", 0.7, 0.9, 270,
-     "Walgreens cuts annual profit forecast and announces cost reductions",
-     "Walgreens Boots Alliance cut its annual adjusted profit forecast and announced additional cost reductions, citing weaker consumer demand and lower vaccine sales."),
-    ("CVS", "WBA", date(2024, 10, 15), "WBA", "restructuring_layoffs", "b_disadvantaged", "company_specific", 0.65, 0.9, 365,
-     "Walgreens to close 1,200 stores over three years in restructuring plan",
-     "Walgreens Boots Alliance said it will close about 1,200 stores over three years as part of a restructuring plan for its U.S. retail pharmacy business."),
     ("AMD", "NVDA", date(2023, 5, 24), "NVDA", "guidance_change", "b_advantaged", "company_specific", 0.85, 0.85, 365,
      "Nvidia issues revenue forecast far above estimates on data-center AI demand",
      "Nvidia forecast second-quarter revenue far above analyst estimates, citing surging demand for its data-center chips used in artificial intelligence."),

@@ -10,7 +10,7 @@ risk rankings, not probabilities or investment advice.
 ## What it does
 
 * **Watchlist** of pairs (initially KO/PEP, WMT/TGT, HD/LOW, V/MA, XOM/CVX, AMD/NVDA, JPM/BAC,
-  MS/GS, CVS/WBA, MCD/YUM, FDX/UPS; the duplicate LOW/HD is merged). Add, disable, archive (history
+  MS/GS, MCD/YUM, FDX/UPS; the duplicate LOW/HD is merged). Add, disable, archive (history
   kept), group into watchlists, set thresholds and check frequency per pair.
 * **SI-v1**: the original market-only index, (25C + 15D + 25R) × 100 / 65.
 * **SI-v2**: news-enhanced, 35N + 25F + 20M + 10P + 10S with configurable, versioned weights.
