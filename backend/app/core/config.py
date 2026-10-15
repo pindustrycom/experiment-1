@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     # Claude
     anthropic_api_key: SecretStr | None = None
-    claude_model: str = "claude-opus-5-5"
+    claude_model: str = "claude-haiku-5-5"  # news triage is high-volume classification
     claude_effort: Literal["low", "medium", "high", "xhigh", "max"] = "medium"
     claude_timeout_seconds: float = 120.0
 

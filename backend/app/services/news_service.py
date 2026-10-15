@@ -24,7 +24,7 @@ from app.data_sources.sec import ROUTINE_ITEMS, SecEdgar
 from app.models import Company, DocumentCompany, ExtractedEvent, NewsArticle, NewsFetchLog, Pair, ProviderUsage, SourceDocument
 from app.schemas.events import direction_to_ticker_form
 from app.scoring.types import EventEvidence, NewsCoverage
-from app.services import dedup, settings_service, usage
+from app.services import dedup, news_filter, settings_service, usage
 
 log = logging.getLogger(__name__)
 
@@ -191,7 +191,7 @@ def analyze_pending(db: Session, analyst: NewsAnalyst | None = None, now: dateti
     budget = settings_service.get_section(db, "budget")
     pending = db.scalars(select(NewsArticle).where(NewsArticle.analysis_status.in_(("pending", "budget_blocked", "not_configured", "failed")))
                          .order_by(NewsArticle.first_published_at.desc()).limit(500)).all()
-    report = {"analyzed": 0, "skipped": 0, "failed": 0, "budget_blocked": 0, "not_configured": 0, "events": 0, "material_pairs": []}
+    report = {"analyzed": 0, "skipped": 0, "filtered": 0, "failed": 0, "budget_blocked": 0, "not_configured": 0, "events": 0, "material_pairs": []}
     material_pairs: set[int] = set()
     if analyst is None and s.secret("anthropic_api_key"):
         analyst = NewsAnalyst(model=llm["model"], effort=llm["effort"], pricing=llm["pricing"], refusal_fallback=llm["refusal_fallback"])
@@ -204,6 +204,16 @@ def analyze_pending(db: Session, analyst: NewsAnalyst | None = None, now: dateti
             art.analysis_error = "no active pair mentions these companies"
             report["skipped"] += 1
             continue
+        tagged = [c for p in pairs for c in (p.company_a, p.company_b) if c.ticker in art.tickers]
+        why = news_filter.screen(doc, art.tickers, tagged)
+        if why:
+            art.analysis_status = "skipped"
+            art.analysis_error = f"filtered before AI: {why}"
+            report["filtered"] += 1
+            continue
+        if doc.doc_type not in ("filing", "press_release"):
+            text = f"{doc.title or ''}\n{(doc.content_text or '')[:2000]}"
+            pairs = [p for p in pairs if news_filter.mentions(text, p.company_a) or news_filter.mentions(text, p.company_b)]
         if doc.doc_type == "filing" and doc.filing_items and set(doc.filing_items) <= ROUTINE_ITEMS and not llm["analyze_routine_filings"]:
             art.analysis_status = "skipped"
             art.analysis_error = "routine filing items only"

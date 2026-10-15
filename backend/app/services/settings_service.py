@@ -17,7 +17,7 @@ DEFAULTS: dict = {
     "llm": {
         "model": None,  # None -> CLAUDE_MODEL env var
         "effort": None,  # None -> CLAUDE_EFFORT env var
-        "max_documents_per_run": 40,
+        "max_documents_per_run": 400,
         "refusal_fallback": True,
         "analyze_routine_filings": False,
         "pricing": DEFAULT_PRICING,

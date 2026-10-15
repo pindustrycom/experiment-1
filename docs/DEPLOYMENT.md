@@ -88,7 +88,8 @@ Required:
 Data and AI (each optional; whatever is missing makes the affected score components
 **unavailable**, never zero):
 
-* `ANTHROPIC_API_KEY`: Claude news interpretation. Model and effort are `CLAUDE_MODEL` /
+* `ANTHROPIC_API_KEY`: Claude news interpretation (default model Claude Haiku 5.5; a free rule-based filter drops
+  roundups and stories that do not name either company first). Model and effort are `CLAUDE_MODEL` /
   `CLAUDE_EFFORT` and can be changed later in Settings. The monthly AI budget (default $50) is set in
   Settings → AI & budget.
 * `TIINGO_API_KEY`: dividend-adjusted daily prices (recommended). `ENABLE_STOOQ=true` adds the free

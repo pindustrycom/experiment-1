@@ -124,7 +124,7 @@ class NewsAnalyst:
             output_format=EventInterpretation,
             output_config={"effort": self.effort},
         )
-        if self.refusal_fallback:
+        if self.refusal_fallback and not self.model.startswith("claude-haiku"):  # Haiku has no server-side fallback (400)
             kwargs.update(betas=["server-side-fallback-2026-07-01"], fallbacks="default")
         t0 = time.monotonic()
         resp = self.client.beta.messages.parse(**kwargs)

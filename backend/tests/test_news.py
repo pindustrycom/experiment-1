@@ -240,3 +240,23 @@ def test_events_respect_point_in_time_cutoff(db):
     # published but only analysed now: not knowable at an earlier cutoff even after publication
     assert load_events(db, pair, published + timedelta(hours=1)) == []
     assert len(load_events(db, pair, datetime.now(UTC) + timedelta(minutes=1))) == 1
+
+
+def test_free_filter_drops_noise_before_claude():
+    from types import SimpleNamespace as NS
+
+    from app.services.news_filter import mentions, screen
+    ko = NS(ticker="KO", name="The Coca-Cola Company", aliases=["Coca-Cola"])
+    pep = NS(ticker="PEP", name="PepsiCo, Inc.", aliases=["PepsiCo"])
+    v = NS(ticker="V", name="Visa Inc.", aliases=["Visa"])
+
+    def doc(title, text="", kind="news"):
+        return NS(title=title, content_text=text, doc_type=kind)
+    assert screen(doc("PepsiCo cuts full-year guidance as snack volumes fall"), ["PEP"], [pep]) is None
+    assert screen(doc("Coke raises prices again"), ["KO", "PEP"], [ko, pep]) is None
+    assert "roundup" in screen(doc("Top 10 dividend stocks to buy now"), ["KO"], [ko])
+    assert "roundup" in screen(doc("Consumer giants mixed"), ["KO", "PEP", "WMT", "TGT", "HD", "LOW", "MCD"], [ko, pep])
+    assert "neither" in screen(doc("Beverage tariffs loom", "Industry groups warned on Tuesday."), ["KO"], [ko])
+    assert screen(doc("8-K", "", kind="filing"), ["KO"], [ko]) is None  # filings always go through
+    # one-letter tickers are ordinary words unless written as a ticker
+    assert not mentions("V shaped recovery for retailers", v) and mentions("Visa (V) beats estimates", v)
