@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import itertools
 import logging
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 import numpy as np
 import pandas as pd
@@ -66,9 +66,10 @@ def observation_dates(start_year: int, end_year: int, frequency: str) -> list[da
     out = []
     for y in range(start_year, end_year + 1):
         for m in months[frequency]:
-            d = date(y, m, 1)
+            # last trading day of the month, as the original experiment scored at the end of January
+            d = (date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)) - timedelta(days=1)
             while not is_trading_day(d):
-                d = date.fromordinal(d.toordinal() + 1)
+                d = date.fromordinal(d.toordinal() - 1)
             out.append(d)
     return out
 

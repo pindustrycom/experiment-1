@@ -405,7 +405,7 @@ function ScoringTab({ s, admin, reload }: { s: Sections["scoring"]; admin: boole
             </TBody>
           </Table>
           <p className="mt-1 text-[11px] text-muted">
-            See docs/METHODOLOGY.md for every component definition, normalisation and the reconstructed SI-v1 formula.
+            See docs/METHODOLOGY.md for every component definition, normalisation and the SI-v1 formula.
           </p>
         </CardContent>
       </Card>

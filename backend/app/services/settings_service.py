@@ -29,7 +29,7 @@ DEFAULTS: dict = {
         "rss_templates": [],
         "company_feeds": {},
     },
-    "prices": {"providers": ["tiingo", "stooq"], "history_start": "2014-01-01", "benchmark": "SPY"},
+    "prices": {"providers": ["tiingo", "stooq"], "history_start": "2009-01-01", "benchmark": "SPY"},
     "alerts": {"default_threshold": 70.0, "default_change_threshold": 10.0, "confidence_floor": 0.3},
     "predictions": {
         "horizons": [30, 90, 180, 252, 504],

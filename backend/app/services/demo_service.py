@@ -22,7 +22,7 @@ from app.services import backtest_service, fundamentals_service, news_service, p
 from app.services.reference import seed_reference_data
 
 log = logging.getLogger(__name__)
-START = date(2012, 1, 3)
+START = date(2009, 1, 2)
 HORIZON_END = date(2032, 12, 31)
 
 SECTOR_OF = {

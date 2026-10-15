@@ -42,20 +42,20 @@ consistent even after the provider re-bases its history.
 
 ## SI-v1 (market-only benchmark)
 
-SI-v1 = (25·C + 15·D + 25·R) × 100 / 65, version `1.0-reconstructed`.
-
-The formula is preserved from the original experiment. The original `run_experiment.py` was not
-available, so the component normalisations below are a **documented reconstruction**. If the
-original script is supplied, its normalisations will be ported as a new SI-v1 version and the
-reconstruction kept for comparison.
+SI-v1 = (25·C + 15·D + 25·R) × 100 / 65, version `1.0`, ported line for line from the original
+`run_experiment.py` (`index_components` and `calculate_rows`).
 
 | Component | Definition (daily log total returns) |
 |---|---|
-| C — correlation weakness | clip(1 − ρ₅₀₄, 0, 1), ρ over the last 504 sessions |
-| D — correlation deterioration | clip((ρ₅₀₄ − ρ₁₂₆) / 0.5, 0, 1) |
-| R — relative-price divergence | clip(\|ln(PA_t/PA_{t−504}) − ln(PB_t/PB_{t−504})\| / 0.40, 0, 1) |
+| C — correlation weakness | clip((0.90 − ρ₁ᵧ) / 0.90, 0, 1), ρ₁ᵧ over the last 252 sessions |
+| D — correlation deterioration | clip((ρ₅ᵧ − ρ₁ᵧ) / 0.30, 0, 1), ρ₅ᵧ over the last 1260 sessions |
+| R — past return divergence | clip(\|100·(PA_t/PA_{t−252} − 1) − 100·(PB_t/PB_{t−252} − 1)\| / 50, 0, 1), the one-year total-return gap in percentage points |
 
-C and D need at least 90% of the 504-session window as overlapping returns and R needs 505 aligned closes; if any component is missing, SI-v1 is unavailable (it is never re-weighted).
+As in the original, a score needs the last 1261 closes with at most 10 missing and at least 1250
+returns; otherwise SI-v1 is unavailable (never re-weighted). Price history therefore starts in 2009
+by default so that the 2015 backtest observations have five years behind them. Backtest observations
+are taken on the last trading day of the month (end of January for annual runs, as in the
+original). The correlation-only and previous-return-gap baselines use ρ₁ᵧ and the one-year gap.
 
 ## SI-v2 (news-enhanced research hypothesis)
 

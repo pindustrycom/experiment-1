@@ -235,7 +235,7 @@ nano .env                          # APP_MODE=production, add your API keys
 scripts/switch-to-production.sh    # wipes simulated research data, restarts
 ```
 
-The worker then fetches price history (from `history_start`, default 2014-01-01), filings,
+The worker then fetches price history (from `history_start`, default 2009-01-01, enough for SI-v1's five-year window before the 2015 backtest), filings,
 fundamentals and news on its schedule; use **Bot activity → Run now** on `ingest_prices`,
 `ingest_fundamentals` and `ingest_news` to start immediately, then `compute_scores`.
 

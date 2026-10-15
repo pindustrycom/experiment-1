@@ -1,11 +1,12 @@
 """Unit tests for SI-v1, SI-v2 components, missing-data handling and look-ahead safeguards."""
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 import pytest
 
 from app.scoring.components import effective_asymmetry, event_side_sign, score_news, sic_distance
 from app.scoring.params import SI_V2_PARAMS, normalize_weights, si_v2_definition
-from app.scoring.si_v1 import compute_si_v1
+from app.scoring.si_v1 import compute_si_v1, index_components
 from app.scoring.si_v2 import combine, compute_si_v2
 from app.scoring.types import ComponentResult
 from tests.factories import correlated_prices, coverage, event, facts, market, pair_inputs
@@ -16,26 +17,46 @@ CUT = datetime(2026, 9, 30, 22, tzinfo=UTC)
 
 class TestSIv1:
     def test_formula_and_range(self):
-        r = compute_si_v1(market(correlated_prices(rho=0.8)))
+        r = compute_si_v1(market(correlated_prices(n=1400, rho=0.8)))
         c, d, rr = (r.components[k].value for k in "CDR")
         assert r.value == pytest.approx((25 * c + 15 * d + 25 * rr) * 100 / 65, abs=1e-3)
         assert 0 <= r.value <= 100
 
+    @pytest.mark.parametrize("args,expected", [((0.9, 0.9, 0), 0.0), ((-1.0, 0.9, 80), 100.0), ((-0.1, 0.9, 60), 100.0)])
+    def test_matches_original_index_components(self, args, expected):
+        # Reference values from the original run_experiment.py self_test().
+        c, d, r = index_components(*args)
+        assert (25 * c + 15 * d + 25 * r) * 100 / 65 == pytest.approx(expected, abs=1e-10)
+
+    def test_matches_original_calculate_rows(self):
+        prices = correlated_prices(n=1500, rho=0.7, seed=11, drift_a=0.0003)
+        r = compute_si_v1(market(prices))
+        past = prices.iloc[-1261:]
+        rets = np.log(past).diff().dropna()
+        rho5, rho52 = rets.iloc[-1260:].corr().iloc[0, 1], rets.iloc[-252:].corr().iloc[0, 1]
+        gap = abs(100 * (past.a.iloc[-1] / past.a.iloc[-253] - 1) - 100 * (past.b.iloc[-1] / past.b.iloc[-253] - 1))
+        c = 25 * min(1, max(0, (0.9 - rho52) / 0.9))
+        d = 15 * min(1, max(0, (rho5 - rho52) / 0.3))
+        rr = 25 * min(1, max(0, gap / 50))
+        assert r.value == pytest.approx((c + d + rr) * 100 / 65, abs=1e-3)
+        assert r.baselines["rho_short"] == pytest.approx(rho52)
+        assert r.baselines["rho_long"] == pytest.approx(rho5)
+
     def test_high_correlation_scores_lower_than_broken_relationship(self):
-        stable = compute_si_v1(market(correlated_prices(rho=0.9, seed=5)))
-        broken = compute_si_v1(market(correlated_prices(rho=0.9, seed=5, break_at=650, rho_after=0.0, drift_a=0.0008)))
+        stable = compute_si_v1(market(correlated_prices(n=1400, rho=0.9, seed=5)))
+        broken = compute_si_v1(market(correlated_prices(n=1400, rho=0.9, seed=5, break_at=1250, rho_after=0.0, drift_a=0.0008)))
         assert broken.value > stable.value
         assert broken.components["D"].value > stable.components["D"].value
 
     def test_insufficient_history_is_unavailable_not_zero(self):
-        r = compute_si_v1(market(correlated_prices(n=200)))
+        r = compute_si_v1(market(correlated_prices(n=1000)))
         assert r.value is None
         assert not r.components["C"].available
         assert r.baselines["correlation_only"] is None
 
-    def test_baselines_match_components(self):
-        r = compute_si_v1(market(correlated_prices()))
-        assert r.baselines["correlation_only"] == pytest.approx(100 * r.components["C"].value)
+    def test_baselines(self):
+        r = compute_si_v1(market(correlated_prices(n=1400)))
+        assert r.baselines["correlation_only"] == pytest.approx(100 * (1 - r.baselines["rho_short"]))
         assert r.baselines["previous_return_gap"] == pytest.approx(100 * r.components["R"].value)
 
 

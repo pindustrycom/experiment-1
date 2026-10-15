@@ -6,27 +6,30 @@ import hashlib
 import json
 from copy import deepcopy
 
-SI_V1_VERSION = "1.0-reconstructed"
+SI_V1_VERSION = "1.0"
 SI_V1_DEFINITION = {
     "index_name": "si_v1",
     "version": SI_V1_VERSION,
     "weights": {"C": 25, "D": 15, "R": 25},
     "params": {
         "returns": "daily log total returns (adjusted close)",
-        "long_window": 504,
-        "short_window": 126,
-        "min_coverage_ratio": 0.9,
-        "C": "clip(1 - rho_long, 0, 1)",
+        "long_window": 1260,
+        "short_window": 252,
+        "max_missing_closes": 10,
+        "min_returns": 1250,
+        "C": "clip((c_anchor - rho_short) / c_anchor, 0, 1)",
+        "c_anchor": 0.90,
         "D": "clip((rho_long - rho_short) / d_scale, 0, 1)",
-        "d_scale": 0.5,
-        "R": "clip(|ln(PA_t/PA_t-L) - ln(PB_t/PB_t-L)| / r_scale, 0, 1)",
-        "r_scale": 0.40,
+        "d_scale": 0.30,
+        "R": "clip(|100*(PA_t/PA_t-252 - 1) - 100*(PB_t/PB_t-252 - 1)| / r_scale_pp, 0, 1)",
+        "r_window": 252,
+        "r_scale_pp": 50.0,
         "formula": "(25C + 15D + 25R) * 100 / 65",
     },
     "description": (
-        "Market-only benchmark. Formula preserved from the original experiment; the normalisations "
-        "of C, D and R are a documented reconstruction because the original run_experiment.py was not "
-        "available. Replace with the original implementation (new version) if it is supplied."
+        "Market-only benchmark, ported from the original run_experiment.py (index_components and "
+        "calculate_rows): rho_short is the 1-year (252-session) and rho_long the 5-year (1260-session) "
+        "correlation of daily log returns; R is the 1-year simple total-return gap in percentage points."
     ),
 }
 
