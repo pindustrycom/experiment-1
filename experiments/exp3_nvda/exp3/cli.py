@@ -173,6 +173,8 @@ def main(argv=None) -> None:
     r.add_argument("--no-score", action="store_true")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    for noisy in ("httpx", "httpx2", "anthropic"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
     s = run(a.data, a.out, not a.no_collect, not a.no_score)
     print(json.dumps({k: s.get(k) for k in ("steps", "warnings", "claude_usd_total", "coverage", "results", "signal_check")}, indent=1, default=str))
     sys.exit(0 if s.get("results") else 1)

@@ -41,17 +41,21 @@ def grade(g: str) -> float | None:
     return 1.0 if g in BUY else 0.0 if g in HOLD else -1.0 if g in SELL else None
 
 
+def _s(x) -> str:
+    return x if isinstance(x, str) else ""
+
+
 def broker_score(row) -> float:
     """An analyst action as bullish (+) or bearish (-), in -1..1."""
-    g = grade(row["to_grade"])
+    g = grade(_s(row["to_grade"]))
     s = 0.5 * g if g is not None else 0.0
-    a = (row["action"] or "").lower()
+    a = _s(row["action"]).lower()
     s += 1.0 if a == "up" else -1.0 if a == "down" else 0.0
     pt, prior = row.get("pt"), row.get("pt_prior")
     if pd.notna(pt) and pd.notna(prior) and prior and pt:
         s += 0.5 * np.sign(pt - prior)
     else:
-        p = (row.get("pt_action") or "").lower()
+        p = _s(row.get("pt_action")).lower()
         s += 0.5 if p == "raises" else -0.5 if p == "lowers" else 0.0
     return float(np.clip(s / 1.5, -1, 1))
 

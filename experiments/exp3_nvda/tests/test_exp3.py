@@ -51,6 +51,8 @@ def test_broker_scores():
     down = {"to_grade": "Sell", "action": "down", "pt": 100, "pt_prior": 150, "pt_action": "Lowers"}
     assert features.broker_score(up) == 1.0 and features.broker_score(down) == -1.0
     assert 0 < features.broker_score({"to_grade": "Overweight", "action": "reit", "pt": None, "pt_prior": None, "pt_action": ""}) < 1
+    # empty CSV cells come back as NaN
+    assert features.broker_score({"to_grade": float("nan"), "action": "main", "pt": float("nan"), "pt_prior": float("nan"), "pt_action": float("nan")}) == 0.0
 
 
 def test_unobserved_weeks_are_nan_and_long_memory_persists():

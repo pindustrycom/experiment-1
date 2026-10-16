@@ -51,9 +51,14 @@ def _get(session: requests.Session, url: str, params: dict | None = None, tries:
 
 
 class Progress:
-    def __init__(self, data: Path):
-        self.f = data / "progress.json"
+    """Finished windows of one collector. Each collector has its own file, because they run side by side."""
+
+    def __init__(self, data: Path, name: str):
+        self.f = data / f"progress_{name}.json"
         self.d = json.loads(self.f.read_text()) if self.f.exists() else {}
+        old = data / "progress.json"          # first version shared one file (only its Reddit entries survived)
+        if old.exists():
+            self.d = {**{k: v for k, v in json.loads(old.read_text()).items() if k.startswith(name[:2])}, **self.d}
 
     def done(self, key: str) -> bool:
         return key in self.d
@@ -142,7 +147,7 @@ def parse_rss(content: bytes) -> list[dict]:
 def news(data: Path, start=config.SENTIMENT_START, end=config.TEST_END, query=config.NEWS_QUERY, pause: float = 1.5,
          fetch=None, cap: int = 95, max_seconds: float = 3 * 3600) -> dict:
     """Weekly windows; a window that hits Google's ~100 result cap is split in half, down to one day."""
-    prog, path = Progress(data), data / "news.jsonl"
+    prog, path = Progress(data, "gn"), data / "news.jsonl"
     s = requests.Session()
     s.headers["User-Agent"] = UA_BROWSER
 
@@ -198,21 +203,22 @@ ARCTIC = "https://arctic-shift.photon-reddit.com/api/posts/search"
 def reddit(data: Path, start=config.SENTIMENT_START, end=config.TEST_END, subs=config.SUBREDDITS, terms=config.REDDIT_TERMS,
            pause: float = 1.0, fetch=None, max_seconds: float = 3 * 3600) -> dict:
     """Monthly windows per subreddit and term, paged 100 posts at a time."""
-    prog, path = Progress(data), data / "reddit.jsonl"
+    prog, path = Progress(data, "rd"), data / "reddit.jsonl"
     s = requests.Session()
     s.headers["User-Agent"] = "exp3-nvda research"
 
     def default_fetch(sub, term, after, before):
-        r = _get(s, ARCTIC, {"subreddit": sub, "title": term, "after": after, "before": before, "limit": 100, "sort": "asc"}, tries=6, pause=4)
+        r = _get(s, ARCTIC, {"subreddit": sub, "title": term, "after": after, "before": before, "limit": 100, "sort": "asc"}, tries=4, pause=3)
         return r.json().get("data") or []
 
     fetch = fetch or default_fetch
     stats = {"windows": 0, "items": 0, "failed": []}
     t0 = time.time()
     months = pd.date_range(pd.Timestamp(start).replace(day=1), pd.Timestamp(end), freq="MS")
-    for sub in subs:
-        for term in terms:
-            for m in months:
+    # months outermost, so a time limit leaves every subreddit with the same span covered
+    for m in months:
+        for sub in subs:
+            for term in terms:
                 key = f"rd:{sub}:{term}:{m.strftime('%Y-%m')}"
                 if prog.done(key):
                     continue
