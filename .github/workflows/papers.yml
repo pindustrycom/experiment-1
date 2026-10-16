@@ -1,13 +1,15 @@
 name: Experiment 2 paper ideas
 
 # Paper backtests of three ideas from the literature (experiments/exp2_sector_ssm/exp2/papers.py): the variance risk
-# premium, a Gu-Kelly-Xiu style machine-learning ranking of S&P 500 stocks, and overnight versus intraday momentum.
+# premium, a Gu-Kelly-Xiu style machine-learning ranking of S&P 500 stocks, and overnight versus intraday momentum;
+# then exp2/volpred.py: forecast each stock's volatility and use the forecast as an input for return prediction.
 # Prices (Yahoo) and the S&P 500 membership list (Wikipedia) are cached in the "papers-data" release with the latest
 # results. Nothing is deployed and nothing is traded.
 
 on:
   pull_request:
-    paths: ["experiments/exp2_sector_ssm/exp2/papers.py", "experiments/exp2_sector_ssm/tests/test_papers.py", ".github/workflows/papers.yml"]
+    paths: ["experiments/exp2_sector_ssm/exp2/papers.py", "experiments/exp2_sector_ssm/exp2/volpred.py", "experiments/exp2_sector_ssm/tests/test_papers.py",
+            "experiments/exp2_sector_ssm/tests/test_volpred.py", ".github/workflows/papers.yml"]
   workflow_dispatch:
 
 permissions:
@@ -40,7 +42,7 @@ jobs:
           pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
       - name: Tests
-        run: ruff check exp2 tests && python -m pytest -q tests/test_papers.py
+        run: ruff check exp2 tests && python -m pytest -q tests/test_papers.py tests/test_volpred.py
 
       - name: Restore cached data
         run: |
@@ -54,6 +56,11 @@ jobs:
         run: |
           set -o pipefail
           python -m exp2 papers --data papers_data --out papers_results | tee /tmp/papers.json
+
+      - name: Volatility forecast as an input (exp2/volpred.py)
+        run: |
+          set -o pipefail
+          python -m exp2 volpred --data papers_data --out papers_results/volpred | tee /tmp/volpred.json
 
       - name: Save data and results
         if: always()

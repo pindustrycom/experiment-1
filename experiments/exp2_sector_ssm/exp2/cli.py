@@ -194,6 +194,9 @@ def main(argv=None) -> None:
     pp.add_argument("--data", type=Path, default=Path("papers_data"))
     pp.add_argument("--out", type=Path, default=Path("papers_results"))
     pp.add_argument("--no-network", action="store_true")
+    vp = sub.add_parser("volpred", help="forecast volatility, then use it to predict returns (exp2/volpred.py)")
+    vp.add_argument("--data", type=Path, default=Path("papers_data"))
+    vp.add_argument("--out", type=Path, default=Path("volpred_results"))
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     if a.cmd == "topo":
@@ -206,6 +209,11 @@ def main(argv=None) -> None:
         from . import papers
         rep = papers.run(a.data, a.out, fetch=not a.no_network)
         print(json.dumps({k: rep.get(k) for k in ("warnings", "universe", "vrp", "overnight_momentum", "gkx", "seconds")}, indent=1, default=str))
+        return
+    if a.cmd == "volpred":
+        from . import volpred
+        rep = volpred.run(a.data, a.out)
+        print(json.dumps(rep, indent=1, default=str))
         return
     if a.cmd == "oria":
         from . import oria
