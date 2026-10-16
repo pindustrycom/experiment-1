@@ -67,11 +67,32 @@ class Data:
         self.y = torch.tensor((y - self.y_mu) / self.y_sd, dtype=torch.float32)[:, None]
 
 
-def fit_ekf(d: Data, cfg: Config, seed: int) -> tuple[EKFSSM, float]:
+# EKF variants: (measurements, input normalisation, radius parameterisation, carried state)
+VARIANTS = {
+    "ekf": ("full", "none", "sigmoid", False),
+    "ekf_price": ("price", "none", "sigmoid", False),
+    "ekf_slow": ("full", "none", "exp", True),           # slow-mode init + carried state, no normalisation
+    "ekf_h2": ("full", "h2", "exp", True),               # ... + sqrt(1 - r^2) input gain
+    "ekf_res": ("full", "resonance", "exp", True),       # ... + resonance-index input gain
+    "ekf_res_price": ("price", "resonance", "exp", True),
+}
+
+
+def input_spectrum(z: torch.Tensor, seg: int) -> torch.Tensor:
+    """Average periodogram of the measurements (all channels, non-overlapping segments), scaled to mean 1."""
+    n = (z.shape[0] // seg) * seg
+    x = z[:n].reshape(-1, seg, z.shape[1])
+    x = x - x.mean(1, keepdim=True)
+    S = (torch.fft.fft(x, dim=1).abs() ** 2).mean((0, 2))
+    return S / S.mean()
+
+
+def fit_ekf(d: Data, cfg: Config, seed: int, norm: str = "none", radius: str = "sigmoid", carry: bool = False) -> tuple[EKFSSM, float]:
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
     sp = d.sp
-    m = EKFSSM(d.z.shape[1], 1, cfg.d_state, cfg.d_hidden)
+    m = EKFSSM(d.z.shape[1], 1, cfg.d_state, cfg.d_hidden, norm=norm, radius=radius)
+    m.spectrum = input_spectrum(d.z[sp["first"]:sp["fit1"] + 1], cfg.spectrum_seg)
     opt = torch.optim.Adam(m.parameters(), lr=cfg.lr)
     burn = 32
     lo, hi = sp["first"], sp["fit1"]
@@ -85,13 +106,20 @@ def fit_ekf(d: Data, cfg: Config, seed: int) -> tuple[EKFSSM, float]:
 
     best, best_state, since = math.inf, copy.deepcopy(m.state_dict()), 0
     for step in range(cfg.steps):
-        starts = rng.integers(lo, max(lo + 1, hi + 2 - w), size=cfg.batch)
+        starts = rng.integers(lo + (cfg.carry if carry else 0), max(lo + 1, hi + 2 - w), size=cfg.batch)
+        x0 = P0 = None
+        if carry:   # run the filter over the preceding sessions without gradient, so slow modes start filled
+            with torch.no_grad():
+                zc = torch.stack([d.z[s - cfg.carry:s] for s in starts])
+                mc = torch.stack([d.mask[s - cfg.carry:s] for s in starts])
+                m(zc, mc)
+                x0, P0 = m.last_x, m.last_P
         zb = torch.stack([d.z[s:s + w] for s in starts])
         mb = torch.stack([d.mask[s:s + w] for s in starts])
         yb = torch.stack([d.y[s:s + w] for s in starts])
         # targets of rows before the training start are not scored
         yb = torch.where(torch.stack([torch.arange(s, s + w) for s in starts])[..., None] >= sp["tr0"], yb, torch.nan)
-        mu, var, obs_nll, _ = m(zb, mb)
+        mu, var, obs_nll, _ = m(zb, mb, x0, P0)
         loss = obs_nll + target_nll(mu[:, burn:], var[:, burn:], yb[:, burn:])
         opt.zero_grad()
         loss.backward()
@@ -108,6 +136,52 @@ def fit_ekf(d: Data, cfg: Config, seed: int) -> tuple[EKFSSM, float]:
     m.load_state_dict(best_state)
     m.eval()
     return m, best
+
+
+def gradient_fading(m: EKFSSM, d: Data, cfg: Config, lags: int = 120, ends: int = 16) -> dict:
+    """How the gradient of the prediction reaching each mode's state fades with lag, through the filter.
+
+    For prediction times T in the validation span, G_k = C (I - K_T H) F_T ... (I - K_{T-k+1} H) F_{T-k+1} is the
+    gradient of the predicted return with respect to the filtered state k sessions earlier. Per mode b we report its
+    energy E_b = sum_k |G_k restricted to b|^2 and its fading rate (per-session decay of |G_k|), and compare E_b with
+    |C_b|^2 times the mode's resonance index, the quantity the resonance index says it should be proportional to."""
+    sp = d.sp
+    lo = sp["va0"] - lags - 1
+    with torch.no_grad():
+        m(d.z[None, lo:sp["va1"] + 1], d.mask[None, lo:sp["va1"] + 1], record=True)
+    tr = m.trace
+    k_modes = m.d // 2
+    E = np.zeros((ends, k_modes, lags))
+    T_all = np.linspace(lags + 1, len(tr) - 1, ends).astype(int)
+    with torch.no_grad():
+        for e, T in enumerate(T_all):
+            G = m.C.detach().clone()                                 # (1, d)
+            for k in range(lags):
+                F, M = tr[T - k]
+                G = G @ M[0]
+                blk = (G ** 2).reshape(-1, k_modes, 2).sum((0, 2))
+                E[e, :, k] = blk.numpy()
+                G = G @ F[0]
+    prof = E.mean(0)                                                 # (modes, lags)
+    energy = prof.sum(1)
+    rate = []
+    for b in range(k_modes):
+        y = np.log(prof[b, :60] + 1e-30)
+        rate.append(float(np.exp(np.polyfit(np.arange(60), y, 1)[0] / 2)))   # amplitude decay per session
+    with torch.no_grad():
+        cb = (m.C.detach() ** 2).reshape(-1, k_modes, 2).sum((0, 2)) * m.gain()[::2] ** 2
+        res = m.resonance()
+        r = m.r()
+    pred_res = (cb * res).numpy()
+    pred_h2 = (cb / (1 - r ** 2)).numpy()
+
+    def rank_corr(a, b):
+        return float(pd.Series(a).rank().corr(pd.Series(b).rank())) if np.std(a) > 0 and np.std(b) > 0 else None
+
+    return {"r": r.numpy().round(4).tolist(), "period": (2 * np.pi / m.theta.detach().abs().clamp_min(1e-6)).numpy().round(1).tolist(),
+            "fade_per_session": np.round(rate, 4).tolist(), "energy": energy.tolist(), "pred_resonance": pred_res.tolist(), "pred_h2": pred_h2.tolist(),
+            "rank_corr_energy_vs_resonance": rank_corr(energy, pred_res), "rank_corr_energy_vs_h2": rank_corr(energy, pred_h2),
+            "half_life_sessions": [round(float(np.log(0.5) / np.log(x)), 1) if 0 < x < 1 else None for x in rate]}
 
 
 def ekf_predict(models: list[EKFSSM], d: Data) -> tuple[np.ndarray, np.ndarray]:
@@ -156,16 +230,19 @@ def run(df: pd.DataFrame, cfg: Config) -> tuple[pd.DataFrame, dict]:
     y = df[TARGET].to_numpy(float)
     tr = slice(sp["tr0"], sp["va1"] + 1)      # targets that end inside the training years
     preds, info = {}, {"split": {k: df.index[v].strftime("%Y-%m-%d") for k, v in sp.items()}, "ekf": {}}
-    for name, cols in (("ekf", FULL), ("ekf_price", PRICE_ONLY)):
-        d = Data(df, cols, sp)
-        models, vals = [], []
+    for name, (meas, norm, radius, carry) in VARIANTS.items():
+        if name not in cfg.ekf_variants:
+            continue
+        d = Data(df, FULL if meas == "full" else PRICE_ONLY, sp)
+        models, vals, fading = [], [], []
         for s in cfg.seeds:
-            m, v = fit_ekf(d, cfg, s)
+            m, v = fit_ekf(d, cfg, s, norm, radius, carry)
             models.append(m)
             vals.append(v)
+            fading.append(gradient_fading(m, d, cfg))
             log.info("%s seed %d: val nll %.4f", name, s, v)
         preds[name] = ekf_predict(models, d)
-        info["ekf"][name] = {"val_nll": vals, "periods": [float(2 * math.pi / th) for th in models[0].theta.detach().abs().clamp_min(1e-6).tolist()]}
+        info["ekf"][name] = {"val_nll": vals, "fading": fading}
     for name, cols in (("ridge", FULL), ("ridge_price", PRICE_ONLY)):
         d = Data(df, cols, sp)
         p, sd, meta = fit_ridge(d, df)

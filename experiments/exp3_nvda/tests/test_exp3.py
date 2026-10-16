@@ -3,8 +3,10 @@ from dataclasses import replace
 
 import numpy as np
 import pandas as pd
+import torch
 
-from exp3 import cli, collect, config, features, score
+from exp3 import cli, collect, config, features, model, score
+from exp3.ekf import EKFSSM
 
 CFG = replace(config.DEFAULT, steps=20, window=64, seeds=(0,), val_sessions=60, patience=20)
 
@@ -121,11 +123,36 @@ def test_end_to_end_with_planted_sentiment(tmp_path):
     s = cli.run(tmp_path, tmp_path / "out", do_collect=False, cfg=CFG, scorer=FakeScorer())
     assert s["steps"]["score"]["scored"] > 0 and s["steps"]["model"]["status"] == "ok", s["steps"]
     r = s["results"]
-    assert set(r["test"]) == {"ekf", "ekf_price", "ridge", "ridge_price", "momentum", "drift", "zero"}
+    assert set(r["test"]) == {*model.VARIANTS, "ridge", "ridge_price", "momentum", "drift", "zero"}
     # the planted signal is found by the models that see sentiment, and not by those that don't
     assert r["test"]["ridge"]["skill"] > 0.2 > r["test"]["ridge_price"]["skill"]
-    assert r["test"]["ekf"]["ic"] > 0.3
+    assert r["test"]["ekf"]["ic"] > 0.3 and r["test"]["ekf_res"]["ic"] > 0.1
+    f = s["model"]["ekf"]["ekf_res"]["fading"][0]
+    assert len(f["energy"]) == CFG.d_state // 2 and all(0 < x <= 1.05 for x in f["fade_per_session"])
     assert r["sentiment_adds"]["ridge_vs_ridge_price"]["t"] < -2
     assert (tmp_path / "out" / "index.html").exists()
     p = pd.read_csv(tmp_path / "out" / "predictions.csv")
     assert p[p["period"] == "test"]["date"].min() >= "2022-01-01" and p["date"].max() <= "2025-12-31"
+
+
+def test_resonance_gain_reduces_to_h2_for_white_input():
+    m = EKFSSM(3, 1, d_state=6, norm="resonance", radius="exp", r_max=0.98)   # sharper poles alias on a finite grid
+    m.spectrum = torch.ones(512)
+    r = m.r().detach()
+    assert torch.allclose(m.resonance().detach(), 1 / (1 - r ** 2), rtol=2e-2)
+    h = EKFSSM(3, 1, d_state=6, norm="h2", radius="exp", r_max=0.98)
+    h.spectrum = torch.ones(512)
+    h.load_state_dict(m.state_dict())
+    assert torch.allclose(m.gain().detach(), h.gain().detach(), rtol=1e-2)
+
+
+def test_resonance_gain_tames_a_resonant_mode():
+    """A mode tuned to the input's dominant frequency gets a smaller input gain than under the flat (H2) rule."""
+    m = EKFSSM(3, 1, d_state=4, norm="resonance", radius="exp", r_min=0.95, r_max=0.95)
+    with torch.no_grad():
+        m.theta.copy_(torch.tensor([2 * torch.pi * 8 / 64, 2 * torch.pi * 25 / 64]))
+    S = torch.full((64,), 0.1)
+    S[8] = S[64 - 8] = 10.0
+    m.spectrum = S / S.mean()
+    g = m.gain().detach()[::2]
+    assert g[0] < g[1]

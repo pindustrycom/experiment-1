@@ -54,6 +54,9 @@ class Config:
     lr: float = 1e-2
     patience: int = 80
     seeds: tuple = (0, 1, 2)
+    carry: int = 128              # sessions filtered without gradient before each training window (slow modes start filled)
+    spectrum_seg: int = 64        # frequency grid for the resonance index
+    ekf_variants: tuple = ("ekf", "ekf_price", "ekf_slow", "ekf_h2", "ekf_res", "ekf_res_price")
 
     def digest(self) -> str:
         return hashlib.sha256(json.dumps(asdict(self), sort_keys=True).encode()).hexdigest()[:12]
