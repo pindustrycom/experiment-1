@@ -1,48 +1,50 @@
-"""Which historical sources for NVDA sentiment (2018-2025) can a GitHub runner reach, and how deep do they go?
-Prints one line per source; never prints keys."""
+"""Probe: Google News RSS depth for NVIDIA, Reddit title search pacing, FNSPID range reads."""
 import time
+import xml.etree.ElementTree as ET
 
 import requests
 
 S = requests.Session()
-S.headers["User-Agent"] = "exp3-nvda research"
+S.headers["User-Agent"] = "Mozilla/5.0 (exp3-nvda research)"
 
 
-def probe(name, url, params=None, show=lambda j: str(j)[:300], pause=0.0):
-    time.sleep(pause)
-    try:
-        r = S.get(url, params=params or {}, timeout=60)
+def gnews(q, a, b):
+    r = S.get("https://news.google.com/rss/search", params={"q": f"{q} after:{a} before:{b}", "hl": "en-US", "gl": "US", "ceid": "US:en"}, timeout=40)
+    if r.status_code != 200:
+        return f"HTTP {r.status_code} {r.text[:150]}"
+    items = ET.fromstring(r.content).findall(".//item")
+    return f"{len(items)} items; {[(i.findtext('pubDate'), i.findtext('title')[:60]) for i in items[:3]]}"
+
+
+for a, b in (("2018-03-01", "2018-03-08"), ("2020-06-01", "2020-06-08"), ("2023-05-20", "2023-05-27"), ("2025-03-01", "2025-03-08")):
+    for q in ("NVIDIA", "NVIDIA stock", "NVDA"):
         try:
-            body = show(r.json()) if r.status_code == 200 else r.text[:300].replace("\n", " ")
-        except Exception:  # noqa: BLE001
-            body = r.text[:300].replace("\n", " ")
-        print(f"[{name}] HTTP {r.status_code}: {body}", flush=True)
-    except Exception as e:  # noqa: BLE001
-        print(f"[{name}] ERROR {type(e).__name__}: {str(e)[:200]}", flush=True)
-
+            print(f"[gnews {q} {a}] {gnews(q, a, b)}", flush=True)
+        except Exception as e:  # noqa: BLE001
+            print(f"[gnews {q} {a}] ERROR {e}", flush=True)
+        time.sleep(2)
 
 A = "https://arctic-shift.photon-reddit.com/api/posts/search"
-n = lambda j: f"{len(j.get('data') or [])} posts; {[(p.get('title') or '')[:50] for p in (j.get('data') or [])[:2]]}"  # noqa: E731
-for y in ("2018", "2020", "2022"):
-    probe(f"arctic wsb query {y}", A, {"subreddit": "wallstreetbets", "query": "NVDA", "after": f"{y}-03-01", "before": f"{y}-03-08", "limit": 100}, n)
-    probe(f"arctic wsb title {y}", A, {"subreddit": "wallstreetbets", "title": "NVDA", "after": f"{y}-03-01", "before": f"{y}-03-08", "limit": 100}, n)
-    probe(f"arctic wsb plain {y}", A, {"subreddit": "wallstreetbets", "after": f"{y}-03-01", "before": f"{y}-03-02", "limit": 100}, n)
-probe("arctic nvidia title 2019", A, {"subreddit": "nvidia", "title": "stock", "after": "2019-01-01", "before": "2019-03-01", "limit": 100}, n)
-probe("arctic stocks title 2019", A, {"subreddit": "stocks", "title": "NVDA", "after": "2019-01-01", "before": "2019-03-01", "limit": 100}, n)
+for sub in ("wallstreetbets", "stocks", "investing", "nvidia"):
+    for a, b in (("2018-01-01", "2018-02-01"), ("2020-06-01", "2020-07-01"), ("2023-05-01", "2023-06-01")):
+        for i in range(4):
+            r = S.get(A, params={"subreddit": sub, "title": "NVDA" if sub != "nvidia" else "stock", "after": a, "before": b, "limit": 100, "sort": "asc"}, timeout=60)
+            if r.status_code == 200:
+                d = r.json().get("data") or []
+                print(f"[reddit {sub} {a}] {len(d)} posts; score/comments={[(p.get('score'), p.get('num_comments')) for p in d[:3]]}", flush=True)
+                break
+            print(f"[reddit {sub} {a}] try {i}: HTTP {r.status_code}", flush=True)
+            time.sleep(5 * (i + 1))
+        time.sleep(2)
 
-DS = "https://datasets-server.huggingface.co"
-probe("hf splits", f"{DS}/splits", {"dataset": "Zihan1004/FNSPID"})
-probe("hf size", f"{DS}/size", {"dataset": "Zihan1004/FNSPID"}, lambda j: str(j)[:600])
-probe("hf filter NVDA", f"{DS}/filter", {"dataset": "Zihan1004/FNSPID", "config": "default", "split": "train",
-                                          "where": "\"Stock_symbol\"='NVDA'", "length": 3},
-      lambda j: f"total={j.get('num_rows_total')}; rows={[r['row'] for r in j.get('rows', [])][:3]}"[:800])
-probe("hf tree", "https://huggingface.co/api/datasets/Zihan1004/FNSPID/tree/main/Stock_news", None,
-      lambda j: str([(f.get('path'), f.get('size')) for f in j])[:400])
-
-G = "https://api.gdeltproject.org/api/v2/doc/doc"
-for y in ("2018", "2020", "2023", "2025"):
-    probe(f"gdelt artlist {y}", G, {"query": "nvidia", "mode": "artlist", "format": "json", "sourcelang": "english",
-                                    "startdatetime": f"{y}0301000000", "enddatetime": f"{y}0308000000", "maxrecords": 250},
-          lambda j: f"{len(j.get('articles') or [])} articles; {[a.get('title', '')[:50] for a in (j.get('articles') or [])[:2]]}", pause=7)
-probe("gdelt tone 2018", G, {"query": "nvidia", "mode": "timelinetone", "format": "json", "startdatetime": "20180101000000", "enddatetime": "20180115000000"},
-      lambda j: str(j)[:300], pause=7)
+u = "https://huggingface.co/datasets/Zihan1004/FNSPID/resolve/main/Stock_news/All_external.csv"
+r = S.get(u, headers={"Range": "bytes=0-1500"}, timeout=60)
+print(f"[fnspid head] HTTP {r.status_code}: {r.text[:1500]!r}")
+t0 = time.time()
+with S.get(u, stream=True, timeout=60) as r:
+    n = 0
+    for chunk in r.iter_content(1 << 20):
+        n += len(chunk)
+        if time.time() - t0 > 20:
+            break
+print(f"[fnspid speed] {n / 1e6 / (time.time() - t0):.0f} MB/s")
