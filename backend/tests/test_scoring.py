@@ -232,3 +232,19 @@ def test_restatement_filed_after_cutoff_is_not_used():
     after = fundamental_metrics(prof, date(2026, 10, 2), {"max_staleness_days": 200})
     assert before["revenue_growth"] == pytest.approx(0.10)
     assert after["revenue_growth"] == pytest.approx(0.30)
+
+
+def test_fundamentals_compare_quarters_of_slightly_different_length():
+    """Coca-Cola's Q1 2026 ran 92 days and Q1 2025 ran 87 (52/53-week calendar); they are still the same quarter."""
+    from datetime import date
+
+    from app.scoring.components import fundamental_metrics
+    from app.scoring.types import CompanyProfile, Fact
+    rows = []
+    for m, cur, prev in [("revenue", 12.5e9, 11.1e9), ("operating_income", 4.0e9, 3.6e9), ("eps_diluted", 0.85, 0.77)]:
+        rows += [Fact(m, date(2026, 4, 3), 92, cur, date(2026, 4, 30), "a1", "10-Q"),
+                 Fact(m, date(2025, 3, 28), 87, prev, date(2025, 4, 29), "a0", "10-Q"),
+                 Fact(m, date(2025, 12, 31), 364, prev * 4, date(2026, 2, 20), "k1", "10-K")]
+    out = fundamental_metrics(CompanyProfile("KO", facts=rows), date(2026, 10, 15), SI_V2_PARAMS["F"])
+    assert {"revenue_growth", "op_margin_change", "eps_growth"} <= set(out)
+    assert out["revenue_growth"] == pytest.approx(12.5 / 11.1 - 1)
