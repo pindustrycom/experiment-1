@@ -1,0 +1,33 @@
+name: Experiment 3
+
+# Experiment 3 (NVDA EKF + SSM with sentiment by category). For now: check which historical
+# sentiment sources the runner can reach. Saves nothing.
+
+on:
+  pull_request:
+    paths: ["experiments/exp3_nvda/**", ".github/workflows/exp3.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exp3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install requests==2.34.2
+      - name: Probe sentiment sources
+        run: python experiments/exp3_nvda/probe.py

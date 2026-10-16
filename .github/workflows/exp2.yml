@@ -11,7 +11,7 @@ name: Experiment 2
 
 on:
   pull_request:   # tests, plus a trial run on real data that saves nothing
-    paths: ["experiments/**", ".github/workflows/exp2.yml"]
+    paths: ["experiments/exp2_sector_ssm/**", "experiments/hub/**", ".github/workflows/exp2.yml"]
   schedule:
     - cron: "40 22 * * 1-5"   # 18:40 New York in summer, 17:40 in winter; ahead of the dashboard run at 23:15
   workflow_dispatch:
