@@ -63,13 +63,21 @@ def sp500_tables(html: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
         r.raise_for_status()
         html = r.text
     tabs = pd.read_html(io.StringIO(html))
-    cur = tabs[0].rename(columns={"Symbol": "ticker", "GICS Sector": "sector"})[["ticker", "sector"]]
-    ch = tabs[1]
-    ch.columns = ["_".join(str(x) for x in c) if isinstance(c, tuple) else str(c) for c in ch.columns]
-    date_col = next(c for c in ch.columns if c.lower().startswith("date") or c.lower().startswith("effective"))
-    add_col = next(c for c in ch.columns if "Added" in c and "Ticker" in c)
-    rem_col = next(c for c in ch.columns if "Removed" in c and "Ticker" in c)
-    changes = pd.DataFrame({"date": pd.to_datetime(ch[date_col], errors="coerce"), "added": ch[add_col], "removed": ch[rem_col]}).dropna(subset=["date"])
+    for t in tabs:
+        t.columns = ["_".join(dict.fromkeys(str(x) for x in c)) if isinstance(c, tuple) else str(c) for c in t.columns]
+    cur = next(t for t in tabs if "Symbol" in t.columns)
+    cur = cur.rename(columns={"Symbol": "ticker", next(c for c in cur.columns if "Sector" in c): "sector"})[["ticker", "sector"]]
+    try:
+        ch = next(t for t in tabs if any("Added" in c for c in t.columns) and any("Removed" in c for c in t.columns))
+
+        def pick(word):
+            cols = [c for c in ch.columns if word in c]
+            return next((c for c in cols if "Ticker" in c or "Symbol" in c), cols[0])
+
+        changes = pd.DataFrame({"date": pd.to_datetime(ch[ch.columns[0]], errors="coerce", format="mixed"), "added": ch[pick("Added")],
+                                "removed": ch[pick("Removed")]}).dropna(subset=["date"])
+    except StopIteration:
+        raise ValueError(f"no changes table; tables' columns: {[list(t.columns)[:6] for t in tabs[:4]]}") from None
     return cur, changes
 
 
@@ -184,10 +192,11 @@ def vrp(data: Path, train_end: str = TRAIN_END) -> tuple[dict, pd.DataFrame]:
     for i in range(36, len(df)):
         ok = ~np.isnan(hx[:i]).any(1) & ~np.isnan(df["rv_next"].to_numpy()[:i])
         ok[i - 1:] = False                                                               # next month's rv must be known
-        if ok.sum() > 24:
-            A = np.c_[np.ones(ok.sum()), hx[:i][ok]]
+        if ok.sum() > 60 and not np.isnan(hx[i]).any():
+            L = np.log(np.maximum(hx[:i][ok], 1e-3))                                     # HAR in logs (stable)
+            A = np.c_[np.ones(ok.sum()), L]
             b = np.linalg.lstsq(A, np.log(df["rv_next"].to_numpy()[:i][ok]), rcond=None)[0]
-            har_pred[i] = np.exp(np.r_[1.0, hx[i]] @ b)
+            har_pred[i] = np.exp(np.r_[1.0, np.log(np.maximum(hx[i], 1e-3))] @ b)
     df["exp_rv_har"] = har_pred
     out = {"months": [str(df.index[0]), str(df.index[-1]), len(df)]}
     test0 = pd.Period(pd.Timestamp(train_end), "M")
@@ -428,9 +437,11 @@ def run(data: Path, out: Path, fetch: bool = True, train_end: str = TRAIN_END) -
         c = pd.read_csv(io.StringIO(r.text)).rename(columns={"Symbol": "ticker", "GICS Sector": "sector", "Sector": "sector"})
         c[["ticker", "sector"]].to_csv(cur_f, index=False)
         pd.DataFrame(columns=["date", "added", "removed"]).to_csv(ch_f, index=False)
-        rep["warnings"].append("Used today's S&P 500 members only (no membership history): results carry survivorship bias.")
     cur = pd.read_csv(cur_f)
     changes = pd.read_csv(ch_f, parse_dates=["date"])
+    if changes.empty:
+        rep["warnings"].append("Used today's S&P 500 members only (no membership history): results carry survivorship bias.")
+    rep["membership_changes"] = len(changes)
     months = pd.date_range(START, pd.Timestamp.today(), freq="ME")
     member = membership(cur, changes, months)
     tickers = sorted(member.columns)
