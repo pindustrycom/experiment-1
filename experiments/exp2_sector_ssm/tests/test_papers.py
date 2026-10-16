@@ -82,3 +82,11 @@ def test_parses_wikipedia_tables():
     assert list(cur["ticker"]) == ["MMM", "BRK.B"] and cur["sector"][0] == "Industrials"
     assert ch["added"][0] == "MMM" and ch["removed"][0] == "OLD" and ch["date"][0] == pd.Timestamp("2025-06-23")
     assert papers.ysym("BRK.B") == "BRK-B"
+
+
+def test_membership_from_dates_added():
+    html = """<table><tr><th>Symbol</th><th>GICS Sector</th><th>Date added</th></tr>
+    <tr><td>OLD</td><td>Energy</td><td>1957-03-04</td></tr><tr><td>NEW</td><td>Energy</td><td>2021-06-01</td></tr></table>"""
+    cur, ch = papers.sp500_tables(html)
+    m = papers.membership(cur, ch, pd.date_range("2019-01-31", "2022-12-31", freq="ME"))
+    assert m.loc["2020-01-31", "OLD"] and not m.loc["2020-01-31", "NEW"] and m.loc["2022-01-31", "NEW"]

@@ -65,10 +65,16 @@ def sp500_tables(html: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     tabs = pd.read_html(io.StringIO(html))
     for t in tabs:
         t.columns = ["_".join(dict.fromkeys(str(x) for x in c)) if isinstance(c, tuple) else str(c) for c in t.columns]
-    cur = next(t for t in tabs if "Symbol" in t.columns)
-    cur = cur.rename(columns={"Symbol": "ticker", next(c for c in cur.columns if "Sector" in c): "sector"})[["ticker", "sector"]]
+    cur0 = next(t for t in tabs if "Symbol" in t.columns)
+    cur = cur0.rename(columns={"Symbol": "ticker", next(c for c in cur0.columns if "Sector" in c): "sector"})[["ticker", "sector"]]
+    ch = next((t for t in tabs if any("Added" in c for c in t.columns) and any("Removed" in c for c in t.columns)), None)
+    if ch is None and "Date added" in cur0.columns:
+        # no change list on the page: use each current member's date added (removed companies stay missing)
+        changes = pd.DataFrame({"date": pd.to_datetime(cur0["Date added"], errors="coerce", format="mixed"), "added": cur0["Symbol"], "removed": None})
+        return cur, changes.dropna(subset=["date"])
     try:
-        ch = next(t for t in tabs if any("Added" in c for c in t.columns) and any("Removed" in c for c in t.columns))
+        if ch is None:
+            raise StopIteration
 
         def pick(word):
             cols = [c for c in ch.columns if word in c]
@@ -441,6 +447,9 @@ def run(data: Path, out: Path, fetch: bool = True, train_end: str = TRAIN_END) -
     changes = pd.read_csv(ch_f, parse_dates=["date"])
     if changes.empty:
         rep["warnings"].append("Used today's S&P 500 members only (no membership history): results carry survivorship bias.")
+    elif changes["removed"].isna().all():
+        rep["warnings"].append("Membership from current members' dates added only: stocks count from the month they joined, "
+                               "but companies that later left the index are missing (partial survivorship bias).")
     rep["membership_changes"] = len(changes)
     months = pd.date_range(START, pd.Timestamp.today(), freq="ME")
     member = membership(cur, changes, months)
