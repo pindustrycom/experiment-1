@@ -190,6 +190,10 @@ def main(argv=None) -> None:
     op.add_argument("--data", type=Path, default=Path("topo_data"))
     op.add_argument("--out", type=Path, default=Path("oria_results"))
     op.add_argument("--no-network", action="store_true")
+    pp = sub.add_parser("papers", help="variance risk premium, ML stock ranking, overnight momentum (exp2/papers.py)")
+    pp.add_argument("--data", type=Path, default=Path("papers_data"))
+    pp.add_argument("--out", type=Path, default=Path("papers_results"))
+    pp.add_argument("--no-network", action="store_true")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     if a.cmd == "topo":
@@ -197,6 +201,11 @@ def main(argv=None) -> None:
         rep = topo.run(a.data, a.out, fetch=not a.no_network)
         print(json.dumps({k: rep.get(k) for k in ("sessions", "warnings", "fetch", "chosen", "placebo_test_sharpe", "topo_gate", "topo_vol_ic", "graph_minus", "results", "seconds")},
                          indent=1, default=str))
+        return
+    if a.cmd == "papers":
+        from . import papers
+        rep = papers.run(a.data, a.out, fetch=not a.no_network)
+        print(json.dumps({k: rep.get(k) for k in ("warnings", "universe", "vrp", "overnight_momentum", "gkx", "seconds")}, indent=1, default=str))
         return
     if a.cmd == "oria":
         from . import oria
