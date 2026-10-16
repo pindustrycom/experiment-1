@@ -45,11 +45,28 @@ class EKFSSM(nn.Module):
     on a ring near the unit circle so slow modes start slow (as in LRU)."""
 
     def __init__(self, n_obs: int, n_targets: int, d_state: int = 8, d_hidden: int = 16, norm: str = "none", radius: str = "sigmoid",
-                 r_min: float = 0.9, r_max: float = 0.995):
+                 r_min: float = 0.9, r_max: float = 0.995, sv: tuple[int, int] | None = None):
+        """sv = (index of the daily return measurement, index of its log-square measurement): adds a stochastic
+        volatility state h (log variance of the daily return) after the oscillating modes. h follows an AR(1)
+        driven, like every other state, by the tanh coupling (so news and the other states can move it); it is
+        measured by log(r^2) with slope 1 (Harvey-Ruiz-Shephard), it scales the return's measurement variance
+        by exp(h), and it scales the forecast variance by exp(kappa h)."""
         super().__init__()
         assert d_state % 2 == 0 and norm in ("none", "h2", "resonance") and radius in ("sigmoid", "exp")
         k = d_state // 2
+        self.k, self.sv = k, sv
+        d_state = d_state + (1 if sv else 0)
         self.d, self.m, self.norm, self.radius = d_state, n_obs, norm, radius
+        if sv:
+            self.phi_raw = nn.Parameter(torch.tensor(3.0))                       # phi = sigmoid: persistence ~0.95
+            self.kappa = nn.Parameter(torch.zeros(n_targets))
+            hm = torch.ones(n_obs, d_state)
+            hm[:, -1] = 0.0
+            hm[sv[1], :] = 0.0
+            hf = torch.zeros(n_obs, d_state)
+            hf[sv[1], -1] = 1.0
+            self.register_buffer("h_mask", hm)
+            self.register_buffer("h_fix", hf)
         if radius == "sigmoid":
             # damped rotations: r in (0.5, 1), periods spread from days to a year (S4D-Lin-like)
             self.rho = nn.Parameter(torch.linspace(1.0, 5.0, k))                 # r = 0.5 + 0.5 sigmoid(rho)
@@ -90,12 +107,24 @@ class EKFSSM(nn.Module):
             g = torch.sqrt(1 - self.r() ** 2)
         else:
             g = self.resonance().rsqrt()
-        return g.repeat_interleave(2)
+        g = g.repeat_interleave(2)
+        if self.sv:
+            gh = torch.ones(1) if self.norm == "none" else torch.sqrt(1 - self.phi() ** 2).reshape(1)
+            g = torch.cat([g, gh])
+        return g
+
+    def phi(self) -> torch.Tensor:
+        return torch.sigmoid(self.phi_raw)
+
+    def Hm(self) -> torch.Tensor:
+        return self.H * self.h_mask + self.h_fix if self.sv else self.H
 
     def A(self) -> torch.Tensor:
         r = self.r()
         cs, sn = r * torch.cos(self.theta), r * torch.sin(self.theta)
         blocks = torch.stack([torch.stack([cs, -sn], -1), torch.stack([sn, cs], -1)], -2)  # (k,2,2)
+        if self.sv:
+            return torch.block_diag(*blocks, self.phi().reshape(1, 1))
         return torch.block_diag(*blocks)
 
     def f(self, x: torch.Tensor, A: torch.Tensor, g: torch.Tensor | None = None):
@@ -116,33 +145,36 @@ class EKFSSM(nn.Module):
         A = self.A()
         g = self.gain()
         Q = torch.diag(self.log_q.exp() * g ** 2)
-        rinv = (-self.log_r).exp()                                             # 1/R, (m,)
         eye = torch.eye(d, dtype=z.dtype)
         x = z.new_zeros(B, d) if x0 is None else x0
         P = eye.expand(B, d, d) * 1.0 if P0 is None else P0
         self.trace = []
         nll, n_obs = z.new_zeros(()), z.new_zeros(())
+        H = self.Hm()
         xs, Ps = [], []
         for t in range(L):
             if t > 0:
                 x, F = self.f(x, A, g)
                 P = F @ P @ F.transpose(1, 2) + Q
             msk = mask[:, t]                                                   # (B,m)
-            w = rinv * msk                                                     # R^-1 on observed dims, 0 elsewhere
-            e = (z[:, t] - (x @ self.H.T + self.b)) * msk                      # innovation
-            HtW = self.H.T * w[:, None, :]                                     # (B,d,m) = H^T R^-1
+            logr = self.log_r.expand(B, -1)
+            if self.sv:     # the return's measurement variance is exp(h) times its base level (predicted h, plug-in)
+                logr = logr + torch.nn.functional.one_hot(torch.tensor(self.sv[0]), self.m).to(z.dtype) * x[:, -1:]
+            w = (-logr).exp() * msk                                            # R^-1 on observed dims, 0 elsewhere
+            e = (z[:, t] - (x @ H.T + self.b)) * msk                           # innovation
+            HtW = H.T * w[:, None, :]                                          # (B,d,m) = H^T R^-1
             Pinv = torch.cholesky_inverse(torch.linalg.cholesky(P))
-            info = Pinv + HtW @ self.H                                         # P+^-1
+            info = Pinv + HtW @ H                                              # P+^-1
             Lc = torch.linalg.cholesky(info)
             Pp = torch.cholesky_inverse(Lc)
             gi = (HtW @ e[..., None]).squeeze(-1)                              # H^T R^-1 e
             # log N(e; 0, S) with S = H P H^T + R, via the matrix determinant lemma and Woodbury
-            logdetS = (self.log_r * msk).sum(-1) + torch.logdet(P) + 2 * torch.log(torch.diagonal(Lc, dim1=-2, dim2=-1)).sum(-1)
+            logdetS = (logr * msk).sum(-1) + torch.logdet(P) + 2 * torch.log(torch.diagonal(Lc, dim1=-2, dim2=-1)).sum(-1)
             quad = (e * e * w).sum(-1) - (gi[:, None, :] @ Pp @ gi[..., None]).squeeze(-1).squeeze(-1)
             nll = nll + 0.5 * (logdetS + quad + msk.sum(-1) * math.log(2 * math.pi)).sum()
             n_obs = n_obs + msk.sum()
             if record:      # d x_{t|t} / d x_{t|t-1} = I - P+ H^T R^-1 H, and the transition Jacobian into it
-                self.trace.append((F if t > 0 else None, eye - Pp @ HtW @ self.H))
+                self.trace.append((F if t > 0 else None, eye - Pp @ HtW @ H))
             x = x + (Pp @ gi[..., None]).squeeze(-1)
             P = 0.5 * (Pp + Pp.transpose(1, 2))
             xs.append(x)
@@ -150,7 +182,10 @@ class EKFSSM(nn.Module):
         self.last_x, self.last_P = x, P
         X, PP = torch.stack(xs, 1), torch.stack(Ps, 1)                          # (B,L,d), (B,L,d,d)
         mu = X @ self.C.T + self.c0
-        var = torch.einsum("td,blde,te->blt", self.C, PP, self.C) + (2 * self.log_s).exp()
+        noise = 2 * self.log_s
+        if self.sv:
+            noise = noise + self.kappa * X[..., -1:]
+        var = torch.einsum("td,blde,te->blt", self.C, PP, self.C) + noise.exp()
         return mu, var, nll / n_obs.clamp_min(1), X
 
 

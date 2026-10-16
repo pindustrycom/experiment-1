@@ -150,7 +150,7 @@ def gradient_fading(m: EKFSSM, d: Data, cfg: Config, lags: int = 120, ends: int 
     with torch.no_grad():
         m(d.z[None, lo:sp["va1"] + 1], d.mask[None, lo:sp["va1"] + 1], record=True)
     tr = m.trace
-    k_modes = m.d // 2
+    k_modes = m.k
     E = np.zeros((ends, k_modes, lags))
     T_all = np.linspace(lags + 1, len(tr) - 1, ends).astype(int)
     with torch.no_grad():
@@ -159,7 +159,7 @@ def gradient_fading(m: EKFSSM, d: Data, cfg: Config, lags: int = 120, ends: int 
             for k in range(lags):
                 F, M = tr[T - k]
                 G = G @ M[0]
-                blk = (G ** 2).reshape(-1, k_modes, 2).sum((0, 2))
+                blk = (G[:, :2 * k_modes] ** 2).reshape(-1, k_modes, 2).sum((0, 2))
                 E[e, :, k] = blk.numpy()
                 G = G @ F[0]
     prof = E.mean(0)                                                 # (modes, lags)
@@ -169,7 +169,7 @@ def gradient_fading(m: EKFSSM, d: Data, cfg: Config, lags: int = 120, ends: int 
         y = np.log(prof[b, :60] + 1e-30)
         rate.append(float(np.exp(np.polyfit(np.arange(60), y, 1)[0] / 2)))   # amplitude decay per session
     with torch.no_grad():
-        cb = (m.C.detach() ** 2).reshape(-1, k_modes, 2).sum((0, 2)) * m.gain()[::2] ** 2
+        cb = (m.C.detach()[:, :2 * k_modes] ** 2).reshape(-1, k_modes, 2).sum((0, 2)) * m.gain()[:2 * k_modes:2] ** 2
         res = m.resonance()
         r = m.r()
     pred_res = (cb * res).numpy()
