@@ -8,8 +8,9 @@ name: Experiment 2 paper ideas
 
 on:
   pull_request:
-    paths: ["experiments/exp2_sector_ssm/exp2/papers.py", "experiments/exp2_sector_ssm/exp2/volpred.py", "experiments/exp2_sector_ssm/tests/test_papers.py",
-            "experiments/exp2_sector_ssm/tests/test_volpred.py", ".github/workflows/papers.yml"]
+    paths: ["experiments/exp2_sector_ssm/exp2/papers.py", "experiments/exp2_sector_ssm/exp2/volpred.py", "experiments/exp2_sector_ssm/exp2/collapse.py", "experiments/exp2_sector_ssm/tests/test_papers.py",
+            "experiments/exp2_sector_ssm/tests/test_volpred.py", "experiments/exp2_sector_ssm/tests/test_collapse.py",
+            ".github/workflows/papers.yml"]
   workflow_dispatch:
 
 permissions:
@@ -42,7 +43,7 @@ jobs:
           pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
       - name: Tests
-        run: ruff check exp2 tests && python -m pytest -q tests/test_papers.py tests/test_volpred.py
+        run: ruff check exp2 tests && python -m pytest -q tests/test_papers.py tests/test_volpred.py tests/test_collapse.py
 
       - name: Restore cached data
         run: |
@@ -61,6 +62,12 @@ jobs:
         run: |
           set -o pipefail
           python -m exp2 volpred --data papers_data --out papers_results/volpred | tee /tmp/volpred.json
+
+      - name: Collapse risk, seven strategy families and a combined portfolio (exp2/collapse.py)
+        run: |
+          set -o pipefail
+          python -m exp2 collapse --data papers_data --out papers_results/collapse | tee /tmp/collapse.json
+          rm -f papers_results/collapse/panel_stage1.pkl
 
       - name: Save data and results
         if: always()

@@ -197,6 +197,9 @@ def main(argv=None) -> None:
     vp = sub.add_parser("volpred", help="forecast volatility, then use it to predict returns (exp2/volpred.py)")
     vp.add_argument("--data", type=Path, default=Path("papers_data"))
     vp.add_argument("--out", type=Path, default=Path("volpred_results"))
+    cp = sub.add_parser("collapse", help="collapse-risk model, seven strategy families and a combined portfolio (exp2/collapse.py)")
+    cp.add_argument("--data", type=Path, default=Path("papers_data"))
+    cp.add_argument("--out", type=Path, default=Path("collapse_results"))
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     if a.cmd == "topo":
@@ -209,6 +212,11 @@ def main(argv=None) -> None:
         from . import papers
         rep = papers.run(a.data, a.out, fetch=not a.no_network)
         print(json.dumps({k: rep.get(k) for k in ("warnings", "universe", "vrp", "overnight_momentum", "gkx", "seconds")}, indent=1, default=str))
+        return
+    if a.cmd == "collapse":
+        from . import collapse
+        rep = collapse.run(a.data, a.out)
+        print(json.dumps({k: rep.get(k) for k in ("warnings", "collapse_model", "pairs", "combined", "seconds")}, indent=1, default=str))
         return
     if a.cmd == "volpred":
         from . import volpred
