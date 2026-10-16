@@ -70,3 +70,15 @@ def test_run_end_to_end(tmp_path):
     assert {"ols3", "ridge", "gbt", "nn"} <= set(g)
     # momentum is planted, so every model should rank stocks profitably before costs dominate
     assert g["ridge"]["test_2019_on"]["ls_equal"]["mean_pct_month"] > 0
+
+
+def test_parses_wikipedia_tables():
+    html = """<table><tr><th>Symbol</th><th>Security</th><th>GICS Sector</th></tr>
+    <tr><td>MMM</td><td>3M</td><td>Industrials</td></tr><tr><td>BRK.B</td><td>Berkshire</td><td>Financials</td></tr></table>
+    <table><tr><th rowspan="2">Effective Date</th><th colspan="2">Added</th><th colspan="2">Removed</th><th rowspan="2">Reason</th></tr>
+    <tr><th>Ticker</th><th>Security</th><th>Ticker</th><th>Security</th></tr>
+    <tr><td>June 23, 2025</td><td>MMM</td><td>3M</td><td>OLD</td><td>Old Co</td><td>x</td></tr></table>"""
+    cur, ch = papers.sp500_tables(html)
+    assert list(cur["ticker"]) == ["MMM", "BRK.B"] and cur["sector"][0] == "Industrials"
+    assert ch["added"][0] == "MMM" and ch["removed"][0] == "OLD" and ch["date"][0] == pd.Timestamp("2025-06-23")
+    assert papers.ysym("BRK.B") == "BRK-B"

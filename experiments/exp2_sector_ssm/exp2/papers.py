@@ -35,6 +35,7 @@ log = logging.getLogger("exp2.papers")
 TRAIN_END = "2018-12-31"
 START = "1998-01-01"
 WIKI = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+FALLBACK = "https://raw.githubusercontent.com/datasets/s-and-p-500-companies/main/data/constituents.csv"
 COST_BP = 10.0           # per unit traded, each side (monthly rebalanced books)
 FEATURES = ["mom12_2", "mom1", "ind_mom", "vol1m", "ivol3m", "beta12m", "max1m", "hi52", "ldvol", "lprice"]
 OLS3 = ["mom12_2", "ldvol", "vol1m"]
@@ -58,7 +59,9 @@ def fetch_yahoo(ticker: str, start: str = START) -> pd.DataFrame:
 def sp500_tables(html: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Current S&P 500 members (ticker, sector) and the dated list of additions and removals."""
     if html is None:
-        html = requests.get(WIKI, headers={"User-Agent": "research-script"}, timeout=30).text
+        r = requests.get(WIKI, headers={"User-Agent": "experiment-1 research (https://github.com/pindustrycom/experiment-1)"}, timeout=30)
+        r.raise_for_status()
+        html = r.text
     tabs = pd.read_html(io.StringIO(html))
     cur = tabs[0].rename(columns={"Symbol": "ticker", "GICS Sector": "sector"})[["ticker", "sector"]]
     ch = tabs[1]
@@ -408,15 +411,24 @@ def run(data: Path, out: Path, fetch: bool = True, train_end: str = TRAIN_END) -
     t0 = time.time()
     out.mkdir(parents=True, exist_ok=True)
     rep = {"built": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"), "train_end": train_end, "warnings": []}
+    data.mkdir(parents=True, exist_ok=True)
     cur_f, ch_f = data / "sp500_current.csv", data / "sp500_changes.csv"
     if fetch:
         try:
             cur, changes = sp500_tables()
-            data.mkdir(parents=True, exist_ok=True)
             cur.to_csv(cur_f, index=False)
             changes.to_csv(ch_f, index=False)
         except Exception as ex:  # noqa: BLE001
-            rep["warnings"].append(f"S&P 500 list: {type(ex).__name__}: {ex}")
+            log.exception("S&P 500 list from Wikipedia")
+            rep["warnings"].append(f"S&P 500 list from Wikipedia: {type(ex).__name__}: {str(ex)[:200]}")
+    if not cur_f.exists() and fetch:
+        # fallback: today's members only (no change history, so the universe has full survivorship bias)
+        r = requests.get(FALLBACK, timeout=30)
+        r.raise_for_status()
+        c = pd.read_csv(io.StringIO(r.text)).rename(columns={"Symbol": "ticker", "GICS Sector": "sector", "Sector": "sector"})
+        c[["ticker", "sector"]].to_csv(cur_f, index=False)
+        pd.DataFrame(columns=["date", "added", "removed"]).to_csv(ch_f, index=False)
+        rep["warnings"].append("Used today's S&P 500 members only (no membership history): results carry survivorship bias.")
     cur = pd.read_csv(cur_f)
     changes = pd.read_csv(ch_f, parse_dates=["date"])
     months = pd.date_range(START, pd.Timestamp.today(), freq="ME")
