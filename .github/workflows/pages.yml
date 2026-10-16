@@ -116,7 +116,8 @@ jobs:
           from datetime import UTC, datetime, timedelta
           from sqlalchemy import func, select
           from app.core.db import session_scope
-          from app.models import ExtractedEvent, IndexScore, NewsArticle, NewsFetchLog, Pair, ProviderUsage
+          import json
+          from app.models import CompanyFundamental, ComponentCalculation, ExtractedEvent, IndexScore, NewsArticle, NewsFetchLog, Pair, ProviderUsage
           with session_scope() as db:
               since = datetime.now(UTC) - timedelta(hours=6)
               fetch = db.execute(select(NewsFetchLog.provider, NewsFetchLog.success, func.count(), func.sum(NewsFetchLog.documents_found))
@@ -135,6 +136,7 @@ jobs:
               use = db.execute(select(ProviderUsage.provider, func.count(), func.sum(ProviderUsage.cost_usd))
                                .where(ProviderUsage.ts >= since).group_by(ProviderUsage.provider)).all()
               print("\n**Provider calls this run:** " + ("; ".join(f"{p}: {n} calls, ${c or 0:.3f}" for p, n, c in use) or "none"))
+              fdiag = []
               print("\n| Pair | SI-v1 | SI-v2 | SI-v2 status | coverage | why |\n|---|---|---|---|---|---|")
               for pr in db.scalars(select(Pair).where(Pair.status == "active").order_by(Pair.slug)):
                   last = {}
@@ -145,6 +147,19 @@ jobs:
                   f = lambda x: "n/a" if x is None or x.value is None else f"{x.value:.1f}"
                   why = "" if v2 is None else " ".join(v2.explanation.split())[:220].replace("|", "/")
                   print(f"| {pr.slug} | {f(v1)} | {f(v2)} | {v2.status if v2 else '-'} | {v2.coverage if v2 else 0:.2f} | {why} |")
+                  if v2 is not None:
+                      fc = db.scalar(select(ComponentCalculation).where(ComponentCalculation.score_id == v2.id, ComponentCalculation.component == "F"))
+                      if fc is not None and not fc.available:
+                          fdiag.append((pr, fc))
+              for pr, fc in fdiag:  # why fundamentals are missing, with the latest SEC facts on file
+                  print(f"\n**{pr.slug} fundamentals:** {fc.explanation} inputs: {json.dumps(fc.inputs, default=str)[:600]}")
+                  for c in (pr.company_a, pr.company_b):
+                      for m in ("revenue", "operating_income", "eps_diluted"):
+                          r = db.execute(select(CompanyFundamental.period_end, CompanyFundamental.duration_days, CompanyFundamental.filed_at, CompanyFundamental.form)
+                                         .where(CompanyFundamental.company_id == c.id, CompanyFundamental.metric == m)
+                                         .order_by(CompanyFundamental.period_end.desc(), CompanyFundamental.filed_at.desc()).limit(3)).all()
+                          n = db.scalar(select(func.count()).select_from(CompanyFundamental).where(CompanyFundamental.company_id == c.id, CompanyFundamental.metric == m))
+                          print(f"- {c.ticker} {m}: {n} facts; latest {[tuple(map(str, x)) for x in r]}")
           PY
 
       - name: Rebuild past score history (weekly; continues where the last run stopped)

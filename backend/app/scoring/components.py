@@ -196,10 +196,17 @@ def _latest_pit(facts: list[Fact], metric: str, cutoff: date, max_stale: int) ->
     if (cutoff - latest.filed_at).days > max_stale:
         return None
     target = latest.period_end - timedelta(days=365)
-    prior = [f for (pe, dur), f in known.items() if dur == latest.duration_days and abs((pe - target).days) <= 20]
+    # 52/53-week calendars (e.g. Coca-Cola) make the same fiscal quarter a few days longer or shorter year to year
+    prior = [f for (pe, dur), f in known.items() if _same_length(dur, latest.duration_days) and abs((pe - target).days) <= 20]
     if not prior:
         return None
     return latest, min(prior, key=lambda f: abs((f.period_end - target).days))
+
+
+def _same_length(d1: int | None, d2: int | None) -> bool:
+    if d1 is None or d2 is None:
+        return d1 == d2
+    return abs(d1 - d2) <= max(7, 0.05 * d2)
 
 
 def _growth(cur: float, prev: float) -> float | None:
