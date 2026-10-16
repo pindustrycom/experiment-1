@@ -1,0 +1,9 @@
+# Experiment 3 runtime and test dependencies. torch is installed separately from the CPU wheel index
+# (see .github/workflows/exp3.yml): pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+anthropic==1.14.0
+numpy==2.5.4
+pandas==3.0.6
+pydantic==2.14.1
+pytest==9.1.1
+requests==2.34.2
+ruff==0.17.1

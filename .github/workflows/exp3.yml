@@ -1,7 +1,12 @@
 name: Experiment 3
 
-# Experiment 3 (NVDA EKF + SSM with sentiment by category). For now: check which historical
-# sentiment sources the runner can reach. Saves nothing.
+# Experiment 3 (NVDA EKF + SSM with sentiment by category): collect NVDA's 2016-2025 history
+# (prices, market cap, analyst actions, Google News headlines, Reddit posts), score the text with
+# Claude Haiku, fit on 2018-2021 and test on 2022-2025.
+#
+# Collected data and scores are cached in the "exp3-data" release, so a rerun only fetches what is
+# missing and never pays twice for a score. Results are uploaded as the "exp3-results" artifact and
+# printed in the log. Nothing is deployed.
 
 on:
   pull_request:
@@ -9,25 +14,68 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write   # the data cache release
 
 concurrency:
-  group: exp3-${{ github.ref }}
-  cancel-in-progress: true
+  group: exp3
+  cancel-in-progress: false
+
+env:
+  DATA_TAG: exp3-data
 
 jobs:
-  probe:
+  run:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 330
     env:
       TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
-      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
       SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+      GH_TOKEN: ${{ github.token }}
+      EXP3_CLAUDE_BUDGET_USD: "4"
+    defaults:
+      run:
+        working-directory: experiments/exp3_nvda
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install requests==2.34.2
-      - name: Probe sentiment sources
-        run: python experiments/exp3_nvda/probe.py
+          cache: pip
+          cache-dependency-path: experiments/exp3_nvda/requirements.txt
+      - run: pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install -r requirements.txt
+      - name: Tests
+        run: ruff check exp3 tests && python -m pytest -q
+
+      - name: Restore collected data
+        run: |
+          mkdir -p data
+          if gh release view "$DATA_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx exp3-data.tar.gz; then
+            gh release download "$DATA_TAG" --repo "$GITHUB_REPOSITORY" --pattern exp3-data.tar.gz --dir /tmp/prev
+            tar xzf /tmp/prev/exp3-data.tar.gz -C data
+            echo "Restored data: $(ls data)"
+          fi
+
+      - name: Run Experiment 3
+        run: |
+          set -o pipefail
+          python -m exp3 run --data data --out results | tee /tmp/summary.json
+
+      - name: Save collected data
+        if: always()
+        run: |
+          [ -d data ] && [ -n "$(ls data)" ] || exit 0
+          tar czf /tmp/exp3-data.tar.gz -C data .
+          gh release view "$DATA_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$DATA_TAG" --repo "$GITHUB_REPOSITORY" --title "Experiment 3 data cache" \
+              --notes "Collected NVDA history and Claude scores for Experiment 3. Not a software release." --latest=false
+          gh release upload "$DATA_TAG" /tmp/exp3-data.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Keep results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exp3-results
+          path: experiments/exp3_nvda/results
+          if-no-files-found: warn
