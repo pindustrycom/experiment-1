@@ -182,8 +182,18 @@ def main(argv=None) -> None:
     r.add_argument("--backtest", action="store_true", help="re-run the walk-forward backtest")
     r.add_argument("--retrain", action="store_true", help="retrain even if the model is current")
     r.add_argument("--no-network", action="store_true", help="use stored data only")
+    tp = sub.add_parser("topo", help="topological stat arb backtest (exp2/topo.py)")
+    tp.add_argument("--data", type=Path, default=Path("topo_data"))
+    tp.add_argument("--out", type=Path, default=Path("topo_results"))
+    tp.add_argument("--no-network", action="store_true")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+    if a.cmd == "topo":
+        from . import topo
+        rep = topo.run(a.data, a.out, fetch=not a.no_network)
+        print(json.dumps({k: rep.get(k) for k in ("sessions", "warnings", "fetch", "chosen", "placebo_test_sharpe", "topo_gate", "topo_vol_ic", "graph_minus", "results", "seconds")},
+                         indent=1, default=str))
+        return
     torch.set_num_threads(max(1, torch.get_num_threads()))
     s = run(a.state, a.site, a.backtest, a.retrain, not a.no_network)
     bt = s.get("backtest") or {}
