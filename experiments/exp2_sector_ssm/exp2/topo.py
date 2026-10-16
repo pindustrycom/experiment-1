@@ -70,7 +70,7 @@ def fetch_yahoo(ticker: str, start: str) -> pd.DataFrame:
     res = r.json()["chart"]["result"][0]
     q = res["indicators"]
     dates = pd.to_datetime(res["timestamp"], unit="s", utc=True).tz_convert("America/New_York").strftime("%Y-%m-%d")
-    return pd.DataFrame({"date": dates, "close": q["quote"][0]["close"], "adj_close": q["adjclose"][0]["adjclose"]}).dropna()
+    return pd.DataFrame({"date": dates, "open": q["quote"][0]["open"], "close": q["quote"][0]["close"], "adj_close": q["adjclose"][0]["adjclose"]}).dropna()
 
 
 def fetch_tiingo(ticker: str, start: str) -> pd.DataFrame:
@@ -80,10 +80,12 @@ def fetch_tiingo(ticker: str, start: str) -> pd.DataFrame:
     key = os.environ.get("TIINGO_API_KEY")
     if not key:
         raise RuntimeError("no TIINGO_API_KEY")
-    return ft(ticker.replace(".", "-"), start, key)[["date", "close", "adj_close"]]
+    df = ft(ticker.replace(".", "-"), start, key)
+    df["open"] = np.nan                     # this source isn't used for open prices
+    return df[["date", "open", "close", "adj_close"]]
 
 
-def update_prices(data: Path, tickers: list[str], fetchers=(fetch_yahoo, fetch_tiingo), pause: float = 1.0, max_age_days: int = 3) -> dict:
+def update_prices(data: Path, tickers: list[str], fetchers=(fetch_yahoo, fetch_tiingo), pause: float = 1.0, max_age_days: int = 3, need_open: bool = False) -> dict:
     """One CSV per ticker; a ticker is refetched (whole history, so adjustments stay consistent) when it is stale."""
     d = data / "prices"
     d.mkdir(parents=True, exist_ok=True)
@@ -91,7 +93,8 @@ def update_prices(data: Path, tickers: list[str], fetchers=(fetch_yahoo, fetch_t
     for t in tickers:
         f = d / f"{t}.csv"
         if f.exists() and (time.time() - f.stat().st_mtime) < max_age_days * 86400:
-            continue
+            if not need_open or "open" in pd.read_csv(f, nrows=1).columns:
+                continue
         for fetch in fetchers:
             try:
                 df = fetch(t, START)
