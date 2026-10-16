@@ -1,4 +1,5 @@
 import json
+import math
 from dataclasses import replace
 
 import numpy as np
@@ -156,3 +157,41 @@ def test_resonance_gain_tames_a_resonant_mode():
     m.spectrum = S / S.mean()
     g = m.gain().detach()[::2]
     assert g[0] < g[1]
+
+
+def test_volatility_state_tracks_regime_switching_variance():
+    """Returns whose variance switches between calm and stressed spells: the SV state, filtered from r and log r^2, follows the true log variance."""
+    rng = np.random.default_rng(0)
+    L = 600
+    regime = (np.sin(np.arange(L) / 40) > 0.3).astype(float)
+    logv = np.log(0.5) + regime * np.log(9.0)
+    r = rng.normal(0, 1, L) * np.exp(logv / 2)
+    z = torch.tensor(np.c_[r, np.log(r ** 2 + 0.01) - np.median(np.log(r ** 2 + 0.01))], dtype=torch.float32)[None]
+    m = EKFSSM(2, 1, d_state=4, sv=(0, 1))
+    with torch.no_grad():
+        m.log_r.copy_(torch.tensor([0.0, math.log(4.93)]))      # var of log chi-square(1) = pi^2 / 2
+        m.log_q.fill_(-4.0)
+        m.log_q[-1] = math.log(0.05)
+        m.phi_raw.fill_(4.0)
+        _, _, _, X = m(z, torch.ones_like(z))
+    h = X[0, 50:, -1].numpy()
+    assert np.corrcoef(h, logv[50:])[0, 1] > 0.7
+
+
+def test_lab_end_to_end(tmp_path):
+    from exp3 import lab
+    days = _prices(tmp_path)
+    news = [{"id": f"gn{i}", "ts": d.strftime("%Y-%m-%dT12:00:00+00:00"), "title": f"nvidia {'up' if i % 3 else 'down'} {i}", "source": "Reuters" if i % 2 else "x"}
+            for i, d in enumerate(days[300::3])]
+    with open(tmp_path / "news.jsonl", "w") as f:
+        f.writelines(json.dumps(r) + "\n" for r in news)
+    (tmp_path / "reddit.jsonl").write_text("")
+    pd.DataFrame({"ts": ["2019-05-01T12:00:00+00:00"], "firm": "X", "action": "up", "from_grade": "Hold", "to_grade": "Buy", "pt_action": "Raises",
+                  "pt": 10, "pt_prior": 8}).to_csv(tmp_path / "analysts.csv", index=False)
+    score.score_all(tmp_path, score.items_to_score(collect.load_jsonl(tmp_path / "news.jsonl"), collect.load_jsonl(tmp_path / "reddit.jsonl")), FakeScorer())
+    rep = lab.run(tmp_path, tmp_path / "lab", cfg=CFG, seeds=(0,), n_placebo=5, ekf_runs_sel=("ekf_PV_sv",))
+    assert set(rep["targets"]) == set(lab.TARGETS)
+    sc = rep["targets"]["vol"]["scores"]
+    assert {"naive", "har", "ridge_PVX_wf", "ekf_PV_sv"} <= set(sc)
+    assert "buy_and_hold_nvda" in rep["pnl"] and 0 <= rep["placebo"]["ret:PVS"]["p_value"] <= 1
+    assert 0 < rep["ekf"]["ekf_PV_sv"]["phi"][0] < 1

@@ -87,11 +87,12 @@ def input_spectrum(z: torch.Tensor, seg: int) -> torch.Tensor:
     return S / S.mean()
 
 
-def fit_ekf(d: Data, cfg: Config, seed: int, norm: str = "none", radius: str = "sigmoid", carry: bool = False) -> tuple[EKFSSM, float]:
+def fit_ekf(d: Data, cfg: Config, seed: int, norm: str = "none", radius: str = "sigmoid", carry: bool = False,
+            sv: tuple[int, int] | None = None) -> tuple[EKFSSM, float]:
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
     sp = d.sp
-    m = EKFSSM(d.z.shape[1], 1, cfg.d_state, cfg.d_hidden, norm=norm, radius=radius)
+    m = EKFSSM(d.z.shape[1], d.y.shape[1], cfg.d_state, cfg.d_hidden, norm=norm, radius=radius, sv=sv)
     m.spectrum = input_spectrum(d.z[sp["first"]:sp["fit1"] + 1], cfg.spectrum_seg)
     opt = torch.optim.Adam(m.parameters(), lr=cfg.lr)
     burn = 32
@@ -102,7 +103,7 @@ def fit_ekf(d: Data, cfg: Config, seed: int, norm: str = "none", radius: str = "
         with torch.no_grad():
             mu, var, _, _ = m(d.z[None, lo:sp["va1"] + 1], d.mask[None, lo:sp["va1"] + 1])
             k = sp["va1"] - sp["va0"] + 1
-            return float(target_nll(mu[0, -k:], var[0, -k:], d.y[sp["va0"]:sp["va1"] + 1]))
+            return float(target_nll(mu[0, -k:], var[0, -k:], d.y[sp["va0"]:sp["va1"] + 1]))   # NaN targets are skipped
 
     best, best_state, since = math.inf, copy.deepcopy(m.state_dict()), 0
     for step in range(cfg.steps):
