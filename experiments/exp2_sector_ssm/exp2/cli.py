@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 import traceback
@@ -189,4 +190,5 @@ def main(argv=None) -> None:
     print(json.dumps({"steps": s["steps"], "warnings": s["warnings"], "latest": s.get("latest"), "model": s.get("model"),
                       "backtest": {k: bt.get(k) for k in ("first", "last", "blocks", "complete", "scorecard_nonoverlap", "vs_zero", "prune_compare", "val_nll_full")}},
                      indent=1, default=str))
-    sys.exit(0)
+    # A trial run (pull request) that produced no model is a failure, not a quiet success.
+    sys.exit(1 if os.environ.get("TRIAL") == "true" and not s.get("model") else 0)

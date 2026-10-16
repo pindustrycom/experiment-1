@@ -59,7 +59,8 @@ def fetch_tiingo(ticker: str, start: str, key: str) -> pd.DataFrame:
                              {"startDate": start, "token": key, "format": "json"}))
 
 
-def update_prices(state: Path, tickers: list[str], start: str, key: str | None, fetch=fetch_tiingo) -> dict:
+def update_prices(state: Path, tickers: list[str], start: str, key: str | None, fetch=fetch_tiingo,
+                  retry_wait: float = 75.0, passes: int = 3) -> dict:
     """Bring each ticker's file up to date. Adjusted closes change for the whole history after a
     dividend or split, so a ticker is re-downloaded in full whenever a new bar carries one or the
     overlap no longer matches; otherwise only recent bars are fetched."""
@@ -69,34 +70,49 @@ def update_prices(state: Path, tickers: list[str], start: str, key: str | None, 
         return out
     d = state / "prices"
     d.mkdir(parents=True, exist_ok=True)
-    for t in tickers:
-        f = d / f"{t}.csv"
-        try:
-            old = pd.read_csv(f, dtype={"date": str}) if f.exists() else None
-            full = old is None or old.empty
-            if not full:
-                since = (pd.Timestamp(old["date"].iloc[-1]) - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
-                new = fetch(t, since, key)
-                ov = old.merge(new, on="date", suffixes=("", "_n"))
-                fresh = new[new["date"] > old["date"].iloc[-1]]
-                corporate = (fresh["div_cash"].fillna(0) != 0).any() or (fresh["split_factor"].fillna(1) != 1).any()
-                drift = ov.empty or (abs(ov["adj_close"] / ov["adj_close_n"] - 1) > 1e-6).any()
-                if corporate or drift:
-                    full = True
-                else:
-                    merged = pd.concat([old, fresh], ignore_index=True)
-            if full:
-                merged = fetch(t, start, key)
-                out["full"].append(t)
-            if merged.empty:
-                raise ProviderError("no bars returned")
-            merged = merged.drop_duplicates("date", keep="last").sort_values("date")
-            merged[PRICE_COLS].to_csv(f, index=False)
-            out["updated"].append(t)
-        except Exception as e:  # noqa: BLE001 - one ticker failing must not stop the others
-            out["failed"][t] = str(e)[:200]
-            log.warning("prices %s failed: %s", t, e)
+    todo = list(tickers)
+    for p in range(passes):
+        if p:
+            # Tiingo rate-limits bursts (HTTP 429); give it a minute, then retry only the failures.
+            log.info("retrying %s in %.0fs", ", ".join(todo), retry_wait)
+            time.sleep(retry_wait)
+        todo = [t for t in todo if not _update_one(d, t, start, key, fetch, out)]
+        if not todo:
+            break
+    out["failed"] = {t: out["failed"][t] for t in todo}
     return out
+
+
+def _update_one(d: Path, t: str, start: str, key: str, fetch, out: dict) -> bool:
+    """Fetch one ticker into its file; True on success."""
+    f = d / f"{t}.csv"
+    try:
+        old = pd.read_csv(f, dtype={"date": str}) if f.exists() else None
+        full = old is None or old.empty
+        if not full:
+            since = (pd.Timestamp(old["date"].iloc[-1]) - pd.Timedelta(days=10)).strftime("%Y-%m-%d")
+            new = fetch(t, since, key)
+            ov = old.merge(new, on="date", suffixes=("", "_n"))
+            fresh = new[new["date"] > old["date"].iloc[-1]]
+            corporate = (fresh["div_cash"].fillna(0) != 0).any() or (fresh["split_factor"].fillna(1) != 1).any()
+            drift = ov.empty or (abs(ov["adj_close"] / ov["adj_close_n"] - 1) > 1e-6).any()
+            if corporate or drift:
+                full = True
+            else:
+                merged = pd.concat([old, fresh], ignore_index=True)
+        if full:
+            merged = fetch(t, start, key)
+            out["full"].append(t)
+        if merged.empty:
+            raise ProviderError("no bars returned")
+        merged = merged.drop_duplicates("date", keep="last").sort_values("date")
+        merged[PRICE_COLS].to_csv(f, index=False)
+        out["updated"].append(t)
+        return True
+    except Exception as e:  # noqa: BLE001 - one ticker failing must not stop the others
+        out["failed"][t] = str(e)[:200]
+        log.warning("prices %s failed: %s", t, e)
+        return False
 
 
 def load_prices(state: Path, tickers: list[str]) -> dict[str, pd.DataFrame]:

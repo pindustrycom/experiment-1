@@ -82,6 +82,7 @@ jobs:
           args=""
           [ "${{ inputs.backtest }}" = "true" ] && args="$args --backtest"
           [ "${{ inputs.retrain }}" = "true" ] && args="$args --retrain"
+          set -o pipefail
           python -m exp2 run --state state --site site $args | tee /tmp/run.json
           python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json
