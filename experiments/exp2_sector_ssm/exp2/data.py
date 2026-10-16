@@ -59,15 +59,57 @@ def fetch_tiingo(ticker: str, start: str, key: str) -> pd.DataFrame:
                              {"startDate": start, "token": key, "format": "json"}))
 
 
-def update_prices(state: Path, tickers: list[str], start: str, key: str | None, fetch=fetch_tiingo,
+def parse_yahoo(payload) -> pd.DataFrame:
+    try:
+        res = payload["chart"]["result"][0]
+        q, adj = res["indicators"]["quote"][0], res["indicators"]["adjclose"][0]["adjclose"]
+        ts = res.get("timestamp") or []
+    except (KeyError, IndexError, TypeError) as e:
+        raise ProviderError(f"yahoo: unexpected payload {str(payload)[:200]}") from e
+    day = lambda t: pd.Timestamp(int(t), unit="s", tz="UTC").tz_convert("America/New_York").strftime("%Y-%m-%d")  # noqa: E731
+    ev = res.get("events") or {}
+    divs = {day(v["date"]): v["amount"] for v in (ev.get("dividends") or {}).values()}
+    splits = {day(v["date"]): v["numerator"] / v["denominator"] for v in (ev.get("splits") or {}).values()}
+    df = pd.DataFrame({"date": [day(t) for t in ts], "close": q["close"], "adj_close": adj, "adj_volume": q.get("volume")})
+    df["div_cash"] = df["date"].map(divs).fillna(0.0)
+    df["split_factor"] = df["date"].map(splits).fillna(1.0)
+    return df.dropna(subset=["close", "adj_close"])[PRICE_COLS].reset_index(drop=True)
+
+
+def fetch_yahoo(ticker: str, start: str, key: str | None = None) -> pd.DataFrame:
+    t0 = int(pd.Timestamp(start, tz="UTC").timestamp())
+    try:
+        r = requests.get(f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker.replace('.', '-')}",
+                         params={"period1": t0, "period2": int(time.time()), "interval": "1d", "events": "div,splits",
+                                 "includeAdjustedClose": "true"}, headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
+    except requests.RequestException as e:
+        raise ProviderError(f"yahoo {ticker}: {type(e).__name__}") from e
+    if r.status_code != 200:
+        raise ProviderError(f"yahoo {ticker}: HTTP {r.status_code}")
+    return parse_yahoo(r.json())
+
+
+_tiingo_limited = False
+
+
+def fetch_prices(ticker: str, start: str, key: str | None) -> pd.DataFrame:
+    """Tiingo first; Yahoo when there is no key or Tiingo refuses (its free tier allows few requests an hour)."""
+    global _tiingo_limited
+    if key and not _tiingo_limited:
+        try:
+            return fetch_tiingo(ticker, start, key)
+        except ProviderError as e:
+            _tiingo_limited = "429" in str(e)    # out of quota: stop asking for the rest of the run
+            log.warning("tiingo %s failed (%s); using Yahoo", ticker, e)
+    return fetch_yahoo(ticker, start)
+
+
+def update_prices(state: Path, tickers: list[str], start: str, key: str | None, fetch=fetch_prices,
                   retry_wait: float = 75.0, passes: int = 3) -> dict:
     """Bring each ticker's file up to date. Adjusted closes change for the whole history after a
     dividend or split, so a ticker is re-downloaded in full whenever a new bar carries one or the
     overlap no longer matches; otherwise only recent bars are fetched."""
     out = {"updated": [], "full": [], "failed": {}}
-    if not key:
-        out["failed"] = {t: "TIINGO_API_KEY not set" for t in tickers}
-        return out
     d = state / "prices"
     d.mkdir(parents=True, exist_ok=True)
     todo = list(tickers)
