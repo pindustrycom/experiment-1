@@ -54,8 +54,8 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:13px;paddin
 GLASS, GLASS_END = "<!--glass-->", "<!--/glass-->"
 GLASS_CSS = """
 :root,:root:root{color-scheme:dark;--text:#f5f5f7;--muted:#98989f;--line:rgba(255,255,255,.08);--panel:rgba(255,255,255,.055);--band:rgba(255,255,255,.07);
---accent:#b79cff;--a:#8b5cf6;--b:#8e8e93;--lo:#30d158;--hi:#ff453a;--md:#ffd60a;--lo-bg:rgba(48,209,88,.14);--md-bg:rgba(255,214,10,.13);--hi-bg:rgba(255,69,58,.15);
---glass-line:rgba(255,255,255,.12);--glass-bg:linear-gradient(150deg,rgba(91,33,182,.42) 0%,rgba(46,16,101,.26) 45%,rgba(255,255,255,.035) 100%);--glass-shadow:0 20px 50px rgba(0,0,0,.55);--glass-hi:rgba(255,255,255,.10);--grid:rgba(255,255,255,.07)}
+--accent:#a593d4;--a:#7a62b3;--b:#8e8e93;--lo:#30d158;--hi:#ff453a;--md:#ffd60a;--lo-bg:rgba(48,209,88,.14);--md-bg:rgba(255,214,10,.13);--hi-bg:rgba(255,69,58,.15);
+--glass-line:rgba(255,255,255,.12);--glass-bg:linear-gradient(150deg,rgba(52,26,92,.38) 0%,rgba(28,14,52,.22) 45%,rgba(255,255,255,.03) 100%);--glass-shadow:0 20px 50px rgba(0,0,0,.55);--glass-hi:rgba(255,255,255,.10);--grid:rgba(255,255,255,.07)}
 html{background:#000;min-height:100%}
 body{background:transparent!important;min-height:100vh;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
 -webkit-font-smoothing:antialiased;letter-spacing:-.005em}main.wrap{padding-top:22px}
@@ -68,8 +68,8 @@ border-radius:20px!important;box-shadow:var(--glass-shadow),inset 0 1px 0 var(--
 .stat{background:var(--band)!important;border:1px solid var(--glass-line)!important;border-radius:14px!important}
 .pf .big{background:none!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:none;backdrop-filter:none}
 th,td{border-bottom-color:var(--line)!important}footer{border-top:1px solid var(--glass-line)!important}
-nav a.on{background:rgba(124,58,237,.28)!important;color:var(--text)!important;border-radius:999px}
-.tag{border-color:var(--glass-line)!important}.banner.warn,.banner.danger{background:rgba(91,33,182,.3)!important}
+nav a.on{background:rgba(70,40,120,.35)!important;color:var(--text)!important;border-radius:999px}
+.tag{border-color:var(--glass-line)!important}.banner.warn,.banner.danger{background:rgba(52,26,92,.4)!important}
 svg text{fill:var(--muted)!important}.chart .grid{stroke:var(--grid)}
 """
 MARK, MARK_END = "<!--portfolio-->", "<!--/portfolio-->"
