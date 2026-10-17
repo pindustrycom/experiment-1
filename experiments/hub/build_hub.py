@@ -50,27 +50,26 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:13px;paddin
 """
 
 
-# Frosted-glass theme (black and burgundy, always dark), laid over every page of the site (the hub and each experiment's pages) so they match.
+# Frosted-glass theme (black page, deep purple glass blocks, always dark), laid over every page of the site (the hub and each experiment's pages) so they match.
 GLASS, GLASS_END = "<!--glass-->", "<!--/glass-->"
 GLASS_CSS = """
 :root,:root:root{color-scheme:dark;--text:#f5f5f7;--muted:#98989f;--line:rgba(255,255,255,.08);--panel:rgba(255,255,255,.055);--band:rgba(255,255,255,.07);
---accent:#ff6b8a;--a:#c8325a;--b:#8e8e93;--lo:#30d158;--hi:#ff453a;--md:#ffd60a;--lo-bg:rgba(48,209,88,.14);--md-bg:rgba(255,214,10,.13);--hi-bg:rgba(255,69,58,.15);
---glass-line:rgba(255,255,255,.12);--glass-shadow:0 20px 50px rgba(0,0,0,.55);--glass-hi:rgba(255,255,255,.10);--grid:rgba(255,255,255,.07)}
-html{background:radial-gradient(ellipse 80% 60% at 12% -8%,rgba(140,10,45,.55),transparent 70%),
-radial-gradient(ellipse 70% 55% at 100% 108%,rgba(110,8,38,.45),transparent 70%),#000;background-attachment:fixed;min-height:100%}
+--accent:#b79cff;--a:#8b5cf6;--b:#8e8e93;--lo:#30d158;--hi:#ff453a;--md:#ffd60a;--lo-bg:rgba(48,209,88,.14);--md-bg:rgba(255,214,10,.13);--hi-bg:rgba(255,69,58,.15);
+--glass-line:rgba(255,255,255,.12);--glass-bg:linear-gradient(150deg,rgba(91,33,182,.42) 0%,rgba(46,16,101,.26) 45%,rgba(255,255,255,.035) 100%);--glass-shadow:0 20px 50px rgba(0,0,0,.55);--glass-hi:rgba(255,255,255,.10);--grid:rgba(255,255,255,.07)}
+html{background:#000;min-height:100%}
 body{background:transparent!important;min-height:100vh;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
 -webkit-font-smoothing:antialiased;letter-spacing:-.005em}main.wrap{padding-top:22px}
 h1,.big .v,.card .v,.brand{letter-spacing:-.02em}
 header{position:sticky;top:0;z-index:10;background:rgba(0,0,0,.55)!important;border-bottom:1px solid var(--glass-line)!important;
 -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
-.card,.panel,.tile,.big,.pf,.banner,.scroll>table,details>.panel{background:var(--panel)!important;border:1px solid var(--glass-line)!important;
+.card,.panel,.tile,.big,.pf,.banner,.scroll>table,details>.panel{background:var(--glass-bg)!important;border:1px solid var(--glass-line)!important;
 border-radius:20px!important;box-shadow:var(--glass-shadow),inset 0 1px 0 var(--glass-hi);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
 .scroll>table{border-collapse:separate;border-spacing:0;overflow:hidden}table{background:transparent!important}
 .stat{background:var(--band)!important;border:1px solid var(--glass-line)!important;border-radius:14px!important}
 .pf .big{background:none!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:none;backdrop-filter:none}
 th,td{border-bottom-color:var(--line)!important}footer{border-top:1px solid var(--glass-line)!important}
-nav a.on{background:rgba(200,50,90,.22)!important;color:var(--text)!important;border-radius:999px}
-.tag{border-color:var(--glass-line)!important}.banner.warn,.banner.danger{background:rgba(128,0,32,.25)!important}
+nav a.on{background:rgba(124,58,237,.28)!important;color:var(--text)!important;border-radius:999px}
+.tag{border-color:var(--glass-line)!important}.banner.warn,.banner.danger{background:rgba(91,33,182,.3)!important}
 svg text{fill:var(--muted)!important}.chart .grid{stroke:var(--grid)}
 """
 MARK, MARK_END = "<!--portfolio-->", "<!--/portfolio-->"
