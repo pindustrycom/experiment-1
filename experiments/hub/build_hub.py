@@ -50,28 +50,28 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:13px;paddin
 """
 
 
-# Frosted-glass theme, laid over every page of the site (the hub and each experiment's pages) so they match.
+# Frosted-glass theme (black and burgundy, always dark), laid over every page of the site (the hub and each experiment's pages) so they match.
 GLASS, GLASS_END = "<!--glass-->", "<!--/glass-->"
 GLASS_CSS = """
-:root{--text:#141726;--muted:#525a70;--line:rgba(30,35,70,.10);--panel:rgba(255,255,255,.52);--band:rgba(255,255,255,.42);--accent:#3552d4;
---glass-line:rgba(255,255,255,.7);--glass-shadow:0 10px 34px rgba(40,50,120,.12);--glass-hi:rgba(255,255,255,.6);
---sky:radial-gradient(circle at 12% 18%,#c7d2fe 0,transparent 42%),radial-gradient(circle at 88% 12%,#fbcfe8 0,transparent 40%),
-radial-gradient(circle at 70% 85%,#a7f3d0 0,transparent 45%),radial-gradient(circle at 18% 90%,#fde68a 0,transparent 38%),linear-gradient(135deg,#eef2ff,#fdf4ff 50%,#ecfeff)}
-@media (prefers-color-scheme:dark){:root{--text:#eef0f8;--muted:#a6adc4;--line:rgba(255,255,255,.09);--panel:rgba(26,29,48,.5);--band:rgba(255,255,255,.06);--accent:#93b2ff;
---glass-line:rgba(255,255,255,.13);--glass-shadow:0 10px 34px rgba(0,0,0,.45);--glass-hi:rgba(255,255,255,.08);
---sky:radial-gradient(circle at 12% 18%,#3b2a8a 0,transparent 42%),radial-gradient(circle at 88% 12%,#7a1d5c 0,transparent 40%),
-radial-gradient(circle at 70% 85%,#0f5c55 0,transparent 45%),radial-gradient(circle at 18% 90%,#5a3f0a 0,transparent 38%),linear-gradient(135deg,#0b0d1a,#140f24 50%,#081a1f)}}
-html{background:var(--sky);background-attachment:fixed;min-height:100%}body{background:transparent!important;min-height:100vh}main.wrap{padding-top:22px}
-header{position:sticky;top:0;z-index:10;background:var(--panel)!important;border-bottom:1px solid var(--glass-line)!important;
--webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%)}
-.card,.panel,.tile,.big,.pf,.banner,.scroll>table,main>table,details>.panel{background:var(--panel)!important;border:1px solid var(--glass-line)!important;
-border-radius:18px!important;box-shadow:var(--glass-shadow),inset 0 1px 0 var(--glass-hi);-webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%)}
-.scroll>table{border-collapse:separate;border-spacing:0;overflow:hidden}
+:root,:root:root{color-scheme:dark;--text:#f5f5f7;--muted:#98989f;--line:rgba(255,255,255,.08);--panel:rgba(255,255,255,.055);--band:rgba(255,255,255,.07);
+--accent:#ff6b8a;--a:#c8325a;--b:#8e8e93;--lo:#30d158;--hi:#ff453a;--md:#ffd60a;--lo-bg:rgba(48,209,88,.14);--md-bg:rgba(255,214,10,.13);--hi-bg:rgba(255,69,58,.15);
+--glass-line:rgba(255,255,255,.12);--glass-shadow:0 20px 50px rgba(0,0,0,.55);--glass-hi:rgba(255,255,255,.10);--grid:rgba(255,255,255,.07)}
+html{background:radial-gradient(ellipse 80% 60% at 12% -8%,rgba(140,10,45,.55),transparent 70%),
+radial-gradient(ellipse 70% 55% at 100% 108%,rgba(110,8,38,.45),transparent 70%),#000;background-attachment:fixed;min-height:100%}
+body{background:transparent!important;min-height:100vh;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+-webkit-font-smoothing:antialiased;letter-spacing:-.005em}main.wrap{padding-top:22px}
+h1,.big .v,.card .v,.brand{letter-spacing:-.02em}
+header{position:sticky;top:0;z-index:10;background:rgba(0,0,0,.55)!important;border-bottom:1px solid var(--glass-line)!important;
+-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
+.card,.panel,.tile,.big,.pf,.banner,.scroll>table,details>.panel{background:var(--panel)!important;border:1px solid var(--glass-line)!important;
+border-radius:20px!important;box-shadow:var(--glass-shadow),inset 0 1px 0 var(--glass-hi);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%)}
+.scroll>table{border-collapse:separate;border-spacing:0;overflow:hidden}table{background:transparent!important}
 .stat{background:var(--band)!important;border:1px solid var(--glass-line)!important;border-radius:14px!important}
 .pf .big{background:none!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:none;backdrop-filter:none}
 th,td{border-bottom-color:var(--line)!important}footer{border-top:1px solid var(--glass-line)!important}
-nav a.on{background:var(--band)}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root{--panel:rgba(255,255,255,.88)}}
+nav a.on{background:rgba(200,50,90,.22)!important;color:var(--text)!important;border-radius:999px}
+.tag{border-color:var(--glass-line)!important}.banner.warn,.banner.danger{background:rgba(128,0,32,.25)!important}
+svg text{fill:var(--muted)!important}.chart .grid{stroke:var(--grid)}
 """
 MARK, MARK_END = "<!--portfolio-->", "<!--/portfolio-->"
 BANNER_CSS = """
@@ -203,8 +203,8 @@ def hub_page(site: Path, t: dict | None = None) -> str:
         rows = t["rows"]
         fx = "" if t.get("fx_known") else " USD/CAD rate unavailable: values exclude currency moves."
         body = f"""{big_number(rows, "combined", "Combined paper portfolio: profit / loss", t.get("start"))}
-<div class="panel">{value_chart(rows, [("combined", "var(--accent)"), ("exp1", "var(--a)"), ("exp2", "var(--b)")])}
-<div class="small muted"><span style="color:var(--accent)">━</span> combined <span style="color:var(--a)">━</span> Exp1
+<div class="panel">{value_chart(rows, [("combined", "var(--text)"), ("exp1", "var(--a)"), ("exp2", "var(--b)")])}
+<div class="small muted"><span style="color:var(--text)">━</span> combined <span style="color:var(--a)">━</span> Exp1
 <span style="color:var(--b)">━</span> Exp2 · dashed line: the starting 1,000 CAD</div></div>
 <p class="small muted">Half of the money follows each experiment. Trades every trading day; US positions, valued in CAD at the
 Bank of Canada rate. No costs or interest.{fx}</p>
