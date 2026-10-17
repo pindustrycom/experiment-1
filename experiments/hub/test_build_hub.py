@@ -39,8 +39,17 @@ def test_hub_shows_exp2_summary(tmp_path):
     d = tmp_path / "exp2" / "data"
     d.mkdir(parents=True)
     (tmp_path / "exp2" / "index.html").write_text("x")
-    (d / "summary.json").write_text(json.dumps({"latest": {"as_of": "2026-10-15", "rows": [
-        {"model": "ssm", "target": "y_sector", "pred": 1.0, "p_up": 0.61}]}, "forward_scorecard": {}}))
+    (d / "summary.json").write_text(json.dumps({
+        "latest": {"date": "2026-10-16", "exp_ret": 0.081},
+        "performance_since_2019": {"portfolio": {"annual_pct": 17.8, "max_dd_pct": 12.3}, "spy": {"annual_pct": 17.3}},
+        "calibration_live": {"n": 0}, "calibration_last_120": {"n": 120, "in68": 0.74}}))
     build_hub.build(tmp_path)
     hub = (tmp_path / "index.html").read_text()
-    assert "+1.01%" in hub and "61%" in hub and "collecting" in hub and "Not published yet" in hub
+    assert "+0.08%" in hub and "74% of 120" in hub and "+17.8% a year" in hub and "12%" in hub and "Not published yet" in hub
+
+
+def test_exp1_links_to_exp2(tmp_path):
+    make_exp1(tmp_path)
+    build_hub.build(tmp_path)
+    assert 'href="../exp2/index.html"' in (tmp_path / "exp1" / "index.html").read_text()
+    assert 'href="../../exp2/index.html"' in (tmp_path / "exp1" / "pairs" / "ko-pep.html").read_text()

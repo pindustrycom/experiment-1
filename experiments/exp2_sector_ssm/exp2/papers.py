@@ -109,13 +109,13 @@ def ysym(t: str) -> str:
     return t.replace(".", "-")
 
 
-def update(data: Path, tickers: list[str], pause: float = 0.3) -> dict:
+def update(data: Path, tickers: list[str], pause: float = 0.3, max_age_days: float = 3.0) -> dict:
     d = data / "prices"
     d.mkdir(parents=True, exist_ok=True)
     out = {"fetched": 0, "failed": []}
     for t in tickers:
         f = d / f"{t}.csv"
-        if f.exists() and time.time() - f.stat().st_mtime < 3 * 86400:
+        if f.exists() and time.time() - f.stat().st_mtime < max_age_days * 86400:
             continue
         try:
             df = fetch_yahoo(ysym(t))

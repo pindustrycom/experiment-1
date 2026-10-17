@@ -4,7 +4,7 @@
 
 Expects each experiment's pages already in place (_site/exp1/, _site/exp2/); a missing one is shown
 as "not published yet" rather than failing the build. It also:
-  - adds an "All experiments" link to Exp1's page headers,
+  - adds "Experiment 2" and "All experiments" links to Exp1's page headers,
   - keeps Exp1's old addresses working: every Exp1 page that used to live at the site root gets a
     redirect page there, and its data files are copied back to /data/ (files can't redirect).
 Standard library only, so it runs in any job.
@@ -14,14 +14,14 @@ from __future__ import annotations
 import argparse
 import html
 import json
-import math
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
 e = html.escape
 REPO_URL = "https://github.com/pindustrycom/experiment-1"
-HUB_LINK = '<a href="{root}index.html" style="color:var(--muted)">All experiments</a>'
+HUB_LINK = ('<a href="{root}exp2/index.html" style="color:var(--muted)">Experiment 2</a> '
+            '<a href="{root}index.html" style="color:var(--muted)">All experiments</a>')
 
 CSS = """
 :root{--bg:#f7f7f5;--panel:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#e3e2dd;--accent:#2f5fd0;--lo:#2e7d4f;--hi:#c0392b;--band:#f1f0ec}
@@ -71,32 +71,33 @@ def exp1_card(site: Path) -> str:
 fundamentals and structure (SI-v2), and forward-tests those rankings.</p>{body}<a class="go" href="exp1/index.html">Open Experiment 1 →</a></div>"""
 
 
-def _pct(logret: float) -> float:
-    return 100 * (math.exp(logret / 100) - 1)
-
-
 def exp2_card(site: Path) -> str:
     d = site / "exp2"
     s = _json(d / "data" / "summary.json") if (d / "index.html").exists() else None
-    if s is None:
+    if s is None or "performance_since_2019" not in s:
         body = '<p class="muted">Not published yet: it appears after its first daily run.</p>'
     else:
         latest = s.get("latest") or {}
-        rows = {(r["model"], r["target"]): r for r in latest.get("rows", [])}
-        sec = rows.get(("ssm", "y_sector"))
-        fwd = ((s.get("forward_scorecard") or {}).get("y_sector") or {}).get("ssm") or {}
-        if sec:
-            v = _pct(sec["pred"])
+        if latest.get("exp_ret") is not None:
+            v = latest["exp_ret"]
             pred = f'<span class="{"pos" if v > 0 else "neg"}">{v:+.2f}%</span>'
-            up = f'{100 * sec["p_up"]:.0f}%'
         else:
-            pred = up = "—"
-        hit = f'{100 * fwd["hit"]:.0f}% of {fwd["n"]}' if fwd.get("hit") is not None else "collecting"
-        body = '<div class="stats">' + stat(f'XLK next 5 sessions ({latest.get("as_of", "—")})', pred) + stat("Chance XLK is up", up) + \
-            stat("Forward test: direction right", hit) + stat("Model", "Pruned S4D") + "</div>"
-    return f"""<div class="card"><div class="tag">Experiment 2</div><h2>Tech sector state-space model</h2>
-<p>A pruned S4D state-space model reads a daily state of tech prices, related sectors and Claude-scored news, and predicts the
-tech ETF's next-week return, scored live against simple baselines.</p>{body}<a class="go" href="exp2/index.html">Open Experiment 2 →</a></div>"""
+            pred = "—"
+        perf = (s["performance_since_2019"].get("portfolio") or {})
+        spy = (s["performance_since_2019"].get("spy") or {})
+        yr = f'{perf["annual_pct"]:+.1f}% a year' if perf.get("annual_pct") is not None else "—"
+        cal = s.get("calibration_live") or {}
+        if not cal.get("n"):
+            cal = s.get("calibration_last_120") or {}
+        band = f'{100 * cal["in68"]:.0f}% of {cal["n"]}' if cal.get("n") else "collecting"
+        body = '<div class="stats">' + stat(f'Predicted return {latest.get("date", "—")}', pred) + \
+            stat("Inside the 68% band", band) + stat("Since 2019 (SPY)", f'{yr} <span class="muted" style="font-size:13px">'
+                                                     f'({spy.get("annual_pct", float("nan")):+.1f}%)</span>') + \
+            stat("Worst drop since 2019", f'{perf.get("max_dd_pct", float("nan")):.0f}%') + "</div>"
+    return f"""<div class="card"><div class="tag">Experiment 2</div><h2>Volatility-timed portfolio</h2>
+<p>A paper portfolio that sells volatility insurance on SPY when it is overpriced and markets are calm, plus a regime-timed SPY
+position and a stock book without collapse-prone names. Each morning it predicts the day's return; each evening it logs the
+error and learns from it.</p>{body}<a class="go" href="exp2/index.html">Open Experiment 2 →</a></div>"""
 
 
 def hub_page(site: Path) -> str:
