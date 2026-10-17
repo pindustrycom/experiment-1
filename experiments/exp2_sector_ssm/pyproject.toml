@@ -1,0 +1,20 @@
+[project]
+name = "exp2-sector-ssm"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 210
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+ignore = ["B905"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["exp2"]
+known-local-folder = ["synth", "test_news"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

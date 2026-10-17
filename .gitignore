@@ -23,3 +23,7 @@ next-env.d.ts
 backups/
 *.dump
 *.partial
+
+# experiment 2 local runs
+experiments/exp2_sector_ssm/state/
+experiments/exp2_sector_ssm/site/

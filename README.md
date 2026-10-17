@@ -48,6 +48,8 @@ restores.
 
 A scheduled GitHub Actions workflow can run the pipeline every weekday evening and publish a
 read-only dashboard to GitHub Pages, with no server. See [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md).
+The published site's root is an experiments hub: this monitor is Experiment 1 (under `/exp1/`), and
+[Experiment 2](experiments/exp2_sector_ssm/README.md), a state-space model of the tech sector, is under `/exp2/`.
 
 ## Repository layout
 
@@ -62,6 +64,7 @@ frontend/         Next.js (App Router) + TypeScript + Tailwind + Recharts dashbo
 infrastructure/   Caddyfile (reverse proxy, automatic HTTPS)
 scripts/          deploy, backup, restore, create-admin, switch-to-production
 docs/             methodology, deployment, testing
+experiments/      exp2_sector_ssm/ (Experiment 2) and hub/ (the site's experiments hub page)
 ```
 
 ## API
