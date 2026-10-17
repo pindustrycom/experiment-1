@@ -53,7 +53,11 @@ def fetch_yahoo(ticker: str, start: str = START) -> pd.DataFrame:
     q = res["indicators"]["quote"][0]
     adj = res["indicators"].get("adjclose", [{}])[0].get("adjclose", q["close"])
     dates = pd.to_datetime(res["timestamp"], unit="s", utc=True).tz_convert("America/New_York").strftime("%Y-%m-%d")
-    return pd.DataFrame({"date": dates, "open": q["open"], "close": q["close"], "adj_close": adj, "volume": q["volume"]}).dropna(subset=["close", "adj_close"])
+    df = pd.DataFrame({"date": dates, "open": q["open"], "close": q["close"], "adj_close": adj, "volume": q["volume"]})
+    df[["close", "adj_close"]] = df[["close", "adj_close"]].astype(float)
+    # Yahoo often leaves the latest session's adjusted close empty until the next day: carry the last adjustment.
+    df["adj_close"] = df["adj_close"].fillna(df["close"] * (df["adj_close"] / df["close"]).ffill())
+    return df.dropna(subset=["close", "adj_close"])
 
 
 def sp500_tables(html: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:

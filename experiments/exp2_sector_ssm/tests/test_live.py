@@ -86,3 +86,20 @@ def test_site_builds(tmp_path):
     page = (tmp_path / "index.html").read_text()
     assert "../exp1/index.html" in page and "Prediction log" in page
     assert (tmp_path / "data" / "summary.json").exists()
+
+
+def test_yahoo_latest_session_without_adjusted_close(monkeypatch):
+    from exp2 import papers
+
+    class R:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"chart": {"result": [{"timestamp": [1760535000, 1760621400, 1760707800],
+                                          "indicators": {"quote": [{"open": [1, 1, 1], "close": [10.0, 11.0, 12.0], "volume": [1, 1, 1]}],
+                                                         "adjclose": [{"adjclose": [9.0, 9.9, None]}]}}]}}
+
+    monkeypatch.setattr(papers.requests, "get", lambda *a, **k: R())
+    df = papers.fetch_yahoo("SPY")
+    assert len(df) == 3 and abs(df["adj_close"].iloc[-1] - 10.8) < 1e-9

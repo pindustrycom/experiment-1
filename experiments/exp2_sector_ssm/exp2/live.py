@@ -272,8 +272,8 @@ def run(state: Path, site: Path, mode: str, now: datetime | None = None, fetch: 
     C = pd.DataFrame({t: d["adj_close"] for t, d in papers.load(data, _tickers(data)).items()}).sort_index()
     R = C.pct_change(fill_method=None)
     L = load_log(state)
-    if mode == "evening":
-        L, rep["scored"] = evening(L, df, plans, R, now)
+    # score whatever has an outcome by now (normally in the evening; the morning catches a late price feed)
+    L, rep["scored"] = evening(L, df, plans, R, now)
     n0 = len(L)
     L = backfill(df, sig, p_hi, plans, R, L, "backfill" if L.empty else "catch-up")
     rep["backfilled_days"] = len(L) - n0
@@ -301,7 +301,9 @@ def refresh(data: Path, today: pd.Timestamp, everything: bool = True) -> dict:
     """Prices for SPY, VIX, T-bills and every past or present member; the member list itself once a month.
     The morning only needs SPY and VIX, unless a new month's book has to be formed."""
     if not everything:
-        return papers.update(data, ["SPY", "^VIX"], pause=0.2, max_age_days=0.2)
+        out = papers.update(data, ["SPY", "^VIX"], pause=0.2, max_age_days=0.2)
+        out["spy_last"] = _last_row(data, "SPY")
+        return out
     out = {}
     cur_f = data / "sp500_current.csv"
     if not cur_f.exists() or time.time() - cur_f.stat().st_mtime > 25 * 86400:
@@ -316,7 +318,15 @@ def refresh(data: Path, today: pd.Timestamp, everything: bool = True) -> dict:
     tick = sorted(set(cur["ticker"]) | set(_tickers(data)))
     out.update(papers.update(data, ["SPY", "^VIX", "^IRX", *tick], pause=0.2, max_age_days=0.2))
     out["failed"] = out.get("failed", [])[:50]
+    out["spy_last"] = _last_row(data, "SPY")
     return out
+
+
+def _last_row(data: Path, ticker: str) -> dict:
+    try:
+        return pd.read_csv(data / "prices" / f"{ticker}.csv").iloc[-1].to_dict()
+    except (OSError, ValueError, IndexError):
+        return {}
 
 
 def morning(L: pd.DataFrame, df: pd.DataFrame, sig: pd.Series, p_hi: pd.Series, plans: dict, today: pd.Timestamp, now: datetime) -> dict:
