@@ -8,7 +8,7 @@ name: Experiment 2 paper ideas
 
 on:
   pull_request:
-    paths: ["experiments/exp2_sector_ssm/exp2/papers.py", "experiments/exp2_sector_ssm/exp2/volpred.py", "experiments/exp2_sector_ssm/exp2/collapse.py", "experiments/exp2_sector_ssm/tests/test_papers.py",
+    paths: ["experiments/exp2_sector_ssm/exp2/papers.py", "experiments/exp2_sector_ssm/exp2/volpred.py", "experiments/exp2_sector_ssm/exp2/collapse.py", "experiments/exp2_sector_ssm/exp2/tech.py", "experiments/exp2_sector_ssm/tests/test_tech.py", "experiments/exp2_sector_ssm/tests/test_papers.py",
             "experiments/exp2_sector_ssm/tests/test_volpred.py", "experiments/exp2_sector_ssm/tests/test_collapse.py",
             ".github/workflows/papers.yml"]
   workflow_dispatch:
@@ -43,7 +43,7 @@ jobs:
           pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
           pip install -r requirements.txt
       - name: Tests
-        run: ruff check exp2 tests && python -m pytest -q tests/test_papers.py tests/test_volpred.py tests/test_collapse.py
+        run: ruff check exp2 tests && python -m pytest -q tests/test_papers.py tests/test_volpred.py tests/test_collapse.py tests/test_tech.py
 
       - name: Restore cached data
         run: |
@@ -68,6 +68,12 @@ jobs:
           set -o pipefail
           python -m exp2 collapse --data papers_data --out papers_results/collapse | tee /tmp/collapse.json
           rm -f papers_results/collapse/panel_stage1.pkl
+
+      - name: The same portfolio on the tech sector (exp2/tech.py)
+        run: |
+          set -o pipefail
+          python -m exp2 tech --data papers_data --out papers_results/tech | tee /tmp/tech.json
+          rm -f papers_results/tech/panel_stage1.pkl
 
       - name: Save data and results
         if: always()
