@@ -306,8 +306,8 @@ def index_page(status: dict, pairs: list[dict], ctx: dict, sparks: dict[str, str
 <td class="n">{num(x.get("confidence"), 2)}</td><td class="muted">{day(x.get("last_update"))}</td></tr>""")
     table = f"""<div class="scroll"><table><thead><tr><th>Pair</th><th class="n">SI-v1</th><th>SI-v1 history</th><th class="n">SI-v2</th><th class="n">7-day change</th>
 <th>Direction</th><th class="n">Confidence</th><th>Updated</th></tr></thead><tbody>{"".join(rows) or '<tr><td colspan="8" class="muted">No pairs yet.</td></tr>'}</tbody></table></div>"""
-    body = f"""<h1>Pairs</h1><p class="sub">Risk that each pair's prices drift apart, on a 0–100 scale (higher is riskier). SI-v1 uses market data only;
-SI-v2 adds news, fundamentals and structure. "n/a" means there is not enough data to score honestly, never zero risk.</p>
+    body = f"""<h1>Pairs</h1><p class="sub">Risk that two similar stocks drift apart, 0–100 (higher is riskier). SI-v1: prices only. SI-v2: adds news
+and fundamentals. "n/a" means not enough data yet.</p>
 {freshness_banner(status)}{tiles}{table}"""
     return page("Pairs", "home", body, ctx)
 
@@ -489,7 +489,7 @@ def build(out: Path, allow_demo: bool) -> dict:
             shutil.rmtree(out)
         (out / "pairs").mkdir(parents=True)
         (out / "data").mkdir()
-        by_pair, sparks = {}, {}
+        by_pair, sparks, closes = {}, {}, []
         for pr in pairs:
             slug = pr["slug"]
             scores = api.get(f"/pairs/{slug}/scores", days=7300, limit=10000)
@@ -497,6 +497,10 @@ def build(out: Path, allow_demo: bool) -> dict:
             v2 = [s for s in scores if s["index_name"] == "si_v2"]
             detail = api.get(f"/pairs/{slug}/scores/{v2[-1]['id']}") if v2 else None
             prices = api.get(f"/pairs/{slug}/prices")
+            if prices.get("available"):  # the paper portfolio (experiments/hub/portfolio.py) trades from these
+                z = prices.get("zscore") or []
+                closes.append({"slug": slug, "a": prices["ticker_a"], "b": prices["ticker_b"], "last_date": prices["last_date"],
+                               "z_last": z[-1]["z"] if z else None, "rows": (prices.get("normalized") or [])[-30:]})
             preds = api.get(f"/pairs/{slug}/predictions", page_size=500)["items"]
             news = api.get(f"/pairs/{slug}/news", page_size=50, material_only=True)["items"]
             by_pair[slug] = (pr, preds)
@@ -509,6 +513,7 @@ def build(out: Path, allow_demo: bool) -> dict:
         (out / "data" / "predictions.csv").write_text(api.text("/research/export/predictions.csv"))
         (out / "data" / "scores.csv").write_text(api.text("/research/export/scores.csv"))
         (out / "data" / "pairs.json").write_text(json.dumps(pairs, indent=1))
+        (out / "data" / "pair_prices.json").write_text(json.dumps(closes))
         (out / ".nojekyll").write_text("")
         return {"pages": 4 + len(pairs), "pairs": len(pairs), "demo": demo}
     finally:
