@@ -48,7 +48,8 @@ restores.
 
 A scheduled GitHub Actions workflow can run the pipeline every weekday evening and publish a
 read-only dashboard to GitHub Pages, with no server. See [docs/GITHUB_PAGES.md](docs/GITHUB_PAGES.md).
-The published site's root is an experiments hub: this monitor is Experiment 1 (under `/exp1/`), and
+The published site's root is a 1000 CAD paper portfolio that trades daily on the two experiments' signals
+([experiments/hub/portfolio.py](experiments/hub/portfolio.py); fake money, no orders anywhere). This monitor is Experiment 1 (under `/exp1/`), and
 [Experiment 2](experiments/exp2_sector_ssm/README.md), a state-space model of the tech sector, is under `/exp2/`.
 
 ## Repository layout

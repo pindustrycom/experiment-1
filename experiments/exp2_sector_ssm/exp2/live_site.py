@@ -34,7 +34,7 @@ main{padding:22px 0 40px}h1{font-size:24px;margin:0 0 4px}h2{font-size:18px;marg
 table{border-collapse:collapse;width:100%;font-size:14px}th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:600;font-size:12px}
 .scroll{overflow-x:auto}svg{width:100%;height:auto;display:block}svg text{fill:var(--muted);font-size:11px}
-ul{margin:6px 0;padding-left:20px}li{margin:3px 0}
+ul{margin:6px 0;padding-left:20px}details{margin-top:22px}summary{cursor:pointer;font-size:17px}details .panel{margin-top:8px}li{margin:3px 0}
 footer{border-top:1px solid var(--line);color:var(--muted);font-size:13px;padding:16px 0 30px}
 """
 
@@ -265,30 +265,27 @@ def page(S: dict, L: pd.DataFrame, scored: pd.DataFrame, first_live: str | None,
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>Experiment 2: volatility-timed portfolio</title><style>{CSS}</style></head><body>
 <header><div class="wrap"><a class="brand" href="../index.html">Market experiments</a><nav><a href="../exp1/index.html">Experiment 1</a>
-<a class="on" href="index.html">Experiment 2</a><a href="../index.html">All experiments</a></nav></div></header>
+<a class="on" href="index.html">Experiment 2</a><a href="../index.html">Paper portfolio</a></nav></div></header>
 <main class="wrap"><h1>Experiment 2: volatility-timed portfolio</h1>
-<p class="sub">A paper portfolio that sells volatility insurance on SPY only when the VIX is above our volatility forecast and markets are calm,
-holds SPY in calm regimes, and owns a risk-parity book of S&amp;P 500 stocks without the most collapse-prone names. Every trading morning
-it predicts the day's return; every evening it scores the prediction and learns from the error.</p>
+<p class="sub">Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book. Predicts each morning, scores each evening.</p>
 {today}
 <h2>Track record</h2><div class="grid">{perf_cards}</div>
 <div class="panel" style="margin-top:12px">{line_chart(eq, first_live, log_scale=True)}</div>
 <h2>Predictions against outcomes</h2><div class="panel">{band_chart(recent_band)}</div>
-<h2>What the errors teach</h2><div class="panel"><ul>{learn}</ul>
+<details><summary><b>What the errors teach</b> <span class="muted small">(details)</span></summary><div class="panel"><ul>{learn}</ul>
 <p class="small muted">Learning in use for the next prediction: volatility multiplier {vm:.2f} (scales our SPY volatility forecast) and band
 multiplier {bm:.2f} (scales the band to how wide errors really were). Both come from the last 120 scored sessions, shrunk towards 1.</p>
 {ctab}<p class="small">Where the misses come from (last 120 sessions):</p><ul class="small">{attr}</ul>
 <p class="small">Biggest misses (last year), with their context:</p><div class="scroll"><table><tr><th>Date</th><th>Predicted</th><th>Result</th><th>Error (pp)</th>
-<th>Error in bands</th><th>SPY</th><th>Vol forecast</th><th>Regime</th><th>Var swap</th></tr>{mtab}</table></div></div>
-<h2>Prediction log</h2><div class="panel"><div class="scroll"><table><tr><th>Date</th><th>Source</th><th>Predicted</th><th>68% band</th><th>Result</th>
+<th>Error in bands</th><th>SPY</th><th>Vol forecast</th><th>Regime</th><th>Var swap</th></tr>{mtab}</table></div></div></details>
+<details><summary><b>Prediction log</b> <span class="muted small">(last 25)</span></summary>
+<div class="panel"><div class="scroll"><table><tr><th>Date</th><th>Source</th><th>Predicted</th><th>68% band</th><th>Result</th>
 <th>Error (pp)</th><th>In band</th></tr>{ltab}</table></div>
 <p class="small muted">Full log: <a href="data/predictions.csv">predictions.csv</a>; summary: <a href="data/summary.json">summary.json</a>.
-Live predictions are also committed to the <code>exp2-ledger</code> branch before the market opens.</p></div>
-<h2>How it was chosen, and the caveats</h2><div class="panel small"><ul>
-<li>The mix ({100 * WEIGHTS['hrp']:.1f}% stock book, {100 * WEIGHTS['regime']:.1f}% regime SPY, {100 * WEIGHTS['varswap']:.1f}% variance swap, levered {LEVERAGE}×) was set on 2005–2018 data
-only. In the 2019–2026 test it made +18.0% a year against +17.1% for SPY, with a worst monthly drop of 7% against 24%.</li>
-<li>It was the best of about 50 strategies tried, so expect live results to be weaker than the backtest.</li>
-<li>The variance swap is synthetic: VIX² against SPY's realised variance. Retail investors can't trade it, and short-VIX products behave differently.</li>
-<li>Much of the backtest edge came from being out of the swap in March 2020. A crash with no warning would hit it.</li>
-<li>Returns exclude interest on cash. The stock book uses today's S&amp;P 500 members, which flatters the replay.</li></ul></div></main>
+Live predictions are also committed to the <code>exp2-ledger</code> branch before the market opens.</p></div></details>
+<details><summary><b>Caveats</b></summary><div class="panel small"><ul>
+<li>Mix ({100 * WEIGHTS['hrp']:.1f}% stocks, {100 * WEIGHTS['regime']:.1f}% SPY, {100 * WEIGHTS['varswap']:.1f}% variance swap, ×{LEVERAGE}) fixed on 2005–2018 data;
+best of ~50 tries, so expect live to be weaker.</li>
+<li>The variance swap is synthetic (VIX² against realised variance) and not tradable by retail investors. A crash with no warning would hit it.</li>
+<li>No interest on cash; the stock book uses today's S&amp;P 500 members, which flatters the replay.</li></ul></div></details></main>
 <footer><div class="wrap">Paper tracking only: nothing here is investment advice and no orders are placed anywhere. Built {e(S['built'])}.</div></footer></body></html>"""
