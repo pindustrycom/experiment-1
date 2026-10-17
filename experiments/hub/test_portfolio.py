@@ -99,3 +99,16 @@ def test_missing_fx_keeps_going(tmp_path, monkeypatch):
     r = build_hub.build(site, tmp_path / "p.json", update=True)
     assert "fx_warning" in r and r["latest"]["combined"] == 1000.0
     assert "In cash" in (site / "index.html").read_text() and "exclude currency moves" in (site / "index.html").read_text()
+
+
+def test_glass_theme_on_every_page_once(tmp_path):
+    site = tmp_path / "site"
+    make_site(site, [("2026-10-16", 100, 100), ("2026-10-19", 100, 100)])
+    write_exp2(site, [])
+    for f in ("exp1/index.html", "exp2/index.html"):
+        (site / f).write_text("<html><head><title>x</title></head><body><main class=\"wrap\">x</main></body></html>")
+    build_hub.build(site, tmp_path / "p.json", update=True)
+    build_hub.build(site, tmp_path / "p.json")
+    for f in ("index.html", "exp1/index.html", "exp2/index.html"):
+        assert "backdrop-filter" in (site / f).read_text()
+    assert (site / "exp1" / "index.html").read_text().count("<!--glass-->") == 1

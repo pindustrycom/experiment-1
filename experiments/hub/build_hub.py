@@ -50,6 +50,29 @@ footer{border-top:1px solid var(--line);color:var(--muted);font-size:13px;paddin
 """
 
 
+# Frosted-glass theme, laid over every page of the site (the hub and each experiment's pages) so they match.
+GLASS, GLASS_END = "<!--glass-->", "<!--/glass-->"
+GLASS_CSS = """
+:root{--text:#141726;--muted:#525a70;--line:rgba(30,35,70,.10);--panel:rgba(255,255,255,.52);--band:rgba(255,255,255,.42);--accent:#3552d4;
+--glass-line:rgba(255,255,255,.7);--glass-shadow:0 10px 34px rgba(40,50,120,.12);--glass-hi:rgba(255,255,255,.6);
+--sky:radial-gradient(circle at 12% 18%,#c7d2fe 0,transparent 42%),radial-gradient(circle at 88% 12%,#fbcfe8 0,transparent 40%),
+radial-gradient(circle at 70% 85%,#a7f3d0 0,transparent 45%),radial-gradient(circle at 18% 90%,#fde68a 0,transparent 38%),linear-gradient(135deg,#eef2ff,#fdf4ff 50%,#ecfeff)}
+@media (prefers-color-scheme:dark){:root{--text:#eef0f8;--muted:#a6adc4;--line:rgba(255,255,255,.09);--panel:rgba(26,29,48,.5);--band:rgba(255,255,255,.06);--accent:#93b2ff;
+--glass-line:rgba(255,255,255,.13);--glass-shadow:0 10px 34px rgba(0,0,0,.45);--glass-hi:rgba(255,255,255,.08);
+--sky:radial-gradient(circle at 12% 18%,#3b2a8a 0,transparent 42%),radial-gradient(circle at 88% 12%,#7a1d5c 0,transparent 40%),
+radial-gradient(circle at 70% 85%,#0f5c55 0,transparent 45%),radial-gradient(circle at 18% 90%,#5a3f0a 0,transparent 38%),linear-gradient(135deg,#0b0d1a,#140f24 50%,#081a1f)}}
+html{background:var(--sky);background-attachment:fixed;min-height:100%}body{background:transparent!important;min-height:100vh}main.wrap{padding-top:22px}
+header{position:sticky;top:0;z-index:10;background:var(--panel)!important;border-bottom:1px solid var(--glass-line)!important;
+-webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%)}
+.card,.panel,.tile,.big,.pf,.banner,.scroll>table,main>table,details>.panel{background:var(--panel)!important;border:1px solid var(--glass-line)!important;
+border-radius:18px!important;box-shadow:var(--glass-shadow),inset 0 1px 0 var(--glass-hi);-webkit-backdrop-filter:blur(20px) saturate(170%);backdrop-filter:blur(20px) saturate(170%)}
+.scroll>table{border-collapse:separate;border-spacing:0;overflow:hidden}
+.stat{background:var(--band)!important;border:1px solid var(--glass-line)!important;border-radius:14px!important}
+.pf .big{background:none!important;border:0!important;box-shadow:none!important;-webkit-backdrop-filter:none;backdrop-filter:none}
+th,td{border-bottom-color:var(--line)!important}footer{border-top:1px solid var(--glass-line)!important}
+nav a.on{background:var(--band)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){:root{--panel:rgba(255,255,255,.88)}}
+"""
 MARK, MARK_END = "<!--portfolio-->", "<!--/portfolio-->"
 BANNER_CSS = """
 .big,.pf{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:0 0 16px}
@@ -148,6 +171,21 @@ def inject(f: Path, block: str) -> bool:
     return True
 
 
+def theme(site: Path) -> int:
+    """Lay the glass theme over every experiment page (replacing any earlier copy)."""
+    n = 0
+    for d in ("exp1", "exp2"):
+        for f in (site / d).rglob("*.html") if (site / d).is_dir() else []:
+            s = f.read_text()
+            if GLASS in s:
+                s = s[:s.index(GLASS)] + s[s.index(GLASS_END) + len(GLASS_END):]
+            if "</head>" not in s:
+                continue
+            f.write_text(s.replace("</head>", f"{GLASS}<style>{GLASS_CSS}</style>{GLASS_END}</head>", 1))
+            n += 1
+    return n
+
+
 def sleeve_card(t: dict, key: str, title: str, href: str, what: str, pos: str) -> str:
     rows = t["rows"]
     v = rows[-1][key]
@@ -174,7 +212,7 @@ Bank of Canada rate. No costs or interest.{fx}</p>
 {sleeve_card(t, "exp2", "Exp2 · volatility-timed", "exp2/index.html", "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", e(t.get("exp2_position") or ""))}</div>"""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
-<title>Paper portfolio</title><style>{CSS}{BANNER_CSS}</style></head><body>
+<title>Paper portfolio</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}</style></head><body>
 <header><div class="wrap"><a class="brand" href="index.html">Paper portfolio</a> <span class="nav"><a href="exp1/index.html">Experiment 1</a>
 <a href="exp2/index.html">Experiment 2</a></span></div></header>
 <main class="wrap">{body}</main>
@@ -232,6 +270,7 @@ def build(site: Path, state: Path | None = None, update: bool = False) -> dict:
         t, rep = r["table"], r["portfolio"]
         inject(site / "exp1" / "index.html", portfolio_banner(t, "exp1", "../"))
         inject(site / "exp2" / "index.html", portfolio_banner(t, "exp2", "../"))
+    theme(site)
     (site / "index.html").write_text(hub_page(site, t))
     (site / ".nojekyll").write_text("")
     return {"exp1_pages_linked": linked, "old_addresses_kept": moved, "exp2": (site / "exp2" / "index.html").exists(), **rep}
