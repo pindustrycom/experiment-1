@@ -200,6 +200,10 @@ def main(argv=None) -> None:
     cp = sub.add_parser("collapse", help="collapse-risk model, seven strategy families and a combined portfolio (exp2/collapse.py)")
     cp.add_argument("--data", type=Path, default=Path("papers_data"))
     cp.add_argument("--out", type=Path, default=Path("collapse_results"))
+    tk = sub.add_parser("tech", help="the volatility-timed portfolio rebuilt on the tech sector (exp2/tech.py)")
+    tk.add_argument("--data", type=Path, default=Path("papers_data"))
+    tk.add_argument("--out", type=Path, default=Path("tech_results"))
+    tk.add_argument("--no-network", action="store_true")
     lp = sub.add_parser("live", help="the combined portfolio tracked daily: morning prediction, evening error (exp2/live.py)")
     lp.add_argument("--mode", choices=["morning", "evening", "site"], required=True)
     lp.add_argument("--state", type=Path, default=Path("live_state"))
@@ -222,6 +226,12 @@ def main(argv=None) -> None:
         from . import collapse
         rep = collapse.run(a.data, a.out)
         print(json.dumps({k: rep.get(k) for k in ("warnings", "collapse_model", "pairs", "combined", "seconds")}, indent=1, default=str))
+        return
+    if a.cmd == "tech":
+        from . import tech
+        rep = tech.run(a.data, a.out, fetch=not a.no_network)
+        print(json.dumps({k: rep.get(k) for k in ("warnings", "fetch", "history_from", "universe_size_today", "combined",
+                                                   "corr_with_spy_portfolio", "half_and_half", "seconds")}, indent=1, default=str))
         return
     if a.cmd == "live":
         from . import live

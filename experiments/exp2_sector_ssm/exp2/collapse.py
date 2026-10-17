@@ -278,7 +278,7 @@ def _hrp(S: np.ndarray) -> np.ndarray:
     return w / w.sum()
 
 
-def construction(P: pd.DataFrame, C: pd.DataFrame, rf_m: pd.Series, risk_col: str = "pc_gbt") -> dict[str, pd.Series]:
+def construction(P: pd.DataFrame, C: pd.DataFrame, rf_m: pd.Series, risk_col: str = "pc_gbt", min_names: int = 50) -> dict[str, pd.Series]:
     """Long-only monthly portfolios of the members: inverse forecast volatility, minimum variance (Ledoit-Wolf
     covariance of the last 252 sessions), hierarchical risk parity; each also without the 10% most collapse-prone."""
     from sklearn.covariance import LedoitWolf
@@ -287,7 +287,7 @@ def construction(P: pd.DataFrame, C: pd.DataFrame, rf_m: pd.Series, risk_col: st
     books = {k: {} for k in ("invvol", "minvar", "hrp", "minvar_nocollapse", "hrp_nocollapse")}
     prev = {k: None for k in books}
     for m, g in P[P[risk_col].notna() & P["y"].notna()].groupby("month"):
-        if m not in me_dates.index or len(g) < 50:
+        if m not in me_dates.index or len(g) < min_names:
             continue
         end = me_dates[m]
         W = R.loc[:end].iloc[-252:][g["ticker"]]

@@ -46,18 +46,34 @@ OLS3 = ["mom12_2", "ldvol", "vol1m"]
 def fetch_yahoo(ticker: str, start: str = START) -> pd.DataFrame:
     t0 = int(pd.Timestamp(start, tz="UTC").timestamp())
     r = requests.get(f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker}",
-                     params={"period1": t0, "period2": int(time.time()), "interval": "1d", "events": "div,splits", "includeAdjustedClose": "true"},
+                     params={"period1": t0, "period2": int(time.time()) + 86400, "interval": "1d", "events": "div,splits",
+                             "includeAdjustedClose": "true"},
                      headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
     r.raise_for_status()
-    res = r.json()["chart"]["result"][0]
+    return parse_yahoo_chart(r.json())
+
+
+def parse_yahoo_chart(payload: dict) -> pd.DataFrame:
+    res = payload["chart"]["result"][0]
     q = res["indicators"]["quote"][0]
     adj = res["indicators"].get("adjclose", [{}])[0].get("adjclose", q["close"])
     dates = pd.to_datetime(res["timestamp"], unit="s", utc=True).tz_convert("America/New_York").strftime("%Y-%m-%d")
     df = pd.DataFrame({"date": dates, "open": q["open"], "close": q["close"], "adj_close": adj, "volume": q["volume"]})
     df[["close", "adj_close"]] = df[["close", "adj_close"]].astype(float)
+    df = df.dropna(subset=["close"])
+    # The daily bars can lag a session behind the quote. Once the market has closed, the quote's price is that day's
+    # close: add it as a bar.
+    meta = res.get("meta") or {}
+    t, px = meta.get("regularMarketTime"), meta.get("regularMarketPrice")
+    if t and px:
+        ts = pd.Timestamp(int(t), unit="s", tz="UTC").tz_convert("America/New_York")
+        day = ts.strftime("%Y-%m-%d")
+        if (df.empty or day > df["date"].iloc[-1]) and ts.hour >= 16 and ts.weekday() < 5:
+            df = pd.concat([df, pd.DataFrame([{"date": day, "open": None, "close": float(px), "adj_close": None,
+                                               "volume": meta.get("regularMarketVolume")}])], ignore_index=True)
     # Yahoo often leaves the latest session's adjusted close empty until the next day: carry the last adjustment.
     df["adj_close"] = df["adj_close"].fillna(df["close"] * (df["adj_close"] / df["close"]).ffill())
-    return df.dropna(subset=["close", "adj_close"])
+    return df.dropna(subset=["adj_close"]).reset_index(drop=True)
 
 
 def sp500_tables(html: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
