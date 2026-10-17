@@ -232,7 +232,7 @@ def backfill(df: pd.DataFrame, sig: pd.Series, p_hi: pd.Series, plans: dict, R: 
     start = pd.Timestamp(max(have)) if have else days[0] - pd.Timedelta(days=1)
     for d in days[days > start]:
         plan = plans.get(str(d.to_period("M")))
-        if plan is None or str(d.date()) in have:
+        if plan is None or str(d.date()) in have or not _book_priced(plan, R, d):
             continue
         prev = df.index[df.index.get_loc(d) - 1]
         cur = pd.concat([L, pd.DataFrame(rows, columns=LOG_COLS)], ignore_index=True) if rows else L
@@ -286,6 +286,14 @@ def run(state: Path, site: Path, mode: str, now: datetime | None = None, fetch: 
     rep["site"] = build(site, L, plans, df)
     rep["seconds"] = round(time.time() - t0, 1)
     return rep
+
+
+def _book_priced(plan: dict, R: pd.DataFrame, d: pd.Timestamp, need: float = 0.9) -> bool:
+    """True when stocks holding at least 90% of the book's weight have a return for day d."""
+    if d not in R.index:
+        return False
+    w = pd.Series(plan["weights"])
+    return float(w[R.loc[d].reindex(w.index).notna().to_numpy()].sum() / w.sum()) >= need
 
 
 def _month_closed(m: pd.Period, df: pd.DataFrame, today: pd.Timestamp) -> bool:
@@ -352,11 +360,14 @@ def evening(L: pd.DataFrame, df: pd.DataFrame, plans: dict, R: pd.DataFrame, now
     L = L.copy()
     for i in L.index[(L["source"] == "live") & (L["status"] == "pending")]:
         d = pd.Timestamp(L.at[i, "date"])
-        if d in df.index:
+        plan = plans.get(str(d.to_period("M")))
+        if d in df.index and plan is not None and not _book_priced(plan, R, d):
+            continue                                                   # SPY is in but most stocks are not yet: wait
+        if d in df.index and plan is not None:
             row = L.loc[i].to_dict()
             for k in ("first_day", "regime_in", "varswap_on"):
                 row[k] = str(row[k]).lower() == "true"
-            res = realize(row, plans[str(d.to_period("M"))], float(df.loc[d, "r"]), R.loc[d] if d in R.index else pd.Series(dtype=float))
+            res = realize(row, plan, float(df.loc[d, "r"]), R.loc[d] if d in R.index else pd.Series(dtype=float))
             res["evaluated_at"] = now.isoformat(timespec="seconds")
             for k, v in res.items():
                 L.at[i, k] = v

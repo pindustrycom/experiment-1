@@ -103,3 +103,28 @@ def test_yahoo_latest_session_without_adjusted_close(monkeypatch):
     monkeypatch.setattr(papers.requests, "get", lambda *a, **k: R())
     df = papers.fetch_yahoo("SPY")
     assert len(df) == 3 and abs(df["adj_close"].iloc[-1] - 10.8) < 1e-9
+
+
+def test_yahoo_quote_adds_a_lagging_session():
+    from exp2 import papers
+    day = 86400
+    t0 = 1760535000                                                     # a Wednesday, 09:30 New York
+    payload = {"chart": {"result": [{"timestamp": [t0, t0 + day],
+                                     "meta": {"regularMarketTime": t0 + 2 * day + 6.5 * 3600, "regularMarketPrice": 12.0},
+                                     "indicators": {"quote": [{"open": [1, 1], "close": [10.0, 11.0], "volume": [1, 1]}],
+                                                    "adjclose": [{"adjclose": [9.0, 9.9]}]}}]}}
+    df = papers.parse_yahoo_chart(payload)
+    assert len(df) == 3 and abs(df["adj_close"].iloc[-1] - 10.8) < 1e-9
+    payload["chart"]["result"][0]["meta"]["regularMarketTime"] = t0 + 2 * day + 3600   # mid-session: not a close yet
+    assert len(papers.parse_yahoo_chart(payload)) == 2
+
+
+def test_waits_until_the_stock_book_is_priced():
+    df = spy()
+    R = pd.DataFrame({"AAA": df["r"], "BBB": df["r"]})
+    d = df.index[-1]
+    R.loc[d, "AAA"] = np.nan                                            # 60% of the book has no price yet
+    L = pd.DataFrame([{**{c: None for c in live.LOG_COLS}, "date": str(d.date()), "source": "live", "status": "pending"}])
+    plans = {str(d.to_period("M")): PLAN}
+    L2, done = live.evening(L, df, plans, R, datetime(2020, 1, 1, tzinfo=UTC))
+    assert done == [] and L2.at[0, "status"] == "pending"
