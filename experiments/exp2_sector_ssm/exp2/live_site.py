@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from . import improve
 from .live import LEVERAGE, WEIGHTS
 
 e = html.escape
@@ -162,7 +163,7 @@ def band_chart(s: pd.DataFrame, w: int = 1000, h: int = 220) -> str:
     return "".join(p) + '<div class="small muted">Shaded bar: the morning\'s 68% band. Dot: the day\'s result (green inside the band, red outside).</div>'
 
 
-def build(site: Path, L: pd.DataFrame, plans: dict, df: pd.DataFrame) -> dict:
+def build(site: Path, L: pd.DataFrame, plans: dict, df: pd.DataFrame, imp: dict | None = None) -> dict:
     site.mkdir(parents=True, exist_ok=True)
     (site / "data").mkdir(exist_ok=True)
     L = L.copy()
@@ -189,12 +190,51 @@ def build(site: Path, L: pd.DataFrame, plans: dict, df: pd.DataFrame) -> dict:
                "performance_since_2019": perf_all, "performance_live": perf_live, "calibration_last_120": c_recent,
                "calibration_live": c_live, "calibration_backfill": c_back, "error_by_sleeve_last_120": attr,
                "lessons": lessons(c_recent, attr), "weights": WEIGHTS, "leverage": LEVERAGE,
+               "improvement_loop": {**(imp or {}), "trial_so_far": improve.progress(L, plans, imp) if imp else {}},
                "current_plan": {k: v for k, v in plans.get(str(pd.Timestamp(latest.get("date", "2000-01-01")).to_period("M")), {}).items() if k != "weights"}}
     (site / "data" / "summary.json").write_text(json.dumps(summary, indent=1, default=str))
     L.drop(columns=["d"]).to_csv(site / "data" / "predictions.csv", index=False, float_format="%.6g")
     (site / "index.html").write_text(page(summary, L, scored, first_live, df))
     (site / ".nojekyll").write_text("")
     return {"rows": len(L), "live_rows": len(live), "scored": len(scored)}
+
+
+def _fmt(k: str, v: float) -> str:
+    return f"×{v:g}" if k in ("leverage", "vol_size", "vol_bar", "stock_size") else f"{v:g}"
+
+
+def loop_panel(imp: dict) -> str:
+    """The weekly improvement loop: settings in use, the running trial against them, and what happened before."""
+    if not imp or "settings" not in imp:
+        return ""
+    cur = imp["settings"]
+    rows = "".join(f"<tr><td>{e(improve.NAMES[k])}</td><td>{_fmt(k, cur[k])}</td>"
+                   f"<td class='muted'>{'' if cur[k] == improve.DEFAULTS[k] else 'default ' + _fmt(k, improve.DEFAULTS[k])}</td></tr>"
+                   for k in improve.ORDER)
+    t, so = imp.get("trial"), imp.get("trial_so_far") or {}
+    if imp.get("paused"):
+        trial = f"<p><b>Paused:</b> {e(imp['paused'])}. Restart with <code>--decision resume</code>.</p>"
+    elif imp.get("pending"):
+        p = imp["pending"]
+        trial = (f"<p><b>Waiting for Joaquin's approval:</b> {e(improve.NAMES[p['key']])} {_fmt(p['key'], p['from'])} → {_fmt(p['key'], p['to'])} "
+                 f"won its 12-week trial (Sharpe {p['trial']['sharpe'] or 0:.2f} against {p['current']['sharpe'] or 0:.2f}, "
+                 f"return {p['trial']['total_pct']:+.1f}% against {p['current']['total_pct']:+.1f}%).</p>")
+    elif t:
+        c, x = so.get("current") or {}, so.get("trial") or {}
+        res = (f" So far over {x['days']} sessions: trial {x['total_pct']:+.2f}% (Sharpe {x['sharpe'] or 0:.2f}) against "
+               f"current {c['total_pct']:+.2f}% (Sharpe {c['sharpe'] or 0:.2f}).") if x.get("days") else " No sessions scored yet."
+        trial = (f"<p><b>Trial running:</b> {e(improve.NAMES[t['key']])} {_fmt(t['key'], t['from'])} → {_fmt(t['key'], t['to'])}, "
+                 f"since {e(t['start'])}, week {t.get('weeks_done', 0)} of {improve.TRIAL_WEEKS}, tracked in the shadow.{res}</p>")
+    else:
+        trial = "<p>The first trial starts after the first Friday close of live tracking.</p>"
+    hist = "".join(f"<li>{e(h['date'])}: {e(h['event'])}"
+                   + (f" ({e(improve.NAMES[h['key']])} {_fmt(h['key'], h['from'])} → {_fmt(h['key'], h['to'])})" if h.get("key") else "")
+                   + (f", {e(h['detail'])}" if h.get("detail") else "") + "</li>" for h in reversed(imp.get("history", [])[-12:]))
+    return (f'<h2>Weekly improvement loop</h2><div class="panel">{trial}<div class="scroll"><table><tr><th>Setting</th><th>In use</th><th></th></tr>{rows}</table></div>'
+            f'<p class="small muted">Each week, after Friday\'s close, one setting is moved one step and tracked in the shadow for '
+            f'{improve.TRIAL_WEEKS} weeks. A trial that beats the current settings on Sharpe is adopted only after Joaquin approves it. '
+            f'Caps: leverage ×1.7, volatility trade ×1.5. A {100 * improve.MAX_DRAWDOWN:.0f}% drop from the peak after a change reverts it and pauses the loop.</p>'
+            + (f'<ul class="small">{hist}</ul>' if hist else "") + "</div>")
 
 
 def page(S: dict, L: pd.DataFrame, scored: pd.DataFrame, first_live: str | None, df: pd.DataFrame) -> str:
@@ -272,6 +312,7 @@ def page(S: dict, L: pd.DataFrame, scored: pd.DataFrame, first_live: str | None,
 <h2>Track record</h2><div class="grid">{perf_cards}</div>
 <div class="panel" style="margin-top:12px">{line_chart(eq, first_live, log_scale=True)}</div>
 <h2>Predictions against outcomes</h2><div class="panel">{band_chart(recent_band)}</div>
+{loop_panel(S.get("improvement_loop") or {})}
 <details><summary><b>What the errors teach</b> <span class="muted small">(details)</span></summary><div class="panel"><ul>{learn}</ul>
 <p class="small muted">Learning in use for the next prediction: volatility multiplier {vm:.2f} (scales our SPY volatility forecast) and band
 multiplier {bm:.2f} (scales the band to how wide errors really were). Both come from the last 120 scored sessions, shrunk towards 1.</p>

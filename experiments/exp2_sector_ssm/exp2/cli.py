@@ -209,6 +209,8 @@ def main(argv=None) -> None:
     lp.add_argument("--state", type=Path, default=Path("live_state"))
     lp.add_argument("--site", type=Path, default=Path("site"))
     lp.add_argument("--no-network", action="store_true")
+    lp.add_argument("--decision", choices=["approve", "reject", "resume"],
+                    help="Joaquin's call on the weekly loop: approve or reject a winning trial, or resume a paused loop")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     if a.cmd == "topo":
@@ -235,7 +237,7 @@ def main(argv=None) -> None:
         return
     if a.cmd == "live":
         from . import live
-        rep = live.run(a.state, a.site, a.mode, fetch=not a.no_network)
+        rep = live.run(a.state, a.site, a.mode, fetch=not a.no_network, decision=a.decision)
         print(json.dumps(rep, indent=1, default=str))
         return
     if a.cmd == "volpred":

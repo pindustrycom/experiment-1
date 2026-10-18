@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import itertools
 import json
 import shutil
 from datetime import UTC, datetime
@@ -80,7 +81,10 @@ BANNER_CSS = """
 .big .v{font-size:52px;font-weight:750;line-height:1.1;font-variant-numeric:tabular-nums}
 .big .d{color:var(--muted);font-size:14px}.big .d b{color:var(--text)}
 .big .pos,.card .pos{color:var(--lo,#2e7d4f)}.big .neg,.card .neg{color:var(--hi,#c0392b)}.pf .small{font-size:13px}
-.pos-line{font-size:14px;margin:6px 0}
+.pos-line{font-size:14px;margin:6px 0}.fail{font-size:14px;margin:6px 0}
+.scroll{overflow-x:auto}.grades{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.grades th,.grades td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+.grades th{color:var(--muted);font-weight:500}
 @media (max-width:520px){.big .v{font-size:40px}}
 """
 
@@ -147,6 +151,63 @@ def exp1_positions(t: dict) -> str:
         f"<b>long {e(b['long'])} / short {e(b['short'])}</b> <span class=\"muted\">({e(b['why'])})</span>" for b in book)
 
 
+def pct(v: float | None) -> str:
+    return "n/a" if v is None else f"{100 * v:.0f}%"
+
+
+def fail_line(t: dict, which: str) -> str:
+    """The share of the experiment's calls that the real closes proved wrong."""
+    g = (t.get("grades") or {}).get(which) or {}
+    if which == "exp1":
+        if not g.get("bets"):
+            return "Fail rate: no bets graded yet. Each pair bet is checked against the real close every trading night."
+        return (f"Fail rate: <b>{pct(g['fail_rate'])}</b> of pair bets lost money "
+                f"({g['lost']} of {g['bets']}, checked against each day's real close).")
+    if not g.get("days"):
+        return "Fail rate: no calls graded yet. Each morning call is checked against the real close every trading night."
+    return (f"Fail rate: <b>{pct(g['fail_rate'])}</b> of morning calls got the day's direction wrong ({g['wrong']} of {g['days']}); "
+            f"the real result fell outside the 68% band on {pct(g['band_miss_rate'])} of days (about 32% is expected).")
+
+
+def _exp1_cell(x: dict | None) -> str:
+    if not x:
+        return '<span class="muted">no bets</span>'
+    legs = ", ".join(f'<span class="{pl_class(100 * l["ret"])}">{e(l["long"])}/{e(l["short"])} {100 * l["ret"]:+.2f}%</span>'
+                     for l in x["legs"])
+    return f'{x["lost"]} of {x["bets"]} lost · book {100 * x["ret"]:+.2f}%<br><span class="small">{legs}</span>'
+
+
+def _exp2_cell(x: dict | None) -> str:
+    if not x:
+        return '<span class="muted">no call</span>'
+    call = f'{x["exp_ret"]:+.2f}%' if x.get("exp_ret") is not None else "?"
+    verdict = {True: '<span class="pos">right</span>', False: '<span class="neg">wrong</span>', None: ""}[x.get("up_right")]
+    return f'called {call}, real <span class="{pl_class(x["real_ret"])}">{x["real_ret"]:+.2f}%</span> · {verdict}'
+
+
+def grades_table(t: dict, limit: int = 30) -> str:
+    """Every trading night: each pot's bets next to what the real closes did, and the day's money in CAD."""
+    g = t.get("grades") or {}
+    rows = {r["date"]: r for r in t["rows"]}
+    dates = sorted(rows)
+    day_pl = {d: {k: rows[d][k] - rows[p][k] for k in ("exp1", "exp2", "combined")} for p, d in itertools.pairwise(dates)}
+    days = g.get("days") or []
+    if not days:
+        return (f'<div class="panel"><b>End-of-day report card</b><p class="small muted">Tracking starts with the close of '
+                f'{e(t.get("start") or "")}. From then on, each trading night lists every bet next to the real closing prices '
+                f'and the share that failed.</p></div>')
+    out = [('<div class="panel"><b>End-of-day report card</b> <span class="small muted">each bet against the real closing prices</span>'
+            '<div class="scroll"><table class="grades"><tr><th>Close</th><th>Exp1 pair bets</th><th>Exp2 morning call</th>'
+            '<th>Money today (CAD)</th></tr>')]
+    for r in days[:limit]:
+        pl = day_pl.get(r["date"])
+        money = (" · ".join(f'{n} <span class="{pl_class(pl[k])}">{cad(pl[k], True)}</span>'
+                            for k, n in (("exp1", "Exp1"), ("exp2", "Exp2"), ("combined", "both")))) if pl else ""
+        out.append(f'<tr><td>{e(r["date"])}</td><td>{_exp1_cell(r.get("exp1"))}</td><td>{_exp2_cell(r.get("exp2"))}</td>'
+                   f'<td>{money}</td></tr>')
+    return "".join(out) + "</table></div></div>"
+
+
 def portfolio_banner(t: dict | None, which: str, root: str) -> str:
     """The big P/L box put at the top of an experiment's page."""
     if not t:
@@ -154,7 +215,7 @@ def portfolio_banner(t: dict | None, which: str, root: str) -> str:
     name = {"exp1": "Exp1 paper portfolio", "exp2": "Exp2 paper portfolio"}[which]
     pos = exp1_positions(t) if which == "exp1" else e(t.get("exp2_position") or "No positions yet.")
     return (f'{MARK}<style>{BANNER_CSS}</style><div class="pf">{big_number(t["rows"], which, name + ": profit / loss", t.get("start"))}'
-            f'<div class="pos-line">{pos}</div><div class="muted small">Paper money only, traded daily from this experiment\'s signals. '
+            f'<div class="pos-line">{pos}</div><div class="fail">{fail_line(t, which)}</div><div class="muted small">Paper money only, traded daily from this experiment\'s signals. '
             f'<a href="{root}index.html">Combined portfolio →</a></div></div>{MARK_END}')
 
 
@@ -207,8 +268,9 @@ def hub_page(site: Path, t: dict | None = None) -> str:
 <span style="color:var(--b)">━</span> Exp2 · dashed line: the starting 1,000 CAD</div></div>
 <p class="small muted">Half of the money follows each experiment. Trades every trading day; US positions, valued in CAD at the
 Bank of Canada rate. No costs or interest.{fx}</p>
-<div class="cards">{sleeve_card(t, "exp1", "Exp1 · pairs", "exp1/index.html", "Long the stock Exp1 favours in each pair, short the other.", exp1_positions(t))}
-{sleeve_card(t, "exp2", "Exp2 · volatility-timed", "exp2/index.html", "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", e(t.get("exp2_position") or ""))}</div>"""
+<div class="cards">{sleeve_card(t, "exp1", "Exp1 · pairs", "exp1/index.html", "Long the stock Exp1 favours in each pair, short the other.", exp1_positions(t) + "<br>" + fail_line(t, "exp1"))}
+{sleeve_card(t, "exp2", "Exp2 · volatility-timed", "exp2/index.html", "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", e(t.get("exp2_position") or "") + "<br>" + fail_line(t, "exp2"))}</div>
+{grades_table(t)}"""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>Paper portfolio</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}</style></head><body>

@@ -7,6 +7,8 @@ name: Experiment 2
 # asks the dashboard workflow (pages.yml) to republish the site, so the morning prediction is on the site before the open.
 # The prediction log is also committed to the "exp2-ledger" branch (live/predictions.csv), so each prediction's
 # timestamp is on record in git before its outcome is known.
+# Each Friday evening the weekly improvement loop (exp2/improve.py) reviews its shadow trial; a trial that wins waits for
+# Joaquin's approval, given by running this workflow by hand with decision=approve (or reject).
 # The earlier tech-sector model (python -m exp2 run) is kept in the code but no longer scheduled.
 
 on:
@@ -22,6 +24,11 @@ on:
         type: choice
         options: [morning, evening]
         default: evening
+      decision:
+        description: "weekly improvement loop: approve or reject the trial that won, or resume a paused loop"
+        type: choice
+        options: [none, approve, reject, resume]
+        default: none
 
 permissions:
   contents: write   # release assets and the ledger branch
@@ -44,6 +51,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TRIAL: ${{ github.event_name == 'pull_request' }}
       MODE: ${{ inputs.mode || (github.event.schedule == '0 13 * * 1-5' && 'morning') || 'evening' }}
+      DECISION: ${{ inputs.decision || 'none' }}
     defaults:
       run:
         working-directory: experiments/exp2_sector_ssm
@@ -80,7 +88,8 @@ jobs:
       - name: Run Experiment 2 (${{ env.MODE }})
         run: |
           set -o pipefail
-          python -m exp2 live --mode "$MODE" --state state --site site | tee /tmp/run.json
+          extra=$([ "$DECISION" != none ] && echo "--decision $DECISION" || true)
+          python -m exp2 live --mode "$MODE" --state state --site site $extra | tee /tmp/run.json
           if [ "$TRIAL" = "true" ]; then   # a trial also exercises the other half of the day
             other=$([ "$MODE" = morning ] && echo evening || echo morning)
             python -m exp2 live --mode "$other" --state state --site site --no-network | tee /tmp/run2.json
@@ -99,6 +108,9 @@ jobs:
               print(f"\nNo prediction: {p.get('skipped')}")
           if s.get("scored") is not None:
               print(f"\nScored: {s['scored'] or 'nothing pending'}")
+          for k in ("decision", "improve"):
+              if s.get(k):
+                  print(f"\n**{'Decision' if k == 'decision' else 'Weekly improvement loop'}:** {json.dumps(s[k], default=str)[:600]}")
           PY
 
       - name: Keep the trial run's pages for inspection
