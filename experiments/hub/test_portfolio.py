@@ -112,3 +112,36 @@ def test_glass_theme_on_every_page_once(tmp_path):
     for f in ("index.html", "exp1/index.html", "exp2/index.html"):
         assert "backdrop-filter" in (site / f).read_text()
     assert (site / "exp1" / "index.html").read_text().count("<!--glass-->") == 1
+
+
+def test_end_of_day_fail_rate(tmp_path):
+    site, state = tmp_path / "site", tmp_path / "portfolio.json"
+    cols = "date,source,status,exp_ret,real_ret,up_right,in68,regime_in,varswap_on,K\n"
+
+    def exp2(lines):
+        d = site / "exp2" / "data"
+        d.mkdir(parents=True, exist_ok=True)
+        (site / "exp2" / "index.html").write_text(MAIN.format(b="exp2"))
+        (d / "predictions.csv").write_text(cols + "".join(x + "\n" for x in lines))
+
+    make_site(site, [("2026-10-15", 100, 100), ("2026-10-16", 100, 100)])
+    exp2([])
+    build_hub.build(site, state, update=True)
+    assert "no bets graded yet" in (site / "index.html").read_text()
+    # Monday: long KO / short PEP wins; Exp2 called up and SPY went up (right, inside the band)
+    make_site(site, [("2026-10-16", 100, 100), ("2026-10-19", 102, 99)])
+    exp2(["2026-10-16,backfill,scored,0.1,-3,False,False,True,True,18",
+          "2026-10-19,live,scored,0.1,0.4,True,True,True,True,18"])
+    build_hub.build(site, state, update=True)
+    # Tuesday: the same bet loses; Exp2 called up but the day fell, outside the band
+    make_site(site, [("2026-10-19", 102, 99), ("2026-10-20", 100, 100)])
+    exp2(["2026-10-19,live,scored,0.1,0.4,True,True,True,True,18",
+          "2026-10-20,live,scored,0.1,-1.5,False,False,True,True,18"])
+    build_hub.build(site, state, update=True)
+    g = json.loads((site / "data" / "portfolio.json").read_text())["grades"]
+    assert g["exp1"] == {"lost": 1, "bets": 2, "fail_rate": 0.5}          # the replayed 10-16 Exp2 row is not graded
+    assert g["exp2"]["wrong"] == 1 and g["exp2"]["days"] == 2 and g["exp2"]["band_miss_rate"] == 0.5
+    assert [d["date"] for d in g["days"]] == ["2026-10-20", "2026-10-19"]
+    hub = (site / "index.html").read_text()
+    assert "End-of-day report card" in hub and "1 of 2" in hub and "KO/PEP" in hub and "wrong" in hub
+    assert "50%" in (site / "exp1" / "index.html").read_text()

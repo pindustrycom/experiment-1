@@ -19,6 +19,10 @@ Learning: two factors are updated from the errors of the last 120 sessions (shru
 and used the next morning: a volatility multiplier (realised r^2 against forecast s^2) and a band multiplier
 (how wide the errors really were against the predicted band). Both are logged with every prediction.
 
+Settings: the leverage, the regime cut-off and the sizes of the sleeves can be changed by the weekly improvement loop
+(exp2/improve.py), only after a 12-week shadow trial wins and Joaquin approves it. The defaults are the frozen portfolio
+above; the settings used for each prediction are logged with it.
+
 Paper tracking only: no orders are placed anywhere.
 """
 from __future__ import annotations
@@ -35,7 +39,7 @@ from zoneinfo import ZoneInfo
 import numpy as np
 import pandas as pd
 
-from . import collapse, papers, volpred
+from . import collapse, improve, papers, volpred
 
 log = logging.getLogger("exp2.live")
 NY = ZoneInfo("America/New_York")
@@ -50,7 +54,7 @@ BACKFILL_FROM = "2019-01-01"
 LOG_COLS = ["date", "source", "made_at", "last_close", "sigma_raw", "vol_mult", "sigma", "p_hi", "regime_in", "varswap_on", "K",
             "n_days", "first_day", "hrp_beta", "hrp_idio", "band_mult", "exp_ret", "sd", "band_lo", "band_hi", "p_up",
             "exp_hrp", "exp_regime", "exp_varswap", "evaluated_at", "status", "spy_ret", "hrp_ret", "real_hrp", "real_regime",
-            "real_varswap", "real_ret", "error_pp", "z", "in68", "in95", "vol_ratio", "up_right"]
+            "real_varswap", "real_ret", "error_pp", "z", "in68", "in95", "vol_ratio", "up_right", "settings"]
 N = NormalDist()
 
 
@@ -159,33 +163,46 @@ def hrp_weights(P: pd.DataFrame, R: pd.DataFrame, month: pd.Period, end: pd.Time
 
 # ---------------------------------------------------------------- one day
 
-def predict(plan: dict, sigma_raw: float, p_hi: float, first_day: bool, vol_mult: float, band_mult: float) -> dict:
+def _sizes(plan: dict, st: dict) -> tuple[float, float, float, bool]:
+    """Leverage and the effective HRP and variance-swap weights under settings st, and whether the swap is struck."""
+    lev = st["leverage"]
+    return lev, WEIGHTS["hrp"] * st["stock_size"], WEIGHTS["varswap"] * st["vol_size"], improve.swap_on(plan, st)
+
+
+def predict(plan: dict, sigma_raw: float, p_hi: float, first_day: bool, vol_mult: float, band_mult: float,
+            settings: dict | None = None) -> dict:
+    st = improve.settings_of(settings)
+    lev, wh, wv, on = _sizes(plan, st)
     s = sigma_raw * vol_mult
-    reg = 1.0 if p_hi < 0.5 else 0.0
-    a = LEVERAGE * (WEIGHTS["hrp"] * plan["beta"] + WEIGHTS["regime"] * reg)
-    h = LEVERAGE * WEIGHTS["hrp"]
-    g = LEVERAGE * WEIGHTS["varswap"] * VEGA / (2 * plan["K"] * plan["n_days"]) if plan["on"] else 0.0
+    reg = 1.0 if p_hi < st["regime_cut"] else 0.0
+    a = lev * (wh * plan["beta"] + WEIGHTS["regime"] * reg)
+    h = lev * wh
+    g = lev * wv * VEGA / (2 * plan["K"] * plan["n_days"]) if on else 0.0
     c, b = g * plan["K"] ** 2, g * 252e4
-    cost = LEVERAGE * WEIGHTS["varswap"] * VEGA * ROLL_COST if plan["on"] and first_day else 0.0
+    cost = lev * wv * VEGA * ROLL_COST if on and first_day else 0.0
     exp_v = c - b * (s ** 2 + MU ** 2) - cost
     exp = 100 * a * MU + exp_v
     sd = math.sqrt((100 * a * s) ** 2 + (100 * h * plan["idio"]) ** 2 + 2 * b ** 2 * s ** 4)
     band = sd * band_mult
-    return {"sigma_raw": sigma_raw, "vol_mult": vol_mult, "sigma": s, "p_hi": p_hi, "regime_in": bool(reg), "varswap_on": plan["on"],
+    return {"sigma_raw": sigma_raw, "vol_mult": vol_mult, "sigma": s, "p_hi": p_hi, "regime_in": bool(reg), "varswap_on": on,
             "K": plan["K"], "n_days": plan["n_days"], "first_day": first_day, "hrp_beta": plan["beta"], "hrp_idio": plan["idio"],
             "band_mult": band_mult, "exp_ret": exp, "sd": sd, "band_lo": exp - band, "band_hi": exp + band,
-            "p_up": N.cdf(exp / band) if band > 0 else 0.5, "exp_hrp": 100 * LEVERAGE * WEIGHTS["hrp"] * plan["beta"] * MU,
-            "exp_regime": 100 * LEVERAGE * WEIGHTS["regime"] * reg * MU, "exp_varswap": exp_v}
+            "p_up": N.cdf(exp / band) if band > 0 else 0.5, "exp_hrp": 100 * lev * wh * plan["beta"] * MU,
+            "exp_regime": 100 * lev * WEIGHTS["regime"] * reg * MU, "exp_varswap": exp_v,
+            "settings": json.dumps(st, sort_keys=True)}
 
 
 def realize(row: dict, plan: dict, spy_ret: float, stock_rets: pd.Series) -> dict:
+    """Score a prediction with the settings it was made under."""
+    st = improve.settings_of(row.get("settings"))
+    lev, wh, wv, on = _sizes(plan, st)
     w = pd.Series(plan["weights"])
     hrp = float((stock_rets.reindex(w.index).fillna(0.0) * w).sum())
-    g = LEVERAGE * WEIGHTS["varswap"] * VEGA / (2 * plan["K"] * plan["n_days"]) if plan["on"] else 0.0
-    cost = LEVERAGE * WEIGHTS["varswap"] * VEGA * ROLL_COST if plan["on"] and row["first_day"] else 0.0
+    g = lev * wv * VEGA / (2 * plan["K"] * plan["n_days"]) if on else 0.0
+    cost = lev * wv * VEGA * ROLL_COST if on and row["first_day"] else 0.0
     rv = g * plan["K"] ** 2 - g * 252e4 * spy_ret ** 2 - cost
-    rh = 100 * LEVERAGE * WEIGHTS["hrp"] * hrp
-    rr = 100 * LEVERAGE * WEIGHTS["regime"] * spy_ret * (1.0 if row["regime_in"] else 0.0)
+    rh = 100 * lev * wh * hrp
+    rr = 100 * lev * WEIGHTS["regime"] * spy_ret * (1.0 if row["regime_in"] else 0.0)
     real = rh + rr + rv
     err = real - row["exp_ret"]
     band = (row["band_hi"] - row["band_lo"]) / 2
@@ -218,11 +235,11 @@ def load_log(state: Path) -> pd.DataFrame:
 
 def save_log(state: Path, df: pd.DataFrame) -> None:
     (state / "log").mkdir(parents=True, exist_ok=True)
-    df[LOG_COLS].to_csv(state / "log" / "predictions.csv", index=False, float_format="%.6g")
+    df.reindex(columns=LOG_COLS).to_csv(state / "log" / "predictions.csv", index=False, float_format="%.6g")
 
 
 def backfill(df: pd.DataFrame, sig: pd.Series, p_hi: pd.Series, plans: dict, R: pd.DataFrame, L: pd.DataFrame | None = None,
-             source: str = "backfill") -> pd.DataFrame:
+             source: str = "backfill", settings: dict | None = None) -> pd.DataFrame:
     """Replay every session since 2019 that the log lacks, as if the tracker had run: same plans, same learning,
     outcomes known. Used once to build the history and later to fill sessions a scheduled run missed."""
     L = L if L is not None else pd.DataFrame(columns=LOG_COLS)
@@ -239,14 +256,14 @@ def backfill(df: pd.DataFrame, sig: pd.Series, p_hi: pd.Series, plans: dict, R: 
         vm, bm = learned(cur)
         first = prev.to_period("M") != d.to_period("M")
         row = {"date": str(d.date()), "source": source, "made_at": "", "last_close": str(prev.date()),
-               **predict(plan, float(sig.loc[prev]), float(p_hi.loc[prev]), first, vm, bm)}
+               **predict(plan, float(sig.loc[prev]), float(p_hi.loc[prev]), first, vm, bm, settings)}
         row.update(realize(row, plan, float(df.loc[d, "r"]), R.loc[d] if d in R.index else pd.Series(dtype=float)))
         row["evaluated_at"] = ""
         rows.append(row)
     return pd.concat([L, pd.DataFrame(rows, columns=LOG_COLS)], ignore_index=True) if rows else L
 
 
-def run(state: Path, site: Path, mode: str, now: datetime | None = None, fetch: bool = True) -> dict:
+def run(state: Path, site: Path, mode: str, now: datetime | None = None, fetch: bool = True, decision: str | None = None) -> dict:
     t0 = time.time()
     now = now or datetime.now(UTC)
     today = pd.Timestamp(now.astimezone(NY).date())
@@ -254,6 +271,9 @@ def run(state: Path, site: Path, mode: str, now: datetime | None = None, fetch: 
     work.mkdir(parents=True, exist_ok=True)
     rep = {"mode": mode, "now": now.isoformat(timespec="seconds"), "ny_date": str(today.date()), "warnings": []}
     plans = json.loads((work / "plans.json").read_text()) if (work / "plans.json").exists() else {}
+    imp = improve.load(work)
+    if decision:
+        rep["decision"] = improve.decide(imp, decision, str(today.date()))
     if fetch:
         rep["fetch"] = refresh(data, today, everything=mode == "evening" or str(today.to_period("M")) not in plans)
     df = spy_frame(data)
@@ -275,15 +295,18 @@ def run(state: Path, site: Path, mode: str, now: datetime | None = None, fetch: 
     # score whatever has an outcome by now (normally in the evening; the morning catches a late price feed)
     L, rep["scored"] = evening(L, df, plans, R, now)
     n0 = len(L)
-    L = backfill(df, sig, p_hi, plans, R, L, "backfill" if L.empty else "catch-up")
+    L = backfill(df, sig, p_hi, plans, R, L, "backfill" if L.empty else "catch-up", None if L.empty else imp["settings"])
     rep["backfilled_days"] = len(L) - n0
+    if mode == "evening":
+        rep["improve"] = improve.weekly(L, plans, imp, str(last.date()))
     if mode == "morning":
-        rep["prediction"] = morning(L, df, sig, p_hi, plans, today, now)
+        rep["prediction"] = morning(L, df, sig, p_hi, plans, today, now, imp["settings"])
         if rep["prediction"].get("row"):
             L = pd.concat([L, pd.DataFrame([rep["prediction"]["row"]])], ignore_index=True)
     save_log(state, L)
+    improve.save(work, imp)
     from .live_site import build
-    rep["site"] = build(site, L, plans, df)
+    rep["site"] = build(site, L, plans, df, imp)
     rep["seconds"] = round(time.time() - t0, 1)
     return rep
 
@@ -337,7 +360,8 @@ def _last_row(data: Path, ticker: str) -> dict:
         return {}
 
 
-def morning(L: pd.DataFrame, df: pd.DataFrame, sig: pd.Series, p_hi: pd.Series, plans: dict, today: pd.Timestamp, now: datetime) -> dict:
+def morning(L: pd.DataFrame, df: pd.DataFrame, sig: pd.Series, p_hi: pd.Series, plans: dict, today: pd.Timestamp, now: datetime,
+            settings: dict | None = None) -> dict:
     last = df.index[-1]
     if today.weekday() >= 5:
         return {"skipped": "weekend"}
@@ -351,7 +375,7 @@ def morning(L: pd.DataFrame, df: pd.DataFrame, sig: pd.Series, p_hi: pd.Series, 
     first = last.to_period("M") != today.to_period("M")
     vm, bm = learned(L)
     row = {"date": str(today.date()), "source": "live", "made_at": now.isoformat(timespec="seconds"), "last_close": str(last.date()),
-           **predict(plan, float(sig.loc[last]), float(p_hi.loc[last]), first, vm, bm), "status": "pending"}
+           **predict(plan, float(sig.loc[last]), float(p_hi.loc[last]), first, vm, bm, settings), "status": "pending"}
     return {"row": row}
 
 

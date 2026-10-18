@@ -15,6 +15,10 @@ Inputs are files the site already has: exp1/data/pairs.json and pair_prices.json
 and exp2/data/predictions.csv (built by exp2/live_site.py). Experiment 1's books need a history, so they are kept in
 a small state file (portfolio.json) that only the full nightly run updates; Experiment 2 and the FX rates are re-read
 every time. Standard library only.
+
+Each night the real closes are also used to grade the day: for Exp1, how many pair bets lost money; for Exp2, whether
+the morning call got the direction of the day right (and whether the result landed inside its 68% band). The share
+that failed is shown on the pages next to the money.
 """
 from __future__ import annotations
 
@@ -71,21 +75,25 @@ def _ret(p: dict, ticker: str, d0: str, d1: str) -> float | None:
     return None
 
 
+def leg_returns(book: list[dict], prices: list[dict], d0: str, d1: str) -> list[float | None]:
+    """Each leg's return (long minus short) from close d0 to close d1; None when a price is missing."""
+    px = {p["slug"]: p for p in prices}
+    out = []
+    for leg in book:
+        p = px.get(leg["slug"])
+        rl = _ret(p, leg["long"], d0, d1) if p else None
+        rs = _ret(p, leg["short"], d0, d1) if p else None
+        out.append(rl - rs if rl is not None and rs is not None else None)
+    return out
+
+
 def book_return(book: list[dict], prices: list[dict], d0: str, d1: str) -> tuple[float, int]:
     """Return of an equal-money book held from close d0 to close d1, and how many legs could be priced
     (a leg without both prices counts as flat)."""
     if not book:
         return 0.0, 0
-    px = {p["slug"]: p for p in prices}
-    tot, n = 0.0, 0
-    for leg in book:
-        p = px.get(leg["slug"])
-        rl = _ret(p, leg["long"], d0, d1) if p else None
-        rs = _ret(p, leg["short"], d0, d1) if p else None
-        if rl is not None and rs is not None:
-            tot += rl - rs
-            n += 1
-    return tot / len(book), n
+    legs = [r for r in leg_returns(book, prices, d0, d1) if r is not None]
+    return sum(legs) / len(book), len(legs)
 
 
 def update_exp1(state: dict, site: Path) -> dict:
@@ -98,44 +106,63 @@ def update_exp1(state: dict, site: Path) -> dict:
     rows = state.setdefault("exp1", [])
     if rows and rows[-1]["date"] >= today:
         return {"exp1": f"already up to {rows[-1]['date']}"}
-    idx, ret, priced = 1.0, 0.0, 0
+    idx, ret, priced, legs = 1.0, 0.0, 0, []
     if rows:
         last = rows[-1]
         ret, priced = book_return(last["book"], prices, last["date"], today)
         if today < START:
             ret = 0.0
+        else:   # grade each bet of the book just closed against the real closes
+            legs = [{"slug": b["slug"], "long": b["long"], "short": b["short"], "ret": r}
+                    for b, r in zip(last["book"], leg_returns(last["book"], prices, last["date"], today))]
         idx = last["index"] * (1 + ret)
-    rows.append({"date": today, "index": idx, "ret": ret, "priced_legs": priced, "book": exp1_book(pairs, prices)})
+    rows.append({"date": today, "index": idx, "ret": ret, "priced_legs": priced, "legs": legs,
+                 "book": exp1_book(pairs, prices)})
     return {"exp1": f"{today}: {ret:+.4%}, {len(rows[-1]['book'])} positions"}
 
 
 # ---------------------------------------------------------------- Experiment 2
 
-def exp2_returns(site: Path) -> list[tuple[str, float]]:
-    """Scored sessions from START on, as (date, return as a fraction). Replayed history before live tracking is left out."""
+def _exp2_rows(site: Path) -> list[dict]:
     f = site / "exp2" / "data" / "predictions.csv"
     try:
         with f.open() as fh:
-            rows = list(csv.DictReader(fh))
+            return list(csv.DictReader(fh))
     except OSError:
         return []
+
+
+def _num(x) -> float | None:
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+
+def exp2_scored(site: Path) -> list[dict]:
+    """Scored sessions from START on: the morning call next to the real result. Replayed history is left out."""
     out = []
-    for r in rows:
+    for r in _exp2_rows(site):
         if r.get("date", "") >= START and r.get("status") == "scored" and r.get("source") in ("live", "catch-up"):
-            try:
-                out.append((r["date"], float(r["real_ret"]) / 100))
-            except (KeyError, ValueError):
+            real = _num(r.get("real_ret"))
+            if real is None:
                 continue
-    return sorted(out)
+            exp = _num(r.get("exp_ret"))
+            right = str(r.get("up_right", "")).lower()
+            in68 = str(r.get("in68", "")).lower()
+            out.append({"date": r["date"], "real_ret": real, "exp_ret": exp,
+                        "up_right": right == "true" if right in ("true", "false") else None,
+                        "in68": in68 == "true" if in68 in ("true", "false") else None})
+    return sorted(out, key=lambda x: x["date"])
+
+
+def exp2_returns(site: Path) -> list[tuple[str, float]]:
+    """Scored sessions from START on, as (date, return as a fraction)."""
+    return [(r["date"], r["real_ret"] / 100) for r in exp2_scored(site)]
 
 
 def exp2_position(site: Path) -> str:
-    f = site / "exp2" / "data" / "predictions.csv"
-    try:
-        with f.open() as fh:
-            rows = list(csv.DictReader(fh))
-    except OSError:
-        return ""
+    rows = _exp2_rows(site)
     if not rows:
         return ""
     r = rows[-1]
@@ -158,6 +185,35 @@ def fetch_fx(start: str) -> dict[str, float]:
 def _asof(series: dict[str, float], d: str) -> float | None:
     k = [x for x in series if x <= d]
     return series[max(k)] if k else None
+
+
+def _rate(bad: int, n: int) -> float | None:
+    return bad / n if n else None
+
+
+def grades(state: dict, site: Path) -> dict:
+    """The end-of-day report card: each day's bets against the real closes, and the share that failed."""
+    days = {}
+    lost = bets = 0
+    for r in state.get("exp1", []):
+        legs = [x for x in r.get("legs") or [] if x.get("ret") is not None]
+        if r["date"] < START or not r.get("legs"):
+            continue
+        bad = sum(x["ret"] < 0 for x in legs)
+        lost, bets = lost + bad, bets + len(legs)
+        days.setdefault(r["date"], {})["exp1"] = {"ret": r["ret"], "lost": bad, "bets": len(legs),
+                                                  "legs": [{k: x[k] for k in ("long", "short", "ret")} for x in legs]}
+    wrong = graded = out68 = banded = 0
+    for r in exp2_scored(site):
+        if r["up_right"] is not None:
+            wrong, graded = wrong + (not r["up_right"]), graded + 1
+        if r["in68"] is not None:
+            out68, banded = out68 + (not r["in68"]), banded + 1
+        days.setdefault(r["date"], {})["exp2"] = r
+    return {"days": [{"date": d, **v} for d, v in sorted(days.items(), reverse=True)],
+            "exp1": {"lost": lost, "bets": bets, "fail_rate": _rate(lost, bets)},
+            "exp2": {"wrong": wrong, "days": graded, "fail_rate": _rate(wrong, graded),
+                     "outside_band": out68, "band_days": banded, "band_miss_rate": _rate(out68, banded)}}
 
 
 def table(state: dict, site: Path) -> dict:
@@ -186,7 +242,7 @@ def table(state: dict, site: Path) -> dict:
     last = state["exp1"][-1] if state.get("exp1") else None
     return {"start": START, "rows": rows, "fx_known": fx0 is not None,
             "exp1_book": last["book"] if last else [], "exp1_book_date": last["date"] if last else None,
-            "exp2_position": exp2_position(site)}
+            "exp2_position": exp2_position(site), "grades": grades(state, site)}
 
 
 def run(site: Path, state_file: Path, update: bool) -> dict:
