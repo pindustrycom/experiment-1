@@ -12,6 +12,9 @@ name: Update dashboard
 #   TIINGO_API_KEY, ANTHROPIC_API_KEY, FINNHUB_API_KEY, ALPHAVANTAGE_API_KEY
 # Optional repository variable: SEC_USER_AGENT, e.g. "SplittabilityMonitor research you@example.com"
 # (SEC requires a contact address; it enables filings and fundamentals).
+#
+# Required secret PASSWORD_SITE: the whole site is encrypted with it (experiments/hub/lock_site.py) and visitors
+# unlock it in the browser. Without it nothing is published and the last deployed site stays up.
 
 on:
   schedule:
@@ -69,7 +72,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
-        if: ${{ !inputs.publish_only }}
         with:
           python-version: "3.12"
           cache: pip
@@ -249,6 +251,14 @@ jobs:
             if [[ $d =~ ^[0-9]{8}$ ]] && [ "$d" -lt "$cutoff" ]; then gh release delete-asset "$STATE_TAG" "$name" --repo "$GITHUB_REPOSITORY" -y; fi
           done
           echo "Saved database: $(du -h /tmp/out/db-latest.dump | cut -f1)" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Lock the site with the password
+        working-directory: ${{ github.workspace }}
+        env:
+          PASSWORD_SITE: ${{ secrets.PASSWORD_SITE }}
+        run: |
+          pip install cryptography==50.0.1
+          python experiments/hub/lock_site.py --site _site | tee -a "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-pages-artifact@v4
         with:
