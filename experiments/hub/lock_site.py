@@ -1,6 +1,6 @@
 """Put the whole GitHub Pages site behind one password, by encrypting every file in it.
 
-    PASSWORD_SITE=... python experiments/hub/lock_site.py --site _site
+    PASSWORD_SITE=... python experiments/hub/lock_site.py --site _site   (pages.yml passes the PASSWORD secret)
 
 GitHub Pages only serves static files, so there is no server that could check a password. Instead every
 published file is encrypted with AES-256-GCM under a key derived from the password (PBKDF2-SHA256, a
@@ -155,5 +155,5 @@ if __name__ == "__main__":
     a = ap.parse_args()
     pw = os.environ.get("PASSWORD_SITE", "")
     if not pw:
-        sys.exit("PASSWORD_SITE is not set: refusing to publish the site without its password.")
+        sys.exit("PASSWORD_SITE is not set (pages.yml fills it from the PASSWORD secret): refusing to publish the site without its password.")
     print(json.dumps(lock(a.site, pw)))

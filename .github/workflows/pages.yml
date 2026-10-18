@@ -13,7 +13,7 @@ name: Update dashboard
 # Optional repository variable: SEC_USER_AGENT, e.g. "SplittabilityMonitor research you@example.com"
 # (SEC requires a contact address; it enables filings and fundamentals).
 #
-# Required secret PASSWORD_SITE: the whole site is encrypted with it (experiments/hub/lock_site.py) and visitors
+# Required secret PASSWORD: the whole site is encrypted with it (experiments/hub/lock_site.py) and visitors
 # unlock it in the browser. Without it nothing is published and the last deployed site stays up.
 
 on:
@@ -255,8 +255,9 @@ jobs:
       - name: Lock the site with the password
         working-directory: ${{ github.workspace }}
         env:
-          PASSWORD_SITE: ${{ secrets.PASSWORD_SITE }}
+          PASSWORD_SITE: ${{ secrets.PASSWORD }}
         run: |
+          set -o pipefail   # a failed lock must stop the publish, not be hidden by tee
           pip install cryptography==50.0.1
           python experiments/hub/lock_site.py --site _site | tee -a "$GITHUB_STEP_SUMMARY"
 
