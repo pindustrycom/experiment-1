@@ -1,0 +1,1407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Resonance Playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: full-bleed 3D bench; slim top bar, left control drawer, right inspector, captions + resonance meter at the bottom.
+   Deliberately single-theme: a dark lab bench so emissive structures read as light. */
+:root {
+  color-scheme: dark;
+  --bench: #0b1016;        /* scene + page ground, slight blue-teal bias */
+  --panel: #121a23;        /* drawers */
+  --panel-2: #18222d;      /* controls */
+  --line: #263442;         /* hairlines */
+  --ink: #e4ecf2;          /* text */
+  --ink-2: #9cadbb;        /* secondary text */
+  --phase: #f2b544;        /* accent: resonance / axioms (warm, like a lit filament) */
+  --excite: #5ec8d8;       /* positive wiring */
+  --suppress: #ef6f6c;     /* negative wiring */
+  --gain: #b28cff;         /* soma gain feedback */
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--bench); color: var(--ink); font-family: var(--f-body); font-size: 14px; overflow: hidden; }
+#app { position: relative; height: 100%; width: 100%; overflow: hidden; }
+canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+canvas#gl.dragging { cursor: grabbing; }
+#labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.lbl { position: absolute; left: 0; top: 0; white-space: nowrap; font-family: var(--f-mono); font-size: 11px; color: var(--ink-2); transform-origin: 0 0; letter-spacing: .02em; text-shadow: 0 1px 3px #000, 0 0 8px var(--bench); }
+.lbl.block { font-family: var(--f-display); font-weight: 700; font-size: 13px; color: var(--ink); letter-spacing: .01em; }
+.lbl.hub { font-size: 12px; color: var(--ink); }
+.lbl.hot { color: var(--phase); }
+.lbl.sub { font-size: 10px; opacity: .85; }
+
+header.top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: linear-gradient(var(--bench) 30%, transparent); pointer-events: none; z-index: 5; }
+header.top > * { pointer-events: auto; }
+h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: -.01em; }
+h1 span { color: var(--phase); }
+.credit { color: var(--ink-2); font-size: 12px; }
+.credit b { color: var(--ink); font-weight: 700; }
+.spacer { flex: 1; }
+
+button, select, input[type=text] { font: inherit; color: var(--ink); background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+button { cursor: pointer; }
+button:hover { border-color: #3b5063; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--phase); outline-offset: 1px; }
+button.on { border-color: var(--phase); color: var(--phase); }
+button.primary { background: #2a2414; border-color: #6b5320; color: var(--phase); }
+button:disabled { opacity: .45; cursor: default; }
+
+aside.drawer { position: absolute; top: 56px; left: max(16px, env(safe-area-inset-left, 0px)); width: 236px; max-height: calc(100% - 180px); overflow: auto;
+  background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); border-radius: 10px; padding: 12px; z-index: 4;
+  display: flex; flex-direction: column; gap: 14px; backdrop-filter: blur(6px); }
+.sec h2 { margin: 0 0 7px; font-family: var(--f-mono); font-weight: 600; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); }
+.row { display: flex; flex-wrap: wrap; gap: 6px; }
+.stack { display: flex; flex-direction: column; gap: 6px; }
+.stack button { text-align: left; }
+.toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding: 2px 0; }
+.toggle input { accent-color: var(--phase); }
+.sw { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; flex: 1; padding: 5px 6px; background: var(--panel-2); font-size: 12.5px; }
+.seg button + button { border-left: 1px solid var(--line); }
+.hint { color: var(--ink-2); font-size: 12px; line-height: 1.45; margin: 0; }
+
+aside.inspect { position: absolute; top: 56px; right: max(16px, env(safe-area-inset-right, 0px)); width: 330px; max-height: calc(100% - 180px); overflow: auto;
+  background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; z-index: 4; backdrop-filter: blur(6px); }
+.inspect .kind { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--phase); }
+.inspect h3 { margin: 4px 0 8px; font-family: var(--f-display); font-size: 19px; font-weight: 700; text-wrap: balance; line-height: 1.15; }
+.inspect p { margin: 0 0 9px; line-height: 1.5; color: var(--ink); }
+.inspect dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 6px 0 10px; font-size: 12.5px; }
+.inspect dt { color: var(--ink-2); }
+.inspect dd { margin: 0; font-family: var(--f-mono); font-size: 12px; font-variant-numeric: tabular-nums; min-width: 0; overflow-wrap: anywhere; }
+.inspect .res { border-top: 1px solid var(--line); padding-top: 9px; margin-top: 4px; }
+.inspect .res h4 { margin: 0 0 6px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; }
+.inspect ul { margin: 0 0 8px; padding-left: 16px; line-height: 1.45; }
+.inspect li { margin-bottom: 3px; }
+.inspect code { font-family: var(--f-mono); font-size: 11.5px; color: var(--excite); overflow-wrap: anywhere; }
+.inspect .num { font-family: var(--f-mono); color: var(--phase); font-variant-numeric: tabular-nums; }
+.close-x { float: right; padding: 2px 8px; }
+
+.bottom { position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: flex-end; justify-content: center; flex-wrap: wrap;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px; pointer-events: none; z-index: 4; }
+.bottom > * { pointer-events: auto; }
+#caption { flex: 0 1 560px; min-width: 0; background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; line-height: 1.45; }
+#caption .step { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--phase); margin-bottom: 3px; }
+#caption .txt { font-size: 14px; }
+#meter, #cellMeter { flex: 0 0 270px; background: color-mix(in srgb, var(--panel) 94%, transparent); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+#meter h2, #cellMeter h2 { margin: 0 0 6px; font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-2); font-weight: 600; display: flex; justify-content: space-between; }
+.bar { display: grid; grid-template-columns: 62px 1fr 38px; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: 11.5px; height: 18px; }
+.bar .track { position: relative; height: 7px; background: var(--panel-2); border-radius: 4px; overflow: visible; }
+.bar .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 4px; background: var(--excite); transition: width .5s ease; }
+.bar .fill.win { background: var(--phase); }
+.bar .rho { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 1px dashed var(--ink-2); }
+.bar .v { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+#meter .empty { color: var(--ink-2); font-size: 12px; }
+
+#mobileToggle { display: none; }
+textarea#exportBox { width: 100%; height: 90px; font-family: var(--f-mono); font-size: 11px; background: var(--panel-2); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; box-sizing: border-box; }
+
+.tabs { min-width: 230px; }
+.tabs button { font-family: var(--f-display); font-weight: 700; font-size: 13.5px; padding: 6px 12px; }
+.pick { flex-wrap: nowrap; }
+.pk { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--ink-2); flex: 1; min-width: 0; }
+.pk select { width: 100%; }
+.grp { display: flex; flex-direction: column; gap: 14px; }
+.sl { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size: 13px; align-items: center; }
+.sl output { font-family: var(--f-mono); font-size: 12px; color: var(--phase); font-variant-numeric: tabular-nums; }
+.sl input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--phase); margin: 2px 0 0; }
+.eq { font-family: var(--f-mono); font-size: 11.5px; line-height: 1.6; color: var(--ink); margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 860px) {
+  aside.inspect { top: auto; bottom: 0; left: 0; right: 0; width: auto; max-height: 46%; border-radius: 12px 12px 0 0; z-index: 6;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  aside.drawer { top: 96px; width: auto; right: max(16px, env(safe-area-inset-right, 0px)); max-height: 60%; }
+  #mobileToggle { display: inline-block; }
+  aside.drawer.closed { display: none; }
+  #meter, #cellMeter { flex: 1 1 100%; }
+  #caption { flex: 1 1 100%; }
+  .credit { flex-basis: 100%; order: 3; }
+}
+@media (prefers-reduced-motion: reduce) { .bar .fill { transition: none; } }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <canvas id="gl" aria-label="3D model of the resonance architecture"></canvas>
+  <div id="labels" aria-hidden="true"></div>
+
+  <header class="top">
+    <h1>Resonance <span>Playground</span></h1>
+    <div class="credit">Resonance index and rule set by <b>Joaquin Philco</b></div>
+    <a class="credit" href="../index.html" style="color:var(--ink-2)">All experiments</a>
+    <div class="seg tabs" role="tablist" aria-label="View">
+      <button id="tab-arch" class="on" role="tab">Architecture</button>
+      <button id="tab-cell" role="tab">One cell</button>
+    </div>
+    <div class="spacer"></div>
+    <button id="aboutBtn">About</button>
+    <button id="mobileToggle" aria-controls="drawer">Controls</button>
+  </header>
+
+  <aside class="drawer" id="drawer">
+   <div class="grp" id="archCtl">
+    <div class="sec">
+      <h2>Show it something</h2>
+      <div class="stack">
+        <div class="row pick">
+          <label class="pk">Digit<select id="inDigit">
+            <option value="none">none</option><option>0</option><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option>
+          </select></label>
+          <label class="pk">Colour<select id="inColour">
+            <option>white</option><option>red</option><option>orange</option><option>yellow</option><option selected>green</option><option>cyan</option><option>blue</option><option>purple</option><option>magenta</option>
+          </select></label>
+        </div>
+        <label class="sl">Blur <output id="inBlurv">0.00</output><input type="range" id="inBlur" min="0" max="1" step="0.05" value="0"></label>
+        <button id="inShow" class="primary">Show it</button>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Stories</h2>
+      <div class="stack">
+        <button id="sc-green3">A green 3 (known)</button>
+        <button id="sc-purple">Purple (never seen)</button>
+        <button id="sc-sleep">Sleep: replay, connect, prune</button>
+        <button id="sc-hyp">Red 1: two axioms at once</button>
+        <button id="sc-reset">Reset</button>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>V1 front end</h2>
+      <div class="seg" role="group" aria-label="V1 front end">
+        <button id="v1-learned" class="on">Learned</button>
+        <button id="v1-gabor">Hand Gabor</button>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Fly to</h2>
+      <div class="row">
+        <button data-fly="all">Overview</button>
+        <button data-fly="front">Eye</button>
+        <button data-fly="cell">Cells</button>
+        <button data-fly="struct">Concepts</button>
+        <button data-fly="agent">Rules</button>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Layers</h2>
+      <div class="stack" id="layerToggles"></div>
+    </div>
+    <div class="sec">
+      <h2>Build</h2>
+      <div class="stack">
+        <input type="text" id="newName" placeholder="Block name, e.g. Auditory soma" aria-label="New block name">
+        <select id="newKind" aria-label="New block kind">
+          <option value="sensor">Sensor</option>
+          <option value="front">Front end</option>
+          <option value="soma">Soma</option>
+          <option value="axon">Axon resonators</option>
+          <option value="structure">Concept structure</option>
+          <option value="rule">Rule</option>
+        </select>
+        <div class="row">
+          <button id="addBlock">Add block</button>
+          <button id="connectBtn">Connect</button>
+          <select id="linkKind" aria-label="Connection kind">
+            <option value="excite">excites</option>
+            <option value="suppress">suppresses</option>
+            <option value="gain">gain feedback</option>
+          </select>
+        </div>
+        <div class="row">
+          <button id="delBtn" disabled>Delete selected</button>
+          <button id="exportBtn">Copy as JSON</button>
+        </div>
+        <p class="hint" id="buildHint">Your blocks appear on the shelf in front. Drag them to place them. Connect works between any two blocks, built-in ones included.</p>
+        <textarea id="exportBox" hidden readonly aria-label="Exported graph"></textarea>
+      </div>
+    </div>
+   </div>
+   <div class="grp" id="cellCtl" hidden>
+    <div class="sec">
+      <h2>Input to the cell</h2>
+      <div class="stack">
+        <select id="cInput" aria-label="Input signal">
+          <option value="edge">Edge under the drifting eye</option>
+          <option value="sine">Pure rhythm</option>
+          <option value="step">Cell switches on</option>
+          <option value="click">One brief kick</option>
+          <option value="noise">Noise</option>
+        </select>
+        <label class="sl" id="cWrow" hidden><span>Rhythm ω<sub>in</sub></span> <output id="cWv"></output><input type="range" id="cW" min="0" max="12" step="1" value="2"></label>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Soma (time)</h2>
+      <div class="stack">
+        <label class="sl">Gain g, from structures <output id="cGainv"></output><input type="range" id="cGain" min="0" max="3" step="0.05" value="1"></label>
+        <label class="sl">Leak α <output id="cAlphav"></output><input type="range" id="cAlpha" min="0" max="0.95" step="0.05" value="0.5"></label>
+        <label class="sl">Threshold θ <output id="cThetav"></output><input type="range" id="cTheta" min="0" max="0.8" step="0.05" value="0"></label>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Axon resonators</h2>
+      <div class="stack">
+        <label class="sl">Pole radius ρ <output id="cRhov"></output><input type="range" id="cRho" min="0.5" max="0.98" step="0.01" value="0.85"></label>
+        <div class="seg" role="group" aria-label="Eye-movement steps"><button id="cT32" class="on">T = 32</button><button id="cT64">T = 64</button></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>Time</h2>
+      <div class="stack">
+        <div class="row"><button id="cPlay">Pause</button><button id="cRestart">Restart</button></div>
+        <label class="sl">Step <output id="cTimev"></output><input type="range" id="cTime" min="0" max="31" step="0.01" value="0"></label>
+        <label class="sl">Speed <output id="cSpeedv"></output><input type="range" id="cSpeed" min="0.25" max="3" step="0.25" value="1"></label>
+      </div>
+    </div>
+    <div class="sec">
+      <h2>What it computes</h2>
+      <p class="eq">v<sub>t</sub> = α v<sub>t−1</sub> + (1−α) g c<sub>t</sub><br>y<sub>t</sub> = max(0, v<sub>t</sub> − θ)<br>h<sub>t</sub> = ρe<sup>iω</sup> h<sub>t−1</sub> + y<sub>t</sub><br>feature = log(Σ|h<sub>t</sub>|² / T)</p>
+    </div>
+   </div>
+  </aside>
+
+  <aside class="inspect" id="inspect" aria-live="polite"></aside>
+
+  <div class="bottom">
+    <div id="caption"><div class="step" id="capStep">How to use</div><div class="txt" id="capTxt">Drag to orbit, scroll or pinch to zoom, right-drag or shift-drag to pan. Click any block to read what it is, where it lives in the code, and what it scored. Then show the model something.</div></div>
+    <div id="meter"><h2><span>Structure resonance R<sub>ℓ</sub></span><span>ρ = vigilance</span></h2><div id="bars"><div class="empty">Shows each concept's resonance when an input is on screen.</div></div></div>
+    <div id="cellMeter" hidden><h2><span>Axon features log(E/T)</span><span>rate = no resonators</span></h2><div id="cellBars"></div></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script>
+(() => {
+"use strict";
+const V3 = THREE.Vector3;
+const COL = { bench: 0x0b1016, ink: 0xe4ecf2, ink2: 0x9cadbb, line: 0x263442, phase: 0xf2b544, excite: 0x5ec8d8, suppress: 0xef6f6c, gain: 0xb28cff,
+  front: 0x6f9bd1, soma: 0x8fbf88, axon: 0xf2b544, struct: 0xe4ecf2, agent: 0xd99a6c, user: 0xc7a3e8 };
+
+// ---------- renderer / scene ----------
+const canvas = document.getElementById("gl");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.setClearColor(COL.bench, 1);
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(COL.bench, 90, 170);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 400);
+scene.add(new THREE.HemisphereLight(0xcfe3ff, 0x0b1016, 0.75));
+const sun = new THREE.DirectionalLight(0xffffff, 0.65); sun.position.set(-20, 40, 30); scene.add(sun);
+
+// floor grid, faint
+const grid = new THREE.GridHelper(120, 60, 0x1b2733, 0x141d27); grid.position.y = -12.5; scene.add(grid);
+
+// ---------- helpers ----------
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const lerp = (a, b, t) => a + (b - a) * t;
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const reduceMotion = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const layers = {};
+const LAYER_DEFS = [
+  ["front", "Eye and V1", COL.front], ["soma", "Somas (time)", COL.soma], ["axon", "Axon resonators", COL.axon],
+  ["wiring", "Co-resonance wiring", COL.excite], ["struct", "Concept structures", COL.struct], ["suppress", "Suppression", COL.suppress],
+  ["rules", "Axioms, bridges, audits", COL.phase], ["agent", "Agent loop", COL.agent], ["feedback", "Gain feedback", COL.gain], ["user", "Your blocks", COL.user]];
+for (const [k] of LAYER_DEFS) { layers[k] = new THREE.Group(); scene.add(layers[k]); }
+
+const labelsEl = document.getElementById("labels");
+const labels = [];
+let labelTab = "arch", tab = "arch";
+function addLabel(text, pos, cls = "", layer = null, obj = null) {
+  const el = document.createElement("div"); el.className = "lbl " + cls; el.textContent = text; labelsEl.appendChild(el);
+  const L = { el, pos: pos.clone(), layer, obj, tab: labelTab }; labels.push(L); return L;
+}
+
+const blocks = {};     // id -> {id, mesh, mat, glow, target, info, layer, pos}
+const pickables = [];
+function addBox(id, layer, pos, size, color, label, opts = {}) {
+  const geo = new THREE.BoxGeometry(size[0], size[1], size[2]);
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: .55, metalness: .1, transparent: true, opacity: opts.opacity ?? .9, emissive: color, emissiveIntensity: .05 });
+  const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(pos); mesh.userData.id = id;
+  const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color, transparent: true, opacity: .8 }));
+  mesh.add(edges);
+  layers[layer].add(mesh); pickables.push(mesh);
+  const b = { id, mesh, mat, glow: 0, target: 0, layer, pos: pos.clone(), size };
+  blocks[id] = b;
+  if (label) b.label = addLabel(label, pos.clone().add(new V3(0, size[1] / 2 + .6, 0)), opts.lblClass || "block", layer, mesh);
+  return b;
+}
+function tube(points, color, radius = .07, layer = "wiring", opacity = .7) {
+  const curve = new THREE.CatmullRomCurve3(points);
+  const geo = new THREE.TubeGeometry(curve, Math.max(16, points.length * 12), radius, 6, false);
+  const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
+  const m = new THREE.Mesh(geo, mat); layers[layer].add(m);
+  return { curve, mesh: m, mat, base: opacity };
+}
+function arc(a, b, lift = 3, sideways = 0) {
+  const mid = a.clone().add(b).multiplyScalar(.5); mid.y += lift; mid.z += sideways;
+  return [a.clone(), mid, b.clone()];
+}
+
+// ---------- geometry of the architecture ----------
+const CH = [ // retina channels
+  { id: "lumOn", name: "Lum ON", col: 0xf0f0f0 }, { id: "lumOff", name: "Lum OFF", col: 0x6b7680 },
+  { id: "rOn", name: "R-ON", col: 0xe8524f }, { id: "gOn", name: "G-ON", col: 0x4fc26a }, { id: "bOn", name: "B-ON", col: 0x4f7ee8 }, { id: "yOn", name: "Y-ON", col: 0xe8d14f }];
+const chZ = c => -6.25 + c * 2.5;
+const X = { sensor: -40, retina: -32, v1: -24, v2: -15, ax: [-10.5, -8, -5.5, -3], hub: 10, parent: 19, agent: 28 };
+const OMEGA = ["0", "π/8", "π/4", "π/2"];
+
+// --- Sensor (image + fixational drift glimpse) ---
+const sensorCanvas = document.createElement("canvas"); sensorCanvas.width = sensorCanvas.height = 256;
+const sensorTex = new THREE.CanvasTexture(sensorCanvas);
+function drawSensor(kind) {
+  const g = sensorCanvas.getContext("2d");
+  g.fillStyle = "#05080b"; g.fillRect(0, 0, 256, 256);
+  if (kind === "green3" || kind === "red1") {
+    g.fillStyle = kind === "green3" ? "#2fe05a" : "#ff3b30"; g.font = "bold 200px Arial, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+    g.fillText(kind === "green3" ? "3" : "1", 128, 140);
+  } else if (kind === "purple") {
+    const gr = g.createRadialGradient(128, 128, 10, 128, 128, 110); gr.addColorStop(0, "#9b3cf0"); gr.addColorStop(.75, "#7a2fd0"); gr.addColorStop(1, "#05080b");
+    g.fillStyle = gr; g.beginPath(); g.arc(128, 128, 110, 0, Math.PI * 2); g.fill();
+  } else {
+    g.strokeStyle = "#1c2a36"; g.lineWidth = 1; for (let i = 0; i <= 256; i += 32) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 256); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(256, i); g.stroke(); }
+    g.fillStyle = "#3a4a58"; g.font = "16px monospace"; g.textAlign = "center"; g.fillText("no input", 128, 132);
+  }
+  sensorTex.needsUpdate = true;
+}
+drawSensor("none");
+const sensorPlane = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshBasicMaterial({ map: sensorTex, side: THREE.DoubleSide }));
+sensorPlane.rotation.y = -Math.PI / 2; sensorPlane.position.set(X.sensor, 0, 0); sensorPlane.userData.id = "sensor";
+layers.front.add(sensorPlane); pickables.push(sensorPlane);
+blocks.sensor = { id: "sensor", mesh: sensorPlane, mat: null, glow: 0, target: 0, layer: "front", pos: sensorPlane.position.clone(), size: [.2, 8, 8] };
+blocks.sensor.label = addLabel("Sensor: image", new V3(X.sensor, 4.7, 0), "block", "front");
+const sensorFrame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(.05, 8.3, 8.3)), new THREE.LineBasicMaterial({ color: COL.front }));
+sensorFrame.position.copy(sensorPlane.position); layers.front.add(sensorFrame);
+// glimpse window moving along a Lissajous loop = fixational drift (T = 32 steps)
+const glimpse = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(.05, 3.2, 3.2)), new THREE.LineBasicMaterial({ color: COL.phase }));
+glimpse.position.set(X.sensor - .15, 0, 0); layers.front.add(glimpse);
+const drift = []; for (let t = 0; t <= 64; t++) { const s = t / 64; drift.push(new V3(X.sensor - .12, 1.75 * Math.sin(4 * Math.PI * s + .7), 1.75 * Math.sin(2 * Math.PI * s))); }
+const driftLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(drift), new THREE.LineDashedMaterial({ color: COL.phase, dashSize: .25, gapSize: .2, transparent: true, opacity: .6 }));
+driftLine.computeLineDistances(); layers.front.add(driftLine);
+addLabel("eye drift, T = 32 steps", new V3(X.sensor, -4.9, 0), "sub", "front");
+
+// --- Retina: cone-opponent ON/OFF channels ---
+CH.forEach((c, i) => {
+  const b = addBox("ch_" + c.id, "front", new V3(X.retina, 0, chZ(i)), [1.4, 1.4, 1.4], c.col, null);
+  b.infoKey = "retina";
+  addLabel(c.name, new V3(X.retina, -1.3, chZ(i)), "sub", "front");
+  const t = tube([new V3(X.sensor + .1, 0, chZ(i) * .55), new V3(X.retina - 3, 0, chZ(i) * .85), new V3(X.retina - .7, 0, chZ(i))], c.col, .05, "front", .45);
+  b.inLink = t;
+});
+blocks.retinaTitle = addLabel("Retina: cone-opponent ON/OFF", new V3(X.retina, 2.4, 0), "block", "front");
+
+// --- V1: learned sparse-coding fields or hand Gabor ---
+const V1_ORI = [91, 91, 0, 90, 148, 114, 179, 91, 1, 40, 1, 35, 135, 93, 178, 116, 139, 4, 138, 130, 62, 89, 44, 43, 13, 72, 56, 90, 3, 0, 93, 162];
+const V1_SEL = [.74, .71, .74, .76, .58, .73, .72, .72, .8, .68, .7, .48, .48, .71, .76, .65, .72, .58, .71, .6, .76, .75, .58, .66, .59, .65, .51, .7, .75, .72, .76, .55];
+function gaborTex(deg, lambda, sel, tint) {
+  const cv = document.createElement("canvas"); cv.width = cv.height = 32; const g = cv.getContext("2d"); const im = g.createImageData(32, 32);
+  const th = deg * Math.PI / 180, sig = 6 + 5 * (1 - sel), ct = Math.cos(th), st = Math.sin(th);
+  const tr = (tint >> 16 & 255) / 255, tg = (tint >> 8 & 255) / 255, tb = (tint & 255) / 255;
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+    const dx = x - 15.5, dy = y - 15.5, u = dx * ct + dy * st;
+    const v = Math.exp(-(dx * dx + dy * dy) / (2 * sig * sig)) * Math.cos(2 * Math.PI * u / lambda);
+    const k = (y * 32 + x) * 4, lum = .5 + .5 * v;
+    im.data[k] = 255 * lum * (.35 + .65 * tr); im.data[k + 1] = 255 * lum * (.35 + .65 * tg); im.data[k + 2] = 255 * lum * (.35 + .65 * tb); im.data[k + 3] = 255;
+  }
+  g.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(cv); t.magFilter = THREE.LinearFilter; return t;
+}
+const v1Groups = { learned: new THREE.Group(), gabor: new THREE.Group() };
+layers.front.add(v1Groups.learned, v1Groups.gabor);
+const v1Tiles = { learned: [], gabor: [] };
+CH.forEach((c, ci) => {
+  // learned: 32 fields, 11x11, 4 cols x 8 rows per channel
+  for (let k = 0; k < 32; k++) {
+    const mat = new THREE.MeshBasicMaterial({ map: gaborTex(V1_ORI[k], 7, V1_SEL[k], c.col), transparent: true, opacity: .55, side: THREE.DoubleSide });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(.5, .5), mat);
+    m.rotation.y = -Math.PI / 2; m.position.set(X.v1, 2.1 - (k >> 2) * .6, chZ(ci) - .9 + (k & 3) * .6); m.userData.id = "v1";
+    v1Groups.learned.add(m); pickables.push(m); v1Tiles.learned.push({ m, ch: ci });
+  }
+  // hand Gabor: 4 orientations x 2 scales
+  for (let o = 0; o < 4; o++) for (let s = 0; s < 2; s++) {
+    const mat = new THREE.MeshBasicMaterial({ map: gaborTex(o * 45, s ? 10 : 5.5, .75, c.col), transparent: true, opacity: .55, side: THREE.DoubleSide });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(.85, .85), mat);
+    m.rotation.y = -Math.PI / 2; m.position.set(X.v1, 1.65 - o * 1.1, chZ(ci) - .5 + s * 1.0); m.userData.id = "v1";
+    v1Groups.gabor.add(m); pickables.push(m); v1Tiles.gabor.push({ m, ch: ci });
+  }
+  tube([new V3(X.retina + .7, 0, chZ(ci)), new V3(X.v1 - .3, 0, chZ(ci))], c.col, .05, "front", .4);
+});
+const v1Back = addBox("v1", "front", new V3(X.v1 + .25, -.2, 0), [.08, 6, 16], COL.front, "V1", { opacity: .12 });
+let v1Mode = "learned"; v1Groups.gabor.visible = false;
+
+// --- V2 somas: 16 x 16 cells, leaky integrators in time ---
+const N = 16, K = N * N, sp = .72;
+const cellPos = i => new V3(X.v2, (N / 2 - .5 - Math.floor(i / N)) * sp, ((i % N) - N / 2 + .5) * sp);
+const somaGeo = new THREE.CylinderGeometry(.2, .2, .55, 10); somaGeo.rotateZ(Math.PI / 2);
+const somaMesh = new THREE.InstancedMesh(somaGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .5, emissive: 0x111111 }), K);
+const dummy = new THREE.Object3D();
+for (let i = 0; i < K; i++) { dummy.position.copy(cellPos(i)); dummy.updateMatrix(); somaMesh.setMatrixAt(i, dummy.matrix); somaMesh.setColorAt(i, new THREE.Color(COL.soma).multiplyScalar(.3)); }
+somaMesh.userData.id = "v2"; layers.soma.add(somaMesh); pickables.push(somaMesh);
+blocks.v2 = { id: "v2", mesh: somaMesh, glow: 0, target: 0, layer: "soma", pos: new V3(X.v2, 0, 0), size: [.6, 12, 12] };
+blocks.v2.label = addLabel("V2 somas: 256 cells in time", new V3(X.v2, 6.6, 0), "block", "soma");
+// V1 -> V2 fan
+CH.forEach((c, ci) => tube([new V3(X.v1 + .3, 0, chZ(ci)), new V3((X.v1 + X.v2) / 2, 0, chZ(ci) * .6), new V3(X.v2 - .35, 0, chZ(ci) * .4)], COL.front, .06, "front", .35));
+
+// --- Axon: each cell's output drives 4 resonators (ω = 0, π/8, π/4, π/2) ---
+const axonPts = [];
+for (let i = 0; i < K; i++) { const p = cellPos(i); axonPts.push(p.x + .3, p.y, p.z, X.ax[3] + .4, p.y, p.z); }
+const axonGeo = new THREE.BufferGeometry(); axonGeo.setAttribute("position", new THREE.Float32BufferAttribute(axonPts, 3));
+const axonLines = new THREE.LineSegments(axonGeo, new THREE.LineBasicMaterial({ color: COL.axon, transparent: true, opacity: .14 }));
+layers.axon.add(axonLines);
+const ringGeo = new THREE.TorusGeometry(.2, .045, 6, 16); ringGeo.rotateY(Math.PI / 2);
+const rings = [];
+X.ax.forEach((x, f) => {
+  const m = new THREE.InstancedMesh(ringGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x000000, roughness: .4 }), K);
+  for (let i = 0; i < K; i++) { const p = cellPos(i); dummy.position.set(x, p.y, p.z); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); m.setColorAt(i, new THREE.Color(COL.axon).multiplyScalar(.22)); }
+  m.userData.id = "axon"; layers.axon.add(m); pickables.push(m); rings.push(m);
+  addLabel("ω = " + OMEGA[f], new V3(x, -6.4, 6.2), "sub", "axon");
+});
+blocks.axon = { id: "axon", mesh: rings[0], glow: 0, target: 0, layer: "axon", pos: new V3((X.ax[0] + X.ax[3]) / 2, 0, 0), size: [8, 12, 12] };
+blocks.axon.label = addLabel("Axon: resonance machine", new V3(-6.75, 6.6, 0), "block", "axon");
+const nodePos = (cell, f) => { const p = cellPos(cell); return new V3(X.ax[f], p.y, p.z); };
+
+// ---------- concept structures ----------
+const R = rng(7);
+const hubs = {}; // name -> {name, fam, pos, mesh, mat, members, wire, label, axiom, glow, target, alive}
+const HUE = { red: 0, orange: 30, yellow: 60, green: 120, cyan: 180, blue: 240, purple: 270, magenta: 300 };
+const HCOL = { red: 0xe8524f, orange: 0xf0903c, yellow: 0xe8d14f, green: 0x4fc26a, cyan: 0x4fd6e0, blue: 0x4f7ee8, purple: 0x9b5cf0, magenta: 0xe04fd0 };
+const colourPos = n => { const a = HUE[n] * Math.PI / 180; return new V3(X.hub, 5.8 + 3.3 * Math.sin(a), 3.3 * Math.cos(a)); };
+const digitPos = d => new V3(X.hub, d < 5 ? -2.6 : -5.9, -6 + (d % 5) * 3);
+// member nodes: colour structures sit on cells driven by the colour banks, digit structures on shape cells (results_digits_colours_v1: Jaccard 0.02)
+const colourCells = [], shapeCells = [];
+for (let i = 0; i < K; i++) (((i * 7919) % 13) < 5 ? colourCells : shapeCells).push(i);
+function pickMembers(pool, n, seed) { const r = rng(seed), out = new Set(); while (out.size < n) { const c = pool[Math.floor(r() * pool.length)]; out.add(c * 4 + Math.floor(r() * 4)); } return [...out]; }
+function makeHub(name, fam, pos, color, seed, alive = true) {
+  const geo = fam === "digit" ? new THREE.OctahedronGeometry(.62) : new THREE.IcosahedronGeometry(.62);
+  const mat = new THREE.MeshStandardMaterial({ color, roughness: .35, emissive: color, emissiveIntensity: .12, transparent: true, opacity: 1 });
+  const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(pos); mesh.userData.id = "hub:" + name;
+  layers.struct.add(mesh); pickables.push(mesh);
+  const members = pickMembers(fam === "digit" ? shapeCells : colourCells, 16, seed);
+  const pts = []; members.forEach(n => { const p = nodePos(n >> 2, n & 3); pts.push(p.x, p.y, p.z, pos.x - .6, pos.y, pos.z); });
+  const wg = new THREE.BufferGeometry(); wg.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+  const wire = new THREE.LineSegments(wg, new THREE.LineBasicMaterial({ color: fam === "digit" ? COL.excite : color, transparent: true, opacity: .1 }));
+  layers.wiring.add(wire);
+  const label = addLabel(name, pos.clone().add(new V3(0, .95, 0)), "hub", "struct", mesh);
+  const h = { name, fam, pos: pos.clone(), mesh, mat, members, wire, label, axiom: null, glow: 0, target: 0, alive, scale: alive ? 1 : 0 };
+  if (!alive) { mesh.scale.setScalar(.001); wire.visible = false; label.el.hidden = true; }
+  hubs[name] = h; return h;
+}
+["red", "yellow", "green", "cyan", "blue", "magenta"].forEach((n, i) => makeHub(n, "colour", colourPos(n), HCOL[n], 100 + i));
+for (let d = 0; d < 10; d++) makeHub(String(d), "digit", digitPos(d), 0xdfe7ee, 200 + d);
+makeHub("purple", "colour", colourPos("purple"), HCOL.purple, 120, false);
+makeHub("orange", "colour", colourPos("orange"), HCOL.orange, 121, false);
+const hueRing = new THREE.Mesh(new THREE.TorusGeometry(3.3, .02, 4, 90), new THREE.MeshBasicMaterial({ color: COL.line }));
+hueRing.rotation.y = Math.PI / 2; hueRing.position.set(X.hub, 5.8, 0); layers.struct.add(hueRing);
+addLabel("Concept structures", new V3(X.hub, 10.4, 0), "block", "struct");
+
+// parent concepts (rule 1b): groups found by co-resonance, then named by asking
+const parents = {};
+function makeParent(name, pos, kids) {
+  const geo = new THREE.TorusKnotGeometry(.55, .17, 64, 8);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xcfd8e0, emissive: 0xcfd8e0, emissiveIntensity: .08, roughness: .4 });
+  const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(pos); mesh.userData.id = "parent:" + name; layers.struct.add(mesh); pickables.push(mesh);
+  const links = {}; kids.forEach(k => { links[k] = tube(arc(hubs[k].pos.clone().add(new V3(.6, 0, 0)), pos.clone().add(new V3(-.6, 0, 0)), .6), 0x7d8b97, .025, "struct", .35); if (!hubs[k].alive) links[k].mesh.visible = false; });
+  parents[name] = { name, mesh, mat, links, glow: 0, target: 0, label: addLabel(name + "s (group)", pos.clone().add(new V3(0, 1.1, 0)), "hub", "struct") };
+}
+makeParent("colour", new V3(X.parent, 5.8, 0), ["red", "yellow", "green", "cyan", "blue", "magenta", "purple", "orange"]);
+makeParent("digit", new V3(X.parent, -4.2, 0), ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+
+// suppression links (negative weights between structures that get confused)
+const supLinks = [];
+function addSuppress(a, b) {
+  const pa = hubs[a].pos, pb = hubs[b].pos;
+  const t = tube(arc(pa, pb, 0, 0).map((p, i) => i === 1 ? p.clone().add(new V3(-1.3, 0, 0)) : p), COL.suppress, .04, "suppress", .55);
+  const s = { a, b, ...t }; supLinks.push(s); return s;
+}
+[["3", "8"], ["4", "9"], ["3", "5"], ["1", "7"], ["blue", "cyan"]].forEach(([a, b]) => addSuppress(a, b));
+
+// axioms: a structure that always fully resonates on its own inputs becomes long-term memory (gold halo)
+function setAxiom(name, on) {
+  const h = hubs[name];
+  if (on && !h.axiom) {
+    const halo = new THREE.Mesh(new THREE.TorusGeometry(.95, .045, 6, 40), new THREE.MeshBasicMaterial({ color: COL.phase, transparent: true, opacity: .85 }));
+    halo.rotation.y = Math.PI / 2; halo.position.copy(h.pos); layers.rules.add(halo); h.axiom = halo;
+  } else if (!on && h.axiom) { layers.rules.remove(h.axiom); h.axiom = null; }
+}
+const AXIOMS0 = ["0", "1", "red", "green", "blue", "yellow"];
+AXIOMS0.forEach(n => setAxiom(n, true));
+// semantic bridges: two structures resonating equally on one input (dashed gold)
+const bridges = [];
+function addBridge(a, b) {
+  if (bridges.find(x => x.a === a && x.b === b)) return;
+  const pts = arc(hubs[a].pos, hubs[b].pos, 0).map((p, i) => i === 1 ? p.clone().add(new V3(2.6, 0, 0)) : p);
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(40)), new THREE.LineDashedMaterial({ color: COL.phase, dashSize: .3, gapSize: .22 }));
+  line.computeLineDistances(); layers.rules.add(line); bridges.push({ a, b, line, curve });
+}
+// hypotheses: two axioms firing together, buffered and audited
+let hypothesis = null;
+function showHypothesis(a, b) {
+  clearHypothesis();
+  const p = hubs[a].pos.clone().add(hubs[b].pos).multiplyScalar(.5).add(new V3(3.4, 0, 0));
+  const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(.5), new THREE.MeshStandardMaterial({ color: COL.phase, emissive: COL.phase, emissiveIntensity: .4, wireframe: true }));
+  mesh.position.copy(p); mesh.userData.id = "hypothesis"; layers.rules.add(mesh); pickables.push(mesh);
+  const la = tube([hubs[a].pos, p], COL.phase, .02, "rules", .5), lb = tube([hubs[b].pos, p], COL.phase, .02, "rules", .5);
+  const label = addLabel("hypothesis: " + a + " + " + b, p.clone().add(new V3(0, .9, 0)), "hub hot", "rules");
+  hypothesis = { mesh, la, lb, label, a, b };
+}
+function clearHypothesis() {
+  if (!hypothesis) return; [hypothesis.mesh, hypothesis.la.mesh, hypothesis.lb.mesh].forEach(m => layers.rules.remove(m));
+  hypothesis.label.el.remove(); labels.splice(labels.indexOf(hypothesis.label), 1); hypothesis = null;
+}
+
+// ---------- agent loop (rules 1a, 1c, active sensing, axioms) ----------
+const AG = [
+  ["vig", "Vigilance check", 8], ["ask", "Ask for a label (1a)", 4.8], ["alloc", "Allocate / strengthen", 1.6],
+  ["look", "Look again (rotate)", -1.6], ["sleep", "Sleep routine (1c)", -4.8], ["audit", "Axioms and audits", -8]];
+AG.forEach(([id, name, y]) => { addBox("ag_" + id, "agent", new V3(X.agent, y, 0), [1.2, 2, 4.6], COL.agent, name, { opacity: .55 }); });
+for (let i = 0; i < AG.length - 1; i++) tube([new V3(X.agent, AG[i][2] - 1, 0), new V3(X.agent, AG[i + 1][2] + 1, 0)], COL.agent, .05, "agent", .45);
+const oracle = addBox("oracle", "agent", new V3(X.agent + 6, 4.8, 0), [1.6, 1.6, 1.6], COL.user, "Oracle (you)", { opacity: .7 });
+oracle.mesh.geometry = new THREE.OctahedronGeometry(1.1); oracle.mesh.remove(oracle.mesh.children[0]);
+const L = {
+  hubsToVig: tube([new V3(X.parent + .8, 5.8, 0), new V3(X.agent - 3, 7.5, 0), new V3(X.agent - .65, 8, 0)], COL.agent, .06, "agent", .45),
+  digitsToVig: tube([new V3(X.parent + .8, -4.2, 0), new V3(X.agent - 4, 3, 0), new V3(X.agent - .65, 7.6, 0)], COL.agent, .06, "agent", .45),
+  askOracle: tube([new V3(X.agent + .65, 4.8, 0), new V3(X.agent + 5, 4.8, 0)], COL.user, .06, "agent", .5),
+  oracleAlloc: tube([new V3(X.agent + 5.2, 4, 0), new V3(X.agent + 3, 1.8, 0), new V3(X.agent + .65, 1.6, 0)], COL.user, .06, "agent", .5),
+  allocHubs: tube([new V3(X.agent - .65, 1.6, 0), new V3(X.parent, 1, 2), new V3(X.hub + 1.5, 4, 1)], COL.agent, .06, "agent", .45),
+  lookSensor: tube([new V3(X.agent, -1.6, 2.4), new V3(X.agent - 10, 15, 9), new V3(-10, 17, 9), new V3(X.sensor, 7, 4), new V3(X.sensor, 4.2, 2)], COL.agent, .06, "agent", .35),
+  sleepHubs: tube([new V3(X.agent - .65, -4.8, 0), new V3(X.parent + 1, -8.5, 3), new V3(X.hub + 1, -6.5, 3)], COL.agent, .06, "agent", .45),
+};
+addLabel("Rules", new V3(X.agent, 12.2, 0), "block", "agent");
+// gain feedback: resonating structures raise the gain of their member cells' somas
+const FB = [
+  tube([new V3(X.hub - .5, 5.8, -3.6), new V3(-2, 11, -9), new V3(X.v2, 7, -6)], COL.gain, .06, "feedback", .4),
+  tube([new V3(X.hub - .5, -4.2, -6.4), new V3(-2, -11, -9.5), new V3(X.v2, -6.3, -6)], COL.gain, .06, "feedback", .4)];
+addLabel("gain feedback to somas", new V3(-2, 11.6, -9), "sub", "feedback");
+
+// ---------- pulses travelling along links ----------
+const pulses = [];
+const pulseGeo = new THREE.SphereGeometry(.18, 10, 8);
+function pulse(link, color, dur = 900, delay = 0) {
+  if (!link || !link.curve) return;
+  const m = new THREE.Mesh(pulseGeo, new THREE.MeshBasicMaterial({ color })); m.visible = false; scene.add(m);
+  pulses.push({ m, curve: link.curve, t0: performance.now() + delay, dur, layer: link.mesh ? link.mesh.parent : null });
+}
+function pulseMany(list, color, dur, spread = 300) { list.forEach((l, i) => pulse(l, color, dur, i * spread / Math.max(1, list.length))); }
+
+// ---------- activation state ----------
+const somaAct = new Float32Array(K), somaTgt = new Float32Array(K);
+const ringAct = [0, 1, 2, 3].map(() => new Float32Array(K)), ringTgt = [0, 1, 2, 3].map(() => new Float32Array(K));
+const chAct = new Float32Array(CH.length), chTgt = new Float32Array(CH.length);
+function clearActivity() {
+  somaTgt.fill(0); ringTgt.forEach(a => a.fill(0)); chTgt.fill(0);
+  for (const b of Object.values(blocks)) b.target = 0;
+  for (const h of Object.values(hubs)) h.target = 0;
+  for (const p of Object.values(parents)) p.target = 0;
+}
+function lightStructures(names, strength = 1, noise = .12, seed = 1) {
+  const r = rng(seed);
+  for (let i = 0; i < K; i++) somaTgt[i] = Math.max(somaTgt[i], noise * r());
+  names.forEach(([n, s]) => hubs[n].members.forEach(node => { const c = node >> 2, f = node & 3; somaTgt[c] = Math.max(somaTgt[c], s * strength); ringTgt[f][c] = Math.max(ringTgt[f][c], s * strength); }));
+}
+
+// ---------- resonance meter ----------
+const barsEl = document.getElementById("bars");
+let RHO = .6;
+function showBars(list, winners = []) {
+  if (!list) { barsEl.innerHTML = '<div class="empty">Shows each concept\'s resonance when an input is on screen.</div>'; return; }
+  if (barsEl.querySelector(".empty") || barsEl.children.length !== list.length || [...barsEl.children].some((c, i) => c.dataset.k !== list[i][0])) {
+    barsEl.innerHTML = list.map(([k]) => `<div class="bar" data-k="${k}"><span>${k}</span><div class="track"><div class="fill"></div><div class="rho" style="left:${RHO * 100}%"></div></div><span class="v"></span></div>`).join("");
+  }
+  requestAnimationFrame(() => list.forEach(([k, v], i) => {
+    const row = barsEl.children[i]; const f = row.querySelector(".fill"); f.style.width = (v * 100).toFixed(0) + "%"; f.classList.toggle("win", winners.includes(k));
+    row.querySelector(".v").textContent = v.toFixed(2);
+    hubs[k] && (hubs[k].target = v);
+  }));
+}
+function caption(step, txt) { document.getElementById("capStep").textContent = step; document.getElementById("capTxt").textContent = txt; }
+
+// ---------- scenarios ----------
+let runId = 0;
+const sc = {};
+async function guard(id, ms) { await wait(reduceMotion ? Math.min(ms, 400) : ms); if (id !== runId) throw "cancel"; }
+function frontEnd(chs, sensorKind) {
+  drawSensor(sensorKind); blocks.sensor.target = 1;
+  CH.forEach((c, i) => { chTgt[i] = chs[c.id] || 0; if (chTgt[i] > .3) pulse(blocks["ch_" + c.id].inLink, c.col, 700, i * 60); });
+}
+sc.green3 = async id => {
+  clearActivity(); showBars(null); clearHypothesis();
+  caption("1 · Sensor", "A green 3 lands on the sensor. The eye drifts slowly over it for 32 steps, so the spatial pattern becomes a signal in time.");
+  frontEnd({ lumOn: 1, gOn: 1, yOn: .35, lumOff: .3 }, "green3"); await guard(id, 1900);
+  caption("2 · Retina and V1", "Brightness and green-ON cells fire; the learned V1 fields pick out the edges of the 3 in those channels.");
+  blocks.v1.target = 1; await guard(id, 1600);
+  caption("3 · Somas", "V2 somas integrate their input over time (leaky integration, then a threshold). No labels are used to learn them.");
+  lightStructures([["3", .9], ["green", .9], ["8", .45], ["5", .35]], .8, .15, 3); blocks.v2.target = 1; await guard(id, 1600);
+  caption("4 · Axon", "Each soma's output drives four resonators on its axon. Their energy at ω = 0, π/8, π/4 and π/2 is the cell's frequency signature, and these (cell, frequency) nodes are what structures wire.");
+  blocks.axon.target = 1; await guard(id, 1800);
+  caption("5 · Structures resonate", "Each structure scores R = aᵀWa / ‖a‖². Both 3 and green clear the vigilance line; 8 and 5 resonate partly because they share strokes with 3.");
+  showBars([["3", .82], ["green", .8], ["8", .47], ["5", .38], ["blue", .12], ["cyan", .22]], ["3", "green"]);
+  pulseMany(hubs["3"].members.slice(0, 6).map(n => ({ curve: new THREE.LineCurve3(nodePos(n >> 2, n & 3), hubs["3"].pos) })), COL.excite, 700);
+  parents.digit.target = .8; parents.colour.target = .8; await guard(id, 2400);
+  caption("6 · Gain feedback", "The resonating structures raise the gain of their member cells' somas. The somas recompute, the axons re-resonate and recognition is read again.");
+  FB.forEach(f => pulse(f, COL.gain, 1100)); await guard(id, 700);
+  FB.forEach(f => pulse(f, COL.gain, 1100)); lightStructures([["3", 1], ["green", 1]], 1, 0, 3);
+  showBars([["3", .86], ["green", .83], ["8", .41], ["5", .33], ["blue", .1], ["cyan", .2]], ["3", "green"]); await guard(id, 1800);
+  caption("7 · Suppression", "Negative links from 3 push down 8 and 5, so the winner is clear.");
+  supLinks.filter(s => s.a === "3").forEach(s => pulse(s, COL.suppress, 800));
+  showBars([["3", .86], ["green", .83], ["8", .29], ["5", .22], ["blue", .1], ["cyan", .18]], ["3", "green"]); await guard(id, 1800);
+  caption("8 · Bridge", "3 and green resonate equally, from two different families. That is a semantic bridge, not an error, so the model keeps both: a green 3.");
+  addBridge("3", "green"); blocks.ag_vig.target = 1; pulse(L.hubsToVig, COL.agent); pulse(L.digitsToVig, COL.agent);
+};
+sc.purple = async id => {
+  clearActivity(); showBars(null); clearHypothesis();
+  const known = hubs.purple.alive;
+  caption("1 · Sensor", known ? "Purple again. This time a purple structure exists." : "Something the model has never been shown: purple.");
+  frontEnd({ rOn: .7, bOn: .85, lumOn: .55 }, "purple"); await guard(id, 1800);
+  blocks.v1.target = .7; lightStructures(known ? [["purple", .9], ["blue", .45], ["magenta", .5]] : [["blue", .55], ["magenta", .6], ["red", .35]], .8, .15, 9);
+  blocks.v2.target = 1; blocks.axon.target = 1;
+  caption("2 · Through the cells", "Red-ON and blue-ON cells fire together. The somas integrate, the axon resonators read the frequencies.");
+  await guard(id, 1800);
+  if (known) {
+    showBars([["purple", .81], ["magenta", .44], ["blue", .41], ["red", .2]], ["purple"]);
+    caption("3 · Understood", "Purple clears vigilance on its own and suppresses its neighbours. It was learned from one question.");
+    supLinks.filter(s => s.a === "purple").forEach(s => pulse(s, COL.suppress, 800)); return;
+  }
+  showBars([["magenta", .51], ["blue", .48], ["red", .3], ["cyan", .14]], []);
+  caption("3 · Not understood", "Magenta and blue both resonate, but nothing reaches the vigilance line and there's no clear winner.");
+  pulse(L.hubsToVig, COL.agent); blocks.ag_vig.target = 1; await guard(id, 2200);
+  caption("4 · Look again", "Active sensing: the eye looks at rotated views. A rotated view is only trusted when three views agree. They still don't.");
+  blocks.ag_look.target = 1; pulse(L.lookSensor, COL.agent, 1500);
+  for (let k = 0; k < 3; k++) { sensorPlane.rotation.x = (k + 1) * Math.PI / 6; await guard(id, 500); }
+  sensorPlane.rotation.x = 0; await guard(id, 500);
+  caption("5 · Ask (rule 1a)", "So the model asks for a label. The oracle (you, in the real setting) answers: purple.");
+  blocks.ag_ask.target = 1; pulse(L.askOracle, COL.user); oracle.target = 1; await guard(id, 1200);
+  pulse(L.oracleAlloc, COL.user); blocks.ag_alloc.target = 1; await guard(id, 1000);
+  caption("6 · Allocate", "A new label gets a new structure, built from the nodes that co-resonate on this input above their background level.");
+  const h = hubs.purple; h.alive = true; h.wire.visible = true; h.label.el.hidden = false; pulse(L.allocHubs, COL.agent);
+  h.members = [...new Set([...hubs.blue.members.slice(0, 7), ...hubs.magenta.members.slice(0, 7), ...h.members.slice(0, 4)])];
+  const pts = []; h.members.forEach(n => { const p = nodePos(n >> 2, n & 3); pts.push(p.x, p.y, p.z, h.pos.x - .6, h.pos.y, h.pos.z); });
+  h.wire.geometry.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3)); h.wire.material.opacity = .5;
+  await guard(id, 1600);
+  caption("7 · Placed in the family", "Purple co-resonates with blue and magenta, so it lands in the colour group between them (rule 1b). Suppression links keep it apart from both.");
+  parents.colour.links.purple.mesh.visible = true; pulse(parents.colour.links.purple, 0xcfd8e0);
+  addSuppress("purple", "blue"); addSuppress("purple", "magenta");
+  showBars([["purple", .78], ["magenta", .44], ["blue", .41], ["red", .22]], ["purple"]);
+  await guard(id, 1600);
+  caption("Done", "Purple now has its own structure. Show it purple again and it's recognised without a question; the other colours are not forgotten.");
+};
+let edgesCount = 1240;
+sc.sleep = async id => {
+  clearActivity(); showBars(null); drawSensor("none");
+  caption("1 · Replay", "Sleep (rule 1c). Stored real examples are replayed, and the model records which structures resonate together.");
+  blocks.ag_sleep.target = 1; pulse(L.sleepHubs, COL.agent, 1100);
+  const live = Object.values(hubs).filter(h => h.alive);
+  for (let k = 0; k < 4; k++) {
+    const h = live[Math.floor(Math.random() * live.length)]; lightStructures([[h.name, .8]], 1, .05, k + 20); h.target = .8;
+    pulseMany(h.members.slice(0, 5).map(n => ({ curve: new THREE.LineCurve3(nodePos(n >> 2, n & 3), h.pos) })), COL.excite, 600);
+    await guard(id, 750); somaTgt.fill(0); ringTgt.forEach(a => a.fill(0)); h.target = 0;
+  }
+  caption("2 · Connect", "Where two structures in the same group co-resonate under replay, new cross-structure links are added, but only if they raise the right structure's resonance on stored examples.");
+  for (const [a, b] of [["4", "9"], ["3", "8"]]) { supLinks.filter(s => s.a === a && s.b === b).forEach(s => { s.mat.opacity = .95; pulse(s, COL.suppress); }); }
+  edgesCount += 36; await guard(id, 1800);
+  caption("3 · Prune", "Connections with a low resonance index under the replayed inputs are removed, if recognition of stored examples doesn't drop. This is the original resonance-index pruning, now used during learning.");
+  live.forEach(h => { if (h.members.length > 10) { h.members = h.members.slice(0, h.members.length - 3); const pts = []; h.members.forEach(n => { const p = nodePos(n >> 2, n & 3); pts.push(p.x, p.y, p.z, h.pos.x - .6, h.pos.y, h.pos.z); }); h.wire.geometry.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3)); } });
+  edgesCount = Math.round(edgesCount * .81); await guard(id, 1800);
+  caption("4 · Axioms", "A structure that always fully resonates on its own examples is promoted to an axiom (gold ring): long-term memory. Here 3 qualifies.");
+  setAxiom("3", true); blocks.ag_audit.target = 1; await guard(id, 1500);
+  caption("Done", `Illustrative: wiring went from 1,240 to ${edgesCount.toLocaleString()} connections. The model gets smaller as it learns.`);
+};
+sc.hyp = async id => {
+  clearActivity(); showBars(null);
+  caption("1 · Sensor", "A red 1. Both 1 and red are axioms.");
+  frontEnd({ lumOn: 1, rOn: 1, lumOff: .3 }, "red1"); await guard(id, 1500);
+  blocks.v1.target = 1; blocks.v2.target = 1; blocks.axon.target = 1; lightStructures([["1", .9], ["red", .9], ["7", .4]], .8, .14, 31); await guard(id, 1400);
+  showBars([["1", .84], ["red", .83], ["7", .4], ["orange", 0], ["yellow", .2]].filter(([k]) => hubs[k].alive), ["1", "red"]);
+  caption("2 · Two axioms together", "Two axioms firing together become a hypothesis: maybe 'red 1' means something. The inputs are buffered.");
+  showHypothesis("1", "red"); await guard(id, 2200);
+  caption("3 · Audit", "During sleep the hypothesis is audited against replayed examples. Red and 1 also appear apart, so it is kept as a bridge between independent properties, not merged into one concept.");
+  blocks.ag_audit.target = 1; pulse(L.sleepHubs, COL.agent); await guard(id, 2000);
+  clearHypothesis(); addBridge("1", "red");
+  caption("Done", "Audit passed as a bridge. Had red and 1 only ever appeared together, the audit would have asked whether they're one thing.");
+};
+// ---------- compose an input: any digit, any colour, any blur ----------
+const RGB = { white: [1, 1, 1], red: [1, 0, 0], orange: [1, .55, 0], yellow: [1, 1, 0], green: [0, 1, 0], cyan: [0, 1, 1], blue: [0, 0, 1], purple: [.6, .2, .95], magenta: [1, 0, 1] };
+const DIGIT_NB = { 0: ["6", "8"], 1: ["7"], 2: ["7", "3"], 3: ["8", "5"], 4: ["9"], 5: ["6", "3"], 6: ["5", "0"], 7: ["1", "2"], 8: ["3", "0"], 9: ["4", "8"] };
+const strengthened = {}; // digit -> how many blurry examples it has been taught (rule 1a: a known label strengthens its structure)
+function drawComposed(digit, colour, blur) {
+  const g = sensorCanvas.getContext("2d"), [r, gg, b] = RGB[colour], css = `rgb(${255 * r | 0},${255 * gg | 0},${255 * b | 0})`;
+  const small = Math.max(10, Math.round(256 / (1 + blur * 14))); // blur = draw small, scale up smoothly (works in every browser)
+  const cv = document.createElement("canvas"); cv.width = cv.height = small; const s = cv.getContext("2d"), k = small / 256;
+  s.fillStyle = "#05080b"; s.fillRect(0, 0, small, small);
+  if (digit === "none") { s.fillStyle = css; s.beginPath(); s.arc(128 * k, 128 * k, 100 * k, 0, Math.PI * 2); s.fill(); }
+  else { s.fillStyle = css; s.font = `bold ${200 * k}px Arial, sans-serif`; s.textAlign = "center"; s.textBaseline = "middle"; s.fillText(digit, 128 * k, 140 * k); }
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high"; g.drawImage(cv, 0, 0, 256, 256);
+  sensorTex.needsUpdate = true;
+}
+function retinaFor(colour, digit, blur) {
+  const [r, g, b] = RGB[colour], area = digit === "none" ? 1 : .7;
+  return { lumOn: area * (r + g + b) / 3 + .2, lumOff: .35 - .15 * blur, rOn: Math.max(0, r - g) * area, gOn: Math.max(0, g - r) * area, bOn: Math.max(0, b - (r + g) / 2) * area, yOn: Math.max(0, (r + g) / 2 - b) * area };
+}
+function hueDist(a, b) { const d = Math.abs(HUE[a] - HUE[b]) % 360; return Math.min(d, 360 - d); }
+function scoreInput(digit, colour, blur) {
+  const out = [];
+  if (digit !== "none") {
+    const s = Math.min(3, strengthened[digit] || 0), pen = .75 * blur * (1 - .25 * s);
+    for (let d = 0; d < 10; d++) {
+      const n = String(d); let v = .08 + .05 * blur;
+      if (n === digit) v = .86 * (1 - pen) + .1 * pen;
+      else if (DIGIT_NB[digit].includes(n)) v = .42 + .22 * blur;
+      out.push([n, Math.min(.95, v)]);
+    }
+  }
+  for (const c of ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "magenta"]) {
+    if (!hubs[c].alive) continue;
+    const v = colour === "white" ? .12 : .08 + .78 * Math.exp(-Math.pow(hueDist(c, colour) / 38, 2)) * (1 - .08 * blur);
+    out.push([c, v]);
+  }
+  return out;
+}
+const fam = n => hubs[n].fam;
+function decide(scores, family) {
+  const s = scores.filter(([n]) => fam(n) === family).sort((a, b) => b[1] - a[1]);
+  if (!s.length) return null;
+  const [top, second] = [s[0], s[1] || ["", 0]];
+  return { top: top[0], v: top[1], ok: top[1] >= RHO && top[1] - second[1] >= .12, second: second[0] };
+}
+function barsFrom(scores, winners) {
+  const d = scores.filter(([n]) => fam(n) === "digit").sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const c = scores.filter(([n]) => fam(n) === "colour").sort((a, b) => b[1] - a[1]).slice(0, 3);
+  showBars([...d, ...c], winners);
+}
+function rewire(h) { const pts = []; h.members.forEach(n => { const p = nodePos(n >> 2, n & 3); pts.push(p.x, p.y, p.z, h.pos.x - .6, h.pos.y, h.pos.z); }); h.wire.geometry.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3)); }
+function allocateColour(n) {
+  const h = hubs[n]; h.alive = true; h.wire.visible = true; h.label.el.hidden = false; pulse(L.allocHubs, COL.agent);
+  const nb = ["red", "yellow", "green", "cyan", "blue", "magenta"].filter(c => hubs[c].alive).sort((a, b) => hueDist(a, n) - hueDist(b, n)).slice(0, 2);
+  h.members = [...new Set([...hubs[nb[0]].members.slice(0, 7), ...hubs[nb[1]].members.slice(0, 7), ...pickMembers(colourCells, 4, 300 + HUE[n])])];
+  rewire(h); h.wire.material.opacity = .5; return nb;
+}
+const showControls = () => ({ digit: document.getElementById("inDigit").value, colour: document.getElementById("inColour").value, blur: +document.getElementById("inBlur").value });
+sc.compose = async id => {
+  const { digit, colour, blur } = showControls();
+  clearActivity(); showBars(null); clearHypothesis();
+  const what0 = (blur > .05 ? "blurry " : "") + (digit === "none" ? colour + " patch" : colour + " " + digit);
+  caption("1 · Sensor", `${/^[aeiou]/.test(what0) ? "An" : "A"} ${what0} lands on the sensor. The eye drifts over it for 32 steps.`);
+  drawComposed(digit, colour, blur); blocks.sensor.target = 1;
+  const ret = retinaFor(colour, digit, blur);
+  CH.forEach((c, i) => { chTgt[i] = Math.min(1, ret[c.id] || 0); if (chTgt[i] > .25) pulse(blocks["ch_" + c.id].inLink, c.col, 700, i * 60); });
+  await guard(id, 1600);
+  const fired = CH.filter(c => (ret[c.id] || 0) > .3).map(c => c.name).join(", ");
+  caption("2 · Retina and V1", `${fired} fire. ` + (blur > .2 ? "Blur keeps the colour but removes the fine edges, so the V1 fields that find strokes respond weakly." : "V1 fields pick out the edges in those channels."));
+  blocks.v1.target = digit === "none" ? .35 : 1 - .7 * blur; await guard(id, 1600);
+  let scores = scoreInput(digit, colour, blur);
+  lightStructures(scores.filter(([, v]) => v > .3).map(([n, v]) => [n, v]), .9, .12 + .1 * blur, 41 + blur * 10);
+  blocks.v2.target = 1; blocks.axon.target = 1;
+  caption("3 · Somas and axon", "The somas integrate over time; the axon resonators turn each cell's output into a frequency signature.");
+  await guard(id, 1500);
+  let D = decide(scores, "digit"), C = decide(scores, "colour");
+  barsFrom(scores, [D?.ok && D.top, C?.ok && C.top].filter(Boolean));
+  pulse(L.hubsToVig, COL.agent); pulse(L.digitsToVig, COL.agent); blocks.ag_vig.target = 1;
+  const parts = [];
+  if (D) parts.push(D.ok ? `${D.top} clears vigilance` : `the digit is unclear (${D.top} ${D.v.toFixed(2)} vs ${D.second})`);
+  if (colour === "white") parts.push("no colour structure fires: white only drives the brightness cells");
+  else if (C) parts.push(C.ok ? `${C.top} clears vigilance` : `no colour reaches vigilance (closest: ${C.top} and ${C.second})`);
+  caption("4 · Structures resonate", parts.join("; ") + ".");
+  await guard(id, 2300);
+  // unknown colour: ask, then allocate a new structure in the colour family
+  const newColour = colour !== "white" && !hubs[colour].alive;
+  if (D && !D.ok) {
+    caption("5 · Look again", "Unsure about the digit, so the eye looks at rotated views. Rotation doesn't undo blur, so the views still disagree.");
+    blocks.ag_look.target = 1; pulse(L.lookSensor, COL.agent, 1500);
+    for (let k = 0; k < 3; k++) { sensorPlane.rotation.x = (k + 1) * Math.PI / 6; await guard(id, 450); }
+    sensorPlane.rotation.x = 0; await guard(id, 400);
+  }
+  if ((D && !D.ok) || newColour) {
+    const asked = [D && !D.ok ? `"which digit?"` : "", newColour ? `"what colour is this?"` : ""].filter(Boolean).join(" and ");
+    const ans = [D && !D.ok ? digit : "", newColour ? colour : ""].filter(Boolean).join(", ");
+    caption("6 · Ask (rule 1a)", `The model asks ${asked}. The oracle answers: ${ans}.`);
+    blocks.ag_ask.target = 1; pulse(L.askOracle, COL.user); oracle.target = 1; await guard(id, 1300);
+    pulse(L.oracleAlloc, COL.user); blocks.ag_alloc.target = 1; await guard(id, 900);
+    const notes = [];
+    if (D && !D.ok) { strengthened[digit] = (strengthened[digit] || 0) + 1; notes.push(`${digit} is a known label, so its structure is strengthened with this blurry example instead of a new one being made. Show it again and it tolerates more blur`); }
+    if (newColour) {
+      const nb = allocateColour(colour);
+      parents.colour.links[colour].mesh.visible = true; pulse(parents.colour.links[colour], 0xcfd8e0);
+      nb.forEach(b => addSuppress(colour, b));
+      notes.push(`${colour} is new, so it gets a new structure. It co-resonates with ${nb.join(" and ")}, so it lands in the colour group between them, with suppression links to both`);
+    }
+    caption("7 · Learn", notes.join(". ") + ".");
+    scores = scoreInput(digit, colour, blur).map(([n, v]) => [n, n === digit && D && !D.ok ? Math.max(v, .74) : v]);
+    D = decide(scores, "digit"); C = decide(scores, "colour");
+    lightStructures(scores.filter(([, v]) => v > .3), .9, .1, 43);
+    barsFrom(scores, [D?.ok && D.top, C?.ok && C.top].filter(Boolean));
+    await guard(id, 2600);
+  }
+  const winners = [D?.ok && D.top, colour !== "white" && C?.ok && C.top].filter(Boolean);
+  if (!winners.length) { caption("Done", "Nothing to name here."); return; }
+  caption("8 · Gain feedback", `${winners.join(" and ")} raise the gain of their member cells' somas; the axons re-resonate and the reading firms up.`);
+  FB.forEach(f => pulse(f, COL.gain, 1100)); winners.forEach(w => { if (fam(w) === "digit") parents.digit.target = .8; else parents.colour.target = .8; });
+  scores = scores.map(([n, v]) => [n, winners.includes(n) ? Math.min(.95, v + .04) : v * .85]);
+  barsFrom(scores, winners); await guard(id, 1800);
+  if (winners.length === 2) { addBridge(winners[0], winners[1]); caption("Done", `${winners[0]} and ${winners[1]} resonate about equally from two families: a semantic bridge. The model sees ${/^[aeiou]/.test(colour) ? "an" : "a"} ${colour} ${digit}.`); }
+  else caption("Done", `Understood as ${winners[0]}.`);
+};
+["inDigit", "inColour"].forEach(i => document.getElementById(i).onchange = () => { const s = showControls(); drawComposed(s.digit, s.colour, s.blur); });
+document.getElementById("inBlur").oninput = () => { const s = showControls(); document.getElementById("inBlurv").textContent = s.blur.toFixed(2); drawComposed(s.digit, s.colour, s.blur); };
+document.getElementById("inShow").onclick = () => play("compose");
+async function play(name) {
+  const id = ++runId;
+  document.querySelectorAll("[id^=sc-]").forEach(b => b.classList.toggle("on", b.id === "sc-" + name));
+  try { await sc[name](id); } catch (e) { if (e !== "cancel") console.error(e); }
+  if (id === runId) document.getElementById("sc-" + name)?.classList.remove("on");
+}
+function resetAll() {
+  runId++; clearActivity(); showBars(null); drawSensor("none"); clearHypothesis();
+  bridges.forEach(b => layers.rules.remove(b.line)); bridges.length = 0;
+  for (const n of ["purple", "orange"]) { const h = hubs[n]; h.alive = false; h.wire.visible = false; h.label.el.hidden = true; parents.colour.links[n].mesh.visible = false; }
+  for (let i = supLinks.length - 1; i >= 0; i--) if (supLinks[i].a === "purple" || supLinks[i].a === "orange") { layers.suppress.remove(supLinks[i].mesh); supLinks.splice(i, 1); }
+  supLinks.forEach(s => s.mat.opacity = s.base);
+  Object.values(hubs).forEach(h => { if (h.alive) { h.members = pickMembers(h.fam === "digit" ? shapeCells : colourCells, 16, h.fam === "digit" ? 200 + +h.name : 100 + ["red", "yellow", "green", "cyan", "blue", "magenta"].indexOf(h.name)); const pts = []; h.members.forEach(n => { const p = nodePos(n >> 2, n & 3); pts.push(p.x, p.y, p.z, h.pos.x - .6, h.pos.y, h.pos.z); }); h.wire.geometry.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3)); } });
+  setAxiom("3", false); edgesCount = 1240; for (const k in strengthened) delete strengthened[k];
+  caption("Reset", "Back to the trained state: 10 digits and 6 colours learned; purple and orange not seen yet.");
+  document.querySelectorAll("[id^=sc-]").forEach(b => b.classList.remove("on"));
+}
+document.getElementById("sc-green3").onclick = () => play("green3");
+document.getElementById("sc-purple").onclick = () => play("purple");
+document.getElementById("sc-sleep").onclick = () => play("sleep");
+document.getElementById("sc-hyp").onclick = () => play("hyp");
+document.getElementById("sc-reset").onclick = resetAll;
+
+// V1 toggle
+function setV1(mode) {
+  v1Mode = mode; v1Groups.learned.visible = mode === "learned"; v1Groups.gabor.visible = mode === "gabor";
+  document.getElementById("v1-learned").classList.toggle("on", mode === "learned"); document.getElementById("v1-gabor").classList.toggle("on", mode === "gabor");
+  blocks.v1.label.el.textContent = mode === "learned" ? "V1: learned fields" : "V1: hand Gabor";
+  inspect("v1");
+}
+document.getElementById("v1-learned").onclick = () => setV1("learned");
+document.getElementById("v1-gabor").onclick = () => setV1("gabor");
+
+// layer toggles
+const layerBox = document.getElementById("layerToggles");
+LAYER_DEFS.forEach(([k, name, col]) => {
+  const lab = document.createElement("label"); lab.className = "toggle";
+  lab.innerHTML = `<input type="checkbox" id="ly-${k}" checked><span class="sw" style="background:#${col.toString(16).padStart(6, "0")}"></span>${name}`;
+  layerBox.appendChild(lab);
+  lab.querySelector("input").onchange = e => { layers[k].visible = e.target.checked; };
+});
+
+// ---------- info for the inspector ----------
+const INFO = {
+  overview: { kind: "Architecture", title: "The model as it stands, 18 Oct 2026", body: `
+    <p>Signals flow left to right: an image on the <b>sensor</b>, the eye drifting over it, cone-opponent <b>retina</b> channels, <b>V1</b> fields, <b>V2 somas</b> that integrate in time, and an <b>axon</b> of resonators on each soma. Concept <b>structures</b> wire the axon nodes that co-resonate, and the <b>rules</b> on the right decide when to ask, allocate, sleep and audit.</p>
+    <p>The resonance index and the rule set are Joaquin Philco's. The goal they serve: meet something never seen (purple), know what kind of thing it is (a colour), and allocate a structure for it.</p>
+    <ul><li><span style="color:var(--excite)">cyan</span> positive co-resonance wiring</li><li><span style="color:var(--suppress)">red</span> suppression (negative weights)</li><li><span style="color:var(--gain)">violet</span> gain feedback to somas</li><li><span style="color:var(--phase)">gold</span> axioms, bridges and hypotheses</li></ul>
+    <p class="hint">The animations are illustrative and scripted from the rules. The numbers in each block come from the result files named there.</p>` },
+  sensor: { kind: "Sensor", title: "Visual sensor with fixational drift", body: `
+    <p>The model only meets the world through sensor readings <code>s(t)</code>. For now the only sensor is visual.</p>
+    <p>Time comes from eye movement: the glimpse drifts along a slow Lissajous loop for <span class="num">T = 32</span> steps, so spatial structure turns into temporal frequency.</p>
+    <dl><dt>Code</dt><dd>soma_axon.py · eye_path</dd><dt>Worlds</dt><dd>digits + 6 colours (then purple, orange), Fashion-MNIST, CIFAR-10, Imagenette 64px, pitch × rhythm simple world</dd></dl>` },
+  retina: { kind: "Front end", title: "Retina: cone-opponent ON/OFF cells", body: `
+    <p>Brightness = (R+G+B)/3, red–green = R−G, blue–yellow = B−(R+G)/2, each colour-opponent channel split into rectified ON cells. A centre-surround filter whitens each channel.</p>
+    <p>The ON/OFF split is required: resonator energy is blind to sign, so without it red and green can't be told apart (colour naming fell to 35%).</p>
+    <dl><dt>Code</dt><dd>digits_colours_v1.py · opponent</dd><dt>Source</dt><dd>results_digits_colours_v1.md</dd></dl>
+    <div class="res"><h4>Measured</h4><ul><li>Digit vs colour structure overlap (Jaccard) <span class="num">0.12 → 0.02</span></li><li>Colour of a green 3 named <span class="num">100%</span></li><li>Colour structures put <span class="num">95%</span> of their weight on the colour-ON banks; digit structures <span class="num">0%</span></li></ul></div>` },
+  v1_learned: { kind: "Front end · V1", title: "Learned V1 (sparse coding)", body: `
+    <p>32 receptive fields per channel, 11×11 px, learned without labels by sparse coding (ISTA) of whitened Imagenette patches. They came out Gabor-like: mostly oriented at 0° and 90°, with some diagonals.</p>
+    <dl><dt>Code</dt><dd>learn_v1.py · learn, ista</dd><dt>Run</dt><dd>runs/learned_v1/v1_k11_c32.json</dd><dt>Data</dt><dd>60,000 patches from 2,000 images, λ = 1.0</dd><dt>Fit</dt><dd>unexplained variance 0.19 → 0.17 over 30 epochs</dd></dl>
+    <p>Then each field's response is pooled to a 16×16 map; the V1 somas integrate it over the eye's drift and threshold it.</p>
+    <p class="hint">The tiles here are drawn from each learned field's measured orientation and selectivity, not the raw weights.</p>` },
+  v1_gabor: { kind: "Front end · V1", title: "Hand-made Gabor V1", body: `
+    <p>Complex Gabor cells, 4 orientations (0°, 45°, 90°, 135°) × 2 scales per cone channel; even and odd phase combined. Each channel's 8 maps drive its resonator bank. "Gabor + colour" adds the unfiltered channel back as a 9th input.</p>
+    <dl><dt>Code</dt><dd>gabor_v1.py</dd><dt>Source</dt><dd>results_gabor.md</dd></dl>
+    <div class="res"><h4>Measured (agent test accuracy)</h4><ul><li>Digits + colours, 3 views agree: <span class="num">77.8% → 89.5%</span></li><li>Fashion-MNIST, 3 views agree: <span class="num">66.6% → 67.7%</span></li><li>CIFAR-10 stays near <span class="num">30%</span>, while a linear probe on the same features gets about <span class="num">45%</span>. The bottleneck is the learning rule, not vision.</li></ul></div>` },
+  v2: { kind: "Cell model · soma", title: "V2 somas: time-based cells", body: `
+    <p>K = 256 cells, learned without labels by sparse / predictive coding of V1 activity. Each soma integrates its input current over time (leak α = 0.5) and thresholds it. Its input is multiplied by a gain, which the structures raise through feedback.</p>
+    <p>This is the normal somatic function that still drives learning; the resonance machine sits on the axon (Joaquin, 18 Oct).</p>
+    <dl><dt>Code</dt><dd>soma_axon.py · Soma, leaky</dd><dt>Run</dt><dd>runs/soma_axon/imagenette64.json</dd></dl>` },
+  axon: { kind: "Cell model · axon", title: "Axon resonance machine", body: `
+    <p>Each soma's output over time drives four resonators with poles <code>λ = ρ e^{iω}</code>, ρ = 0.85, ω ∈ {0, π/8, π/4, π/2}. Their log energy is the cell's frequency signature. Each (cell, frequency) pair is a node: 256 × 4 = 1,024 nodes the agent can wire.</p>
+    <dl><dt>Code</dt><dd>soma_axon.py · axon, nodes</dd></dl>
+    <div class="res"><h4>Measured, Imagenette 64px (3k train / 2k test)</h4><ul><li>Agent that asks: <span class="num">33.9%</span>, with gain feedback <span class="num">34.3%</span> (820 questions)</li><li>Same somas, axon reads mean rate only: <span class="num">28.5%</span></li><li>Linear probe on the same nodes: <span class="num">48.4%</span></li></ul><p class="hint">So the resonators add about 5 points over firing rate; the learning rule is still the gap to the linear probe.</p></div>` },
+  hub: n => ({ kind: hubs[n].fam === "digit" ? "Concept structure · digit" : "Concept structure · colour", title: "Structure “" + n + "”", body: `
+    <p>A structure is a weighted graph <code>W_ℓ</code> over nodes in any layer, attached to the label <b>${n}</b>. It is built from co-resonance minus background: <code>W = relu(mean(a aᵀ) − B)</code>, keeping the top 2% of edges.</p>
+    <p>How strongly it resonates on an input: <code>R_ℓ(x) = aᵀ W_ℓ a / ‖a‖²</code>, the share of the input's co-resonance that it explains.</p>
+    <dl><dt>Members shown</dt><dd>${hubs[n].members.length} axon nodes</dd><dt>Axiom</dt><dd>${hubs[n].axiom ? "yes (long-term memory)" : "not yet"}</dd><dt>Code</dt><dd>resonance_agent.py · Agent._positive, resonance</dd></dl>
+    <div class="res"><h4>Measured</h4><ul><li>Hebbian co-resonance wiring, no backprop, one digit at a time: <span class="num">72.0%</span> on MNIST with no forgetting; a gradient classifier under the same exposure falls to <span class="num">9.7%</span> (results_resonance_wiring.md)</li></ul></div>` }),
+  parent: n => ({ kind: "Rule 1b · group", title: n === "colour" ? "Colours" : "Digits", body: `
+    <p>Labels are grouped by which structures resonate together: <code>G_ℓm</code> = correlation of R_ℓ and R_m across inputs. A group is itself unnamed, so the model can ask for its name ("these six things, what are they?").</p>
+    <p>Simple-world finding: co-firing groups related objects, but two values of one property (two pitches) never co-fire. Mutual exclusion is what marks a property family.</p>
+    <dl><dt>Source</dt><dd>rules_spec.md, simple_world/results_simple_world.md</dd></dl>` }),
+  hypothesis: { kind: "Rule · hypothesis", title: "Hypothesis under audit", body: `<p>Two axioms firing together become a hypothesis. Its inputs are buffered and audited during sleep against replayed examples, which decides whether it is a bridge between independent properties or one concept.</p>` },
+  ag_vig: { kind: "Rule 1a", title: "Vigilance check", body: `<p>The input is understood when some structure resonates enough, <code>max R_ℓ ≥ ρ</code>, and there's a clear winner (margin to the runner-up). ρ is set per label at the 20th percentile of its resonance on its own replayed examples.</p><p>Ties between two axioms are bridges, not errors; other ties ask.</p><dl><dt>Code</dt><dd>resonance_agent.py · Agent.understood</dd></dl>` },
+  ag_ask: { kind: "Rule 1a", title: "Ask for a label", body: `<p>When nothing resonates enough, the model asks. A new label allocates a new structure; a known label strengthens its structure, which corrects a false "I don't know".</p><p>Asking is cheap; guessing broke it: when the model had to decide "new" itself, 29% of known colours were flagged and purple split into 21 fragments (novel_concepts.py).</p>` },
+  ag_alloc: { kind: "Rule 1a", title: "Allocate or strengthen", body: `<p>The co-resonance-minus-background rule adds the input's outer product <code>a aᵀ</code> to the label's running sum and rebuilds <code>W_ℓ</code>. 30 recent real examples per label are kept for replay.</p><dl><dt>Code</dt><dd>resonance_agent.py · Agent.learn</dd></dl>` },
+  ag_look: { kind: "Active sensing", title: "Look again from rotated views", body: `<p>When unsure, the model rotates the image and reads again. A rotated view is trusted only when several views name the same label.</p><div class="res"><h4>Measured</h4><ul><li>Digits + colours (Gabor), full rules: <span class="num">75.6%</span>; with 3 views agree: <span class="num">89.5%</span></li></ul></div>` },
+  ag_sleep: { kind: "Rule 1c", title: "Sleep: replay, connect, prune", body: `<p>Periodically: replay stored real examples, record which structures co-resonate, add cross-structure links where they raise the right structure's resonance, and prune links whose resonance index under the replay is low, if recognition doesn't drop.</p><p>Connections carry both parent concepts (semantic conjugation) and discrimination (suppression = negative weights).</p>` },
+  ag_audit: { kind: "Rules · memory", title: "Axioms, bridges and audits", body: `<ul><li><b>Axiom:</b> a structure that always fully resonates on the same input becomes long-term memory.</li><li><b>Bridge:</b> two structures resonating equally on one input are a semantic bridge, not an error.</li><li><b>Hypothesis:</b> two axioms firing together get buffered and audited.</li></ul><p class="hint">Joaquin asked for every rule to be logged with and without it; the ablations are in results_agent.md.</p>` },
+  oracle: { kind: "Oracle", title: "Who answers the questions", body: `<p>In experiments, a simulated oracle returns the true label and every question is counted as a cost. In the real setting, it's a person.</p><div class="res"><h4>Simple world (20 seeds)</h4><ul><li>Agent asked <span class="num">255 ± 16</span> times in 1,500 inputs, 8% at the end</li><li>Unseen pitch+rhythm pairs, both right: agent <span class="num">0.64</span>, shuffled wiring 0.05, GRU on the same labels 0.02</li></ul></div>` },
+  "cell:overview": { kind: "One cell", title: "A time cell and its resonance machine", body: `
+    <p>One V2 cell from the architecture, opened up. The <b>dendrites</b> bring in an input current c(t) as the eye drifts. The <b>soma</b> works in time: it leaks and integrates, applies a threshold, and its input is scaled by a gain that the concept structures raise through feedback.</p>
+    <p>The soma's output y(t) runs down the <b>axon</b> into four resonators. Each one is a rotating, decaying memory h<sub>t</sub> = ρe<sup>iω</sup>h<sub>t−1</sub> + y<sub>t</sub>. The ring is its complex plane, the arrow is h right now, and the <b>spiral</b> behind it is h over time. When the input's rhythm matches ω, the kicks add up in phase and the spiral widens. When it doesn't, they cancel.</p>
+    <p>The <b>bars</b> are each resonator's energy so far. The four log energies are this cell's frequency signature: the nodes the agent wires into structures.</p>
+    <p class="hint">This runs the update rules in soma_axon.py (leaky, axon) live in the page, with the same defaults: α = 0.5, ρ = 0.85, T = 32, ω ∈ {0, π/8, π/4, π/2}. The input signals are examples.</p>` },
+  "cell:input": { kind: "One cell · dendrites", title: "Input current", body: `<p>In the model, a V2 cell's input current is the sparse code of the V1 activity, recomputed at each of the 32 eye-drift steps. Drift turns a still image into a signal in time: an edge that sits in the receptive field comes and goes as the eye loops over it.</p><dl><dt>Code</dt><dd>soma_axon.py · Soma.current, eye_path</dd></dl>` },
+  "cell:soma": { kind: "One cell · soma", title: "Soma: the time-based stage", body: `<p>v<sub>t</sub> = α v<sub>t−1</sub> + (1−α) g c<sub>t</sub>, then y<sub>t</sub> = max(0, v<sub>t</sub> − θ). The leak α smooths the input: high α keeps long memory and dulls fast rhythms, which you can watch in the π/2 spiral shrinking.</p><p>The gain g is where the concept structures act: when a structure resonates, its member cells' gain goes up, the soma recomputes, and the axon re-resonates.</p><dl><dt>Code</dt><dd>soma_axon.py · leaky, Soma.output, feedback_recognise</dd></dl>` },
+  "cell:axon": { kind: "One cell · axon", title: "Axon: the resonance machine", body: `<p>The soma's output drives four resonators in parallel. Joaquin's revision (18 Oct): the resonance machine sits on the axon, reads the signal's frequency and feeds back into the somatic function, rather than replacing it.</p><div class="res"><h4>Measured, Imagenette 64px</h4><ul><li>With the resonators: agent <span class="num">33.9%</span></li><li>Axon reads only the mean firing rate: <span class="num">28.5%</span></li></ul></div>` },
+  cellRes: f => ({ kind: "One cell · resonator", title: "Resonator ω = " + ["0", "π/8", "π/4", "π/2"][f], body: `<p>Pole λ = ρe<sup>iω</sup>${f ? ", one turn every " + [0, 16, 8, 4][f] + " steps" : ", no rotation: a leaky sum, so it measures the mean level"}. Each step it rotates its memory by ω, shrinks it by ρ, and adds the new output y<sub>t</sub>.</p><p>Its feature is log(Σ|h<sub>t</sub>|²/T). Right now: <span class="num">${SIM ? SIM.feat[f].toFixed(2) : "–"}</span>.</p><p class="hint">Raise ρ toward 1 and its frequency tuning gets sharper but slower to settle; lower it and every resonator responds to everything.</p>` }),
+  suppress: { kind: "Discrimination", title: "Suppression link", body: `<p>A negative weight between two structures that get confused, such as 3 and 8 or 4 and 9. When one resonates, it pushes the other down. On CIFAR the suppression is still too weak, which is part of why the agent behaves like a class-average template there.</p>` },
+};
+const inspectEl = document.getElementById("inspect");
+let selected = null;
+function inspect(id, force) {
+  let I;
+  selected = id;
+  inspectEl.hidden = window.innerWidth <= 860 && (!id || id === "overview" || id === "cell:overview") && !force;
+  if (!id || id === "overview") I = INFO.overview;
+  else if (id.startsWith("cell:res")) I = INFO.cellRes(+id.slice(8));
+  else if (id.startsWith("cell:")) I = INFO[id];
+  else if (id.startsWith("hub:")) I = INFO.hub(id.slice(4));
+  else if (id.startsWith("parent:")) I = INFO.parent(id.slice(7));
+  else if (id === "v1") I = INFO["v1_" + v1Mode];
+  else if (id.startsWith("ch_")) I = INFO.retina;
+  else if (id.startsWith("user:")) { const u = userBlocks.find(b => b.id === id); I = { kind: "Your block · " + u.kind, title: u.name, body: `<p>Added on the shelf. Connections: ${userLinks.filter(l => l.a === id || l.b === id).length}.</p><p class="hint">Drag to move it. Use Connect to wire it to any block, then Copy as JSON to hand the design back to Claude.</p>` }; }
+  else I = INFO[id] || INFO.overview;
+  inspectEl.innerHTML = `${id && id !== "overview" && id !== "cell:overview" ? '<button class="close-x" id="closeInspect" aria-label="Back to overview">×</button>' : ""}<div class="kind">${I.kind}</div><h3>${I.title}</h3>${I.body}`;
+  const cx = document.getElementById("closeInspect"); if (cx) cx.onclick = () => inspect(tab === "cell" ? "cell:overview" : null);
+  if (id === "overview" && force) inspectEl.insertAdjacentHTML("afterbegin", '<button class="close-x" id="closeAbout" aria-label="Close">×</button>'), document.getElementById("closeAbout").onclick = () => inspect(null);
+  document.getElementById("delBtn").disabled = !(id && id.startsWith("user:"));
+}
+
+// ---------- camera: orbit / pan / zoom ----------
+let orbit = { theta: -.72, phi: 1.12, r: 82, target: new V3(-9, -.5, 0) };
+let fly = null;
+function updateCam() {
+  const o = orbit; o.phi = Math.max(.15, Math.min(Math.PI - .15, o.phi)); o.r = Math.max(6, Math.min(170, o.r));
+  camera.position.set(o.target.x + o.r * Math.sin(o.phi) * Math.sin(o.theta), o.target.y + o.r * Math.cos(o.phi), o.target.z + o.r * Math.sin(o.phi) * Math.cos(o.theta));
+  camera.lookAt(o.target);
+}
+const VIEWS = { all: { t: [-9, -.5, 0], r: 82, theta: -.72, phi: 1.12 }, front: { t: [-30, 0, 0], r: 30, theta: -1.0, phi: 1.2 }, cell: { t: [-9, 0, 0], r: 30, theta: -.9, phi: 1.15 },
+  struct: { t: [14, 1, 0], r: 32, theta: -1.15, phi: 1.2 }, agent: { t: [29, 1, 0], r: 30, theta: -.85, phi: 1.2 } };
+function flyTo(v) { fly = { from: { t: orbit.target.clone(), r: orbit.r, theta: orbit.theta, phi: orbit.phi }, to: { t: new V3(...v.t), r: v.r, theta: v.theta, phi: v.phi }, t0: performance.now(), dur: reduceMotion ? 1 : 1100 }; }
+document.querySelectorAll("[data-fly]").forEach(b => b.onclick = () => flyTo(VIEWS[b.dataset.fly]));
+
+const ptrs = new Map(); let downAt = null, dragBlock = null, lastPinch = 0;
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+function pick(ev) {
+  const r = canvas.getBoundingClientRect(); mouse.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  const vis = (tab === "cell" ? cellPick : pickables).filter(m => { let o = m; while (o) { if (!o.visible) return false; o = o.parent; } return true; });
+  const hit = ray.intersectObjects(vis, false)[0];
+  return hit ? hit.object.userData.id : null;
+}
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+canvas.addEventListener("pointerdown", e => {
+  canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY, b: e.button, shift: e.shiftKey });
+  downAt = { x: e.clientX, y: e.clientY, t: performance.now() }; fly = null;
+  const id = ptrs.size === 1 ? pick(e) : null;
+  if (tab === "arch" && id && id.startsWith("user:") && !connecting) { dragBlock = userBlocks.find(b => b.id === id); }
+  canvas.classList.add("dragging");
+});
+canvas.addEventListener("pointermove", e => {
+  const p = ptrs.get(e.pointerId); if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+  if (dragBlock) {
+    const r = canvas.getBoundingClientRect(); mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(mouse, camera); const plane = new THREE.Plane(new V3(0, 1, 0), -dragBlock.mesh.position.y); const hit = new V3();
+    if (ray.ray.intersectPlane(plane, hit)) { dragBlock.mesh.position.x = hit.x; dragBlock.mesh.position.z = hit.z; rebuildUserLinks(); }
+    return;
+  }
+  if (ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (lastPinch) orbit.r *= lastPinch / d; lastPinch = d; panBy(dx / 2, dy / 2); return;
+  }
+  if (p.b === 2 || p.shift) panBy(dx, dy);
+  else { orbit.theta -= dx * .005; orbit.phi -= dy * .005; }
+});
+function panBy(dx, dy) {
+  const s = orbit.r * .0016; const right = new V3().setFromMatrixColumn(camera.matrix, 0); const up = new V3().setFromMatrixColumn(camera.matrix, 1);
+  orbit.target.addScaledVector(right, -dx * s).addScaledVector(up, dy * s);
+}
+function endPtr(e) {
+  const wasClick = downAt && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) < 6 && ptrs.size === 1;
+  ptrs.delete(e.pointerId); if (ptrs.size < 2) lastPinch = 0;
+  if (dragBlock) { saveUser(); }
+  dragBlock = null; canvas.classList.remove("dragging");
+  if (wasClick) onClickPick(pick(e));
+}
+canvas.addEventListener("pointerup", endPtr); canvas.addEventListener("pointercancel", e => { ptrs.delete(e.pointerId); dragBlock = null; lastPinch = 0; });
+canvas.addEventListener("wheel", e => { e.preventDefault(); orbit.r *= Math.exp(e.deltaY * .0012); fly = null; }, { passive: false });
+
+// ---------- builder: your own blocks ----------
+const KIND_COL = { sensor: 0x6f9bd1, front: 0x6f9bd1, soma: 0x8fbf88, axon: 0xf2b544, structure: 0xe4ecf2, rule: 0xd99a6c };
+const LINK_COL = { excite: COL.excite, suppress: COL.suppress, gain: COL.gain };
+let userBlocks = [], userLinks = [], connecting = null;
+const userGroupLinks = new THREE.Group(); layers.user.add(userGroupLinks);
+function addUserBlock(name, kind, pos, id) {
+  id = id || "user:" + Date.now().toString(36) + Math.floor(Math.random() * 1e4);
+  const geo = kind === "structure" ? new THREE.IcosahedronGeometry(.9) : new THREE.BoxGeometry(2.2, 1.6, 2.2);
+  const col = KIND_COL[kind] || COL.user;
+  const mat = new THREE.MeshStandardMaterial({ color: col, emissive: COL.user, emissiveIntensity: .25, roughness: .45, transparent: true, opacity: .9 });
+  const mesh = new THREE.Mesh(geo, mat); mesh.position.copy(pos); mesh.userData.id = id;
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), new THREE.LineBasicMaterial({ color: COL.user })));
+  layers.user.add(mesh); pickables.push(mesh);
+  const label = addLabel(name, pos.clone().add(new V3(0, 1.4, 0)), "block", "user", mesh);
+  const u = { id, name, kind, mesh, label }; userBlocks.push(u); return u;
+}
+function posOf(id) {
+  if (id.startsWith("user:")) return userBlocks.find(b => b.id === id)?.mesh.position;
+  if (id.startsWith("hub:")) return hubs[id.slice(4)]?.mesh.position;
+  if (id.startsWith("parent:")) return parents[id.slice(7)]?.mesh.position;
+  return blocks[id]?.pos;
+}
+function rebuildUserLinks() {
+  while (userGroupLinks.children.length) { const c = userGroupLinks.children.pop(); c.geometry.dispose(); }
+  userLinks.forEach(l => {
+    const a = posOf(l.a), b = posOf(l.b); if (!a || !b) return;
+    const curve = new THREE.CatmullRomCurve3(arc(a, b, Math.min(6, a.distanceTo(b) * .18)));
+    const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 40, .08, 6, false), new THREE.MeshBasicMaterial({ color: LINK_COL[l.kind], transparent: true, opacity: .8 }));
+    userGroupLinks.add(m); l.curve = curve; l.mesh = m;
+    // label the link kind at its midpoint once per rebuild
+  });
+  userLinks.forEach(l => { if (l.curve && !l._pulsed) { pulse(l, LINK_COL[l.kind], 900); l._pulsed = true; } });
+}
+function saveUser() {
+  try { localStorage.setItem("resonance-playground-v1", JSON.stringify(exportGraph())); } catch (e) { }
+}
+function exportGraph() {
+  return { blocks: userBlocks.map(b => ({ id: b.id, name: b.name, kind: b.kind, pos: b.mesh.position.toArray().map(v => +v.toFixed(2)) })), links: userLinks.map(l => ({ from: l.a, to: l.b, kind: l.kind })) };
+}
+function loadUser() {
+  try { const d = JSON.parse(localStorage.getItem("resonance-playground-v1") || "null"); if (!d) return;
+    d.blocks.forEach(b => addUserBlock(b.name, b.kind, new V3(...b.pos), b.id)); userLinks = d.links.map(l => ({ a: l.from, b: l.to, kind: l.kind, _pulsed: true })); rebuildUserLinks();
+  } catch (e) { }
+}
+const hint = document.getElementById("buildHint");
+document.getElementById("addBlock").onclick = () => {
+  const name = document.getElementById("newName").value.trim() || "New block"; const kind = document.getElementById("newKind").value;
+  const n = userBlocks.length; const u = addUserBlock(name, kind, new V3(-30 + (n % 8) * 7, -10.5, 13 + Math.floor(n / 8) * 5));
+  document.getElementById("newName").value = ""; saveUser(); inspect(u.id); flyToObj(u.mesh.position);
+};
+function flyToObj(p) { flyTo({ t: [p.x, p.y + 2, p.z], r: 34, theta: orbit.theta, phi: 1.15 }); }
+const connectBtn = document.getElementById("connectBtn");
+connectBtn.onclick = () => {
+  if (connecting) { connecting = null; connectBtn.classList.remove("on"); hint.textContent = "Connect cancelled."; return; }
+  connecting = { a: null }; connectBtn.classList.add("on"); hint.textContent = "Click the block the connection starts from.";
+};
+function onClickPick(id) {
+  if (tab === "cell") { inspect(id || "cell:overview"); return; }
+  if (connecting) {
+    if (!id) return;
+    if (!connecting.a) { connecting.a = id; hint.textContent = "Now click the block it goes to."; return; }
+    if (id !== connecting.a) { userLinks.push({ a: connecting.a, b: id, kind: document.getElementById("linkKind").value }); rebuildUserLinks(); saveUser(); hint.textContent = "Connected. Press Connect again for another."; }
+    connecting = null; connectBtn.classList.remove("on"); return;
+  }
+  inspect(id || null);
+}
+document.getElementById("delBtn").onclick = () => {
+  if (!selected || !selected.startsWith("user:")) return;
+  const i = userBlocks.findIndex(b => b.id === selected); if (i < 0) return;
+  const u = userBlocks[i]; layers.user.remove(u.mesh); pickables.splice(pickables.indexOf(u.mesh), 1);
+  u.label.el.remove(); labels.splice(labels.indexOf(u.label), 1); userBlocks.splice(i, 1);
+  userLinks = userLinks.filter(l => l.a !== selected && l.b !== selected); rebuildUserLinks(); saveUser(); inspect(null);
+};
+document.getElementById("exportBtn").onclick = () => {
+  const txt = JSON.stringify(exportGraph(), null, 1); const box = document.getElementById("exportBox");
+  box.value = txt; box.hidden = false;
+  try { navigator.clipboard.writeText(txt).then(() => { hint.textContent = "Copied. Paste it into the thread and Claude can build it."; }, () => { box.select(); hint.textContent = "Select the text below and copy it."; }); }
+  catch (e) { box.select(); hint.textContent = "Select the text below and copy it."; }
+};
+document.getElementById("aboutBtn").onclick = () => inspect("overview", true);
+document.getElementById("mobileToggle").onclick = () => document.getElementById("drawer").classList.toggle("closed");
+if (window.innerWidth <= 860) document.getElementById("drawer").classList.add("closed");
+
+// ---------- One cell tab: a time-based soma and the resonance machine on its axon (soma_axon.py) ----------
+const cellScene = new THREE.Scene(); cellScene.fog = new THREE.Fog(COL.bench, 70, 150);
+cellScene.add(new THREE.HemisphereLight(0xcfe3ff, 0x0b1016, .8));
+{ const s2 = new THREE.DirectionalLight(0xffffff, .65); s2.position.set(-20, 40, 30); cellScene.add(s2); }
+{ const g2 = new THREE.GridHelper(90, 45, 0x1b2733, 0x141d27); g2.position.y = -7.5; cellScene.add(g2); }
+const cellPick = [];
+labelTab = "cell";
+const CP = { input: "edge", w: 2, gain: 1, alpha: .5, theta: 0, rho: .85, T: 32, speed: 1, playing: true, t: 0 };
+const RZ = [-7.5, -2.5, 2.5, 7.5], RX = -1.5, TX1 = 17;
+const RCOL = [0x8fd0ff, 0x5ec8d8, 0xf2b544, 0xef8f6c];
+const OMV = [0, Math.PI / 8, Math.PI / 4, Math.PI / 2];
+const tx = t => (TX1 * t) / Math.max(1, CP.T - 1);
+function cellMesh(geo, color, pos, id, opts = {}) {
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: opts.ei ?? .1, roughness: .45, transparent: !!opts.op, opacity: opts.op ?? 1 }));
+  m.position.copy(pos); if (id) { m.userData.id = id; cellPick.push(m); } cellScene.add(m); return m;
+}
+// dendrites carry the input current in
+const SOMA = new V3(-10, 0, 0);
+const dendrites = [];
+[[-17, 3.5, -3], [-18, -1, 2.5], [-16.5, -3.5, -1.5], [-17, 1.5, 4.5], [-16, 4, 2]].forEach(([x, y, z]) => {
+  const curve = new THREE.CatmullRomCurve3([new V3(x, y, z), new V3((x + SOMA.x) / 2, y * .6, z * .6), SOMA.clone().add(new V3(-1.2, 0, 0))]);
+  const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 24, .12, 6, false), new THREE.MeshStandardMaterial({ color: COL.front, emissive: COL.front, emissiveIntensity: .15 }));
+  m.userData.id = "cell:input"; cellPick.push(m); cellScene.add(m); dendrites.push({ curve });
+});
+const somaShell = cellMesh(new THREE.SphereGeometry(1.8, 32, 20), COL.soma, SOMA, "cell:soma", { op: .25, ei: .05 });
+const somaCore = cellMesh(new THREE.SphereGeometry(1.2, 24, 16), COL.soma, SOMA, "cell:soma", { ei: .2 });
+// axon: trunk, then four branches, one per resonator
+const AX0 = SOMA.clone().add(new V3(1.8, 0, 0)), AXS = new V3(-5.5, 0, 0);
+const trunk = new THREE.CatmullRomCurve3([AX0, AXS]);
+cellScene.add(Object.assign(new THREE.Mesh(new THREE.TubeGeometry(trunk, 8, .18, 8, false), new THREE.MeshStandardMaterial({ color: COL.axon, emissive: COL.axon, emissiveIntensity: .15 })), { userData: { id: "cell:axon" } }));
+cellPick.push(cellScene.children[cellScene.children.length - 1]);
+const branches = RZ.map((z, f) => {
+  const curve = new THREE.CatmullRomCurve3([AXS, new V3(-4, 0, z * .5), new V3(RX - .4, 0, z)]);
+  const m = new THREE.Mesh(new THREE.TubeGeometry(curve, 20, .1, 6, false), new THREE.MeshStandardMaterial({ color: RCOL[f], emissive: RCOL[f], emissiveIntensity: .15 }));
+  m.userData.id = "cell:axon"; cellPick.push(m); cellScene.add(m); return { curve };
+});
+// each resonator: a ring = the complex plane (Re up, Im sideways), a phasor = h_t, a spiral = h over time
+const res = RZ.map((z, f) => {
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(2.3, .05, 6, 64), new THREE.MeshBasicMaterial({ color: RCOL[f], transparent: true, opacity: .55 }));
+  ring.rotation.y = Math.PI / 2; ring.position.set(RX, 0, z); cellScene.add(ring);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(2.3, 48), new THREE.MeshBasicMaterial({ color: RCOL[f], transparent: true, opacity: .06, side: THREE.DoubleSide }));
+  disc.rotation.y = Math.PI / 2; disc.position.set(RX, 0, z); disc.userData.id = "cell:res" + f; cellPick.push(disc); cellScene.add(disc);
+  const arrow = new THREE.ArrowHelper(new V3(0, 1, 0), new V3(RX, 0, z), 1, RCOL[f], .45, .3); cellScene.add(arrow);
+  const axisLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(RX, 0, z), new V3(TX1 + .5, 0, z)]), new THREE.LineDashedMaterial({ color: 0x3a4a58, dashSize: .3, gapSize: .25 }));
+  axisLine.computeLineDistances(); cellScene.add(axisLine);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1.2), new THREE.MeshStandardMaterial({ color: RCOL[f], emissive: RCOL[f], emissiveIntensity: .35 }));
+  bar.position.set(TX1 + 2.5, 0, z); bar.userData.id = "cell:res" + f; cellPick.push(bar); cellScene.add(bar);
+  const lbl = addLabel("ω = " + ["0", "π/8", "π/4", "π/2"][f], new V3(RX, 2.9, z), "hub");
+  const eLbl = addLabel("", new V3(TX1 + 2.5, 0, z), "sub");
+  return { ring, arrow, bar, lbl, eLbl, spiral: null, z };
+});
+// time wall: input current and soma output over the same time axis
+const WZ = -12;
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(TX1 + 2, 12), new THREE.MeshBasicMaterial({ color: 0x101820, transparent: true, opacity: .55, side: THREE.DoubleSide }));
+wall.position.set(TX1 / 2, 0, WZ - .1); cellScene.add(wall);
+[3.2, -2.8].forEach(y => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(0, y, WZ), new V3(TX1, y, WZ)]), new THREE.LineBasicMaterial({ color: 0x2c3b48 })); cellScene.add(l); });
+addLabel("input current c(t)", new V3(-1.2, 4.6, WZ), "sub");
+addLabel("soma output y(t)", new V3(-1.2, -1.4, WZ), "sub");
+addLabel("time →", new V3(TX1 / 2, -6.6, WZ), "sub");
+let cTrace = null, yTrace = null;
+const playhead = new THREE.Mesh(new THREE.PlaneGeometry(22, 13), new THREE.MeshBasicMaterial({ color: COL.phase, transparent: true, opacity: .025, side: THREE.DoubleSide, depthWrite: false }));
+playhead.rotation.y = Math.PI / 2; cellScene.add(playhead);
+const playLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V3(0, -6, WZ), new V3(0, 6.5, WZ)]), new THREE.LineBasicMaterial({ color: COL.phase }));
+cellScene.add(playLine);
+const signalBalls = [0, 1, 2, 3].map(f => { const m = new THREE.Mesh(new THREE.SphereGeometry(.22, 10, 8), new THREE.MeshBasicMaterial({ color: RCOL[f] })); cellScene.add(m); return m; });
+const inBalls = dendrites.map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(.2, 10, 8), new THREE.MeshBasicMaterial({ color: COL.front })); cellScene.add(m); return m; });
+addLabel("dendrites: input current", new V3(-17, 5.4, 0), "block");
+addLabel("soma: leaky integrator", new V3(SOMA.x, 2.6, 0), "block");
+addLabel("axon", new V3(-6.6, 1, 0), "block");
+addLabel("energy Σ|h|²", new V3(TX1 + 2.5, 7.8, 0), "block");
+const gainLbl = addLabel("", new V3(SOMA.x, -2.5, 0), "sub hot");
+labelTab = "arch";
+
+// simulation: exactly the update rules in soma_axon.py (leaky, axon)
+let SIM = null;
+function inputSignal() {
+  const T = CP.T, r = rng(11), c = [];
+  for (let t = 0; t < T; t++) {
+    let v = 0;
+    if (CP.input === "edge") v = Math.max(0, Math.sin(4 * Math.PI * t / T + .7));
+    else if (CP.input === "sine") v = .5 + .5 * Math.cos(CP.w * Math.PI / 16 * t);
+    else if (CP.input === "step") v = t >= T / 4 ? 1 : 0;
+    else if (CP.input === "click") v = t === 3 ? 1 : 0;
+    else if (CP.input === "noise") v = r();
+    c.push(v);
+  }
+  return c;
+}
+function simulate() {
+  const T = CP.T, c = inputSignal(), y = [], vv = []; let v = 0;
+  for (let t = 0; t < T; t++) { v = CP.alpha * v + (1 - CP.alpha) * CP.gain * c[t]; vv.push(v); y.push(Math.max(0, v - CP.theta)); }
+  const H = [], E = [], feat = [];
+  OMV.forEach(w => {
+    const lr = CP.rho * Math.cos(w), li = CP.rho * Math.sin(w); let hr = 0, hi = 0, e = 0; const h = [], ec = [];
+    for (let t = 0; t < T; t++) { const nr = lr * hr - li * hi + y[t], ni = lr * hi + li * hr; hr = nr; hi = ni; e += hr * hr + hi * hi; h.push([hr, hi]); ec.push(e); }
+    H.push(h); E.push(ec); feat.push(Math.log(e / T + 1e-4));
+  });
+  const mean = y.reduce((a, b) => a + b, 0) / T;
+  SIM = { c, y, v: vv, H, E, feat, meanRate: Math.log(mean + 1e-4) };
+  buildCellGeometry();
+}
+const sat = r => 3 * Math.tanh(r / 3);
+let HS = .33; // display scale for |h|: the largest |h| in the run fills the ring
+function buildCellGeometry() {
+  const T = CP.T;
+  let hmax = 0; SIM.H.forEach(h => h.forEach(([a, b]) => { hmax = Math.max(hmax, Math.hypot(a, b)); }));
+  HS = hmax > 1e-6 ? 2.0 / hmax : 1;
+  res.forEach((R, f) => {
+    if (R.spiral) { cellScene.remove(R.spiral); R.spiral.geometry.dispose(); }
+    const pts = SIM.H[f].map(([hr, hi], t) => { const m = Math.hypot(hr, hi), s = m > 0 ? sat(m * HS) / m : 0; return new V3(tx(t), hr * s, R.z + hi * s); });
+    if (pts.length < 2) return;
+    const curve = new THREE.CatmullRomCurve3(pts, false, "catmullrom", .2);
+    const segs = (T - 1) * 4;
+    R.spiral = new THREE.Mesh(new THREE.TubeGeometry(curve, segs, .09, 6, false), new THREE.MeshStandardMaterial({ color: RCOL[f], emissive: RCOL[f], emissiveIntensity: .45 }));
+    R.spiral.userData.id = "cell:res" + f; R.segs = segs; cellScene.add(R.spiral);
+  });
+  cellPick.splice(0, cellPick.length, ...cellPick.filter(m => !String(m.userData.id).startsWith("cell:res") || m.geometry.type !== "TubeGeometry"), ...res.map(R => R.spiral).filter(Boolean));
+  const ymax = Math.max(1e-6, ...SIM.c), yo = Math.max(1e-6, ...SIM.y, CP.gain);
+  const mk = (arr, y0, scale, col) => { const pts = arr.map((v, t) => new V3(tx(t), y0 + 2.6 * v / scale, WZ)); return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "catmullrom", .1), (T - 1) * 3, .07, 5, false), new THREE.MeshBasicMaterial({ color: col })); };
+  [cTrace, yTrace].forEach(m => { if (m) { cellScene.remove(m); m.geometry.dispose(); } });
+  cTrace = mk(SIM.c, 3.2, ymax, COL.front); yTrace = mk(SIM.y, -2.8, yo, COL.soma); cellScene.add(cTrace, yTrace);
+  cellReadout();
+}
+const OMN = ["0", "π/8", "π/4", "π/2"];
+function cellReadout() {
+  const el = document.getElementById("cellBars"); if (!el) return;
+  const f = SIM.feat, lo = -9.3, hi = Math.max(1, ...f) + .5, best = f.indexOf(Math.max(...f));
+  el.innerHTML = f.map((v, i) => `<div class="bar"><span>ω=${OMN[i]}</span><div class="track"><div class="fill${i === best ? " win" : ""}" style="width:${(100 * (v - lo) / (hi - lo)).toFixed(0)}%"></div></div><span class="v">${v.toFixed(2)}</span></div>`).join("")
+    + `<div class="bar"><span>rate</span><div class="track"><div class="fill" style="background:var(--ink-2);width:${(100 * (SIM.meanRate - lo) / (hi - lo)).toFixed(0)}%"></div></div><span class="v">${SIM.meanRate.toFixed(2)}</span></div>`;
+  const txt = {
+    edge: "An edge in the receptive field passes under the drifting eye twice per loop, so the input repeats every 16 of the 32 steps. That is ω = 2π/16 = π/8, so among the rotating resonators the π/8 spiral grows widest.",
+    sine: `A pure rhythm at ω = ${document.getElementById("cWv")?.textContent || CP.w + "π/16"}. The resonator closest to it winds up into a wide spiral; the ω = 0 one also picks up the sine's constant offset.`,
+    step: "The cell switches on and stays on. Only ω = 0 keeps growing: a constant has no rhythm, so the rotating resonators keep turning their phasor away from it.",
+    click: "One brief kick. Every resonator rings and decays at rate ρ; the spirals show each one's own frequency. This is the impulse response, the Gabor-like shape the resonators have in time.",
+    noise: "Random input has energy at all frequencies, so all four resonators grow a little and none stands out.",
+  }[CP.input];
+  const rot = f.slice(1), bestRot = 1 + rot.indexOf(Math.max(...rot));
+  if (tab === "cell") caption("One cell · " + (CP.input === "sine" ? "rhythm" : CP.input), txt + ` Strongest rhythm here: ω = ${OMN[bestRot]}. (ω = 0 reads the mean level, which a rectified cell always has.)`);
+}
+function setCellT(t) { CP.t = Math.max(0, Math.min(CP.T - 1, t)); const s = document.getElementById("cTime"); if (s) s.value = CP.t; }
+function cellFrame(dt) {
+  if (!SIM) return;
+  const T = CP.T;
+  if (CP.playing) { CP.t += dt * 8 * CP.speed; if (CP.t > T - 1 + 6) CP.t = 0; const s = document.getElementById("cTime"); if (s) s.value = Math.min(T - 1, CP.t); }
+  const t = Math.min(T - 1, CP.t), ti = Math.floor(t), fr = t - ti, tj = Math.min(T - 1, ti + 1);
+  const at = (arr, i, j) => arr[i] + (arr[j] - arr[i]) * fr;
+  const x = tx(t); playhead.position.set(x, 0, -.8); playLine.position.x = x;
+  const yt = at(SIM.y, ti, tj), ct = at(SIM.c, ti, tj), yo = Math.max(1e-6, ...SIM.y, CP.gain);
+  somaCore.material.emissiveIntensity = .15 + 1.4 * yt / yo; somaCore.scale.setScalar(.75 + .45 * at(SIM.v, ti, tj) / yo);
+  somaShell.scale.setScalar(1 + .15 * (CP.gain - 1));
+  gainLbl.el.textContent = "gain g = " + CP.gain.toFixed(2);
+  dendrites.forEach((d, i) => { const p = ((t / 2 + i * .21) % 1); d.curve.getPoint(p, inBalls[i].position); inBalls[i].scale.setScalar(.3 + 1.6 * ct); });
+  res.forEach((R, f) => {
+    const [hr, hi] = SIM.H[f][ti], [hr2, hi2] = SIM.H[f][tj]; const ar = hr + (hr2 - hr) * fr, ai = hi + (hi2 - hi) * fr;
+    const m = Math.hypot(ar, ai), len = sat(m * HS);
+    if (m > 1e-6) { R.arrow.setDirection(new V3(0, ar / m, ai / m)); R.arrow.setLength(Math.max(.05, len), Math.min(.45, len * .4 + .05), Math.min(.3, len * .3 + .04)); R.arrow.visible = true; } else R.arrow.visible = false;
+    R.arrow.position.set(x, 0, R.z);
+    R.ring.position.x = x;
+    if (R.spiral) R.spiral.geometry.setDrawRange(0, Math.round(R.segs * (t / (T - 1))) * 6 * 6);
+    const e = at(SIM.E[f], ti, tj) / T, h = .1 + 7 * Math.tanh(e / 12);
+    R.bar.scale.y = h; R.bar.position.y = -7.5 + h / 2;
+    R.eLbl.pos.set(TX1 + 2.5, -7.5 + h + .9, R.z); R.eLbl.el.textContent = "log E = " + Math.log(e + 1e-4).toFixed(2);
+    R.lbl.pos.set(x, 2.9, R.z);
+    signalBalls[f].visible = yt > .01; branches[f].curve.getPoint((t * .9) % 1, signalBalls[f].position); signalBalls[f].scale.setScalar(.4 + 1.6 * yt / yo);
+  });
+}
+
+// ---------- frame loop ----------
+const tmpCol = new THREE.Color(), somaBase = new THREE.Color(COL.soma), axBase = new THREE.Color(COL.axon), hot = new THREE.Color(COL.phase);
+let last = performance.now();
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (canvas.width !== Math.floor(w * renderer.getPixelRatio()) || canvas.height !== Math.floor(h * renderer.getPixelRatio())) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+}
+const proj = new V3();
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; const k = 1 - Math.exp(-dt * 5);
+  resize();
+  if (fly) {
+    const t = Math.min(1, (now - fly.t0) / fly.dur), e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    orbit.target.lerpVectors(fly.from.t, fly.to.t, e); orbit.r = lerp(fly.from.r, fly.to.r, e); orbit.theta = lerp(fly.from.theta, fly.to.theta, e); orbit.phi = lerp(fly.from.phi, fly.to.phi, e);
+    if (t >= 1) fly = null;
+  }
+  updateCam();
+  if (tab === "cell") { cellFrame(dt); renderer.render(cellScene, camera); } else {
+  // glimpse drift
+  const s = (now / 4000) % 1; glimpse.position.y = 1.75 * Math.sin(4 * Math.PI * s + .7); glimpse.position.z = 1.75 * Math.sin(2 * Math.PI * s);
+  // blocks glow
+  for (const b of Object.values(blocks)) { b.glow = lerp(b.glow, b.target, k); if (b.mat) b.mat.emissiveIntensity = .05 + b.glow * .9; }
+  // retina channels
+  CH.forEach((c, i) => { chAct[i] = lerp(chAct[i], chTgt[i], k); const b = blocks["ch_" + c.id]; b.mat.emissiveIntensity = .05 + chAct[i] * 1.2; b.mesh.scale.setScalar(1 + chAct[i] * .25); });
+  // V1 tiles
+  for (const { m, ch } of v1Tiles[v1Mode]) m.material.opacity = .3 + .7 * Math.max(chAct[ch] * (blocks.v1.glow), .0) + .25;
+  // somas + rings
+  let dirty = false;
+  for (let i = 0; i < K; i++) {
+    const a = somaAct[i] = lerp(somaAct[i], somaTgt[i], k);
+    tmpCol.copy(somaBase).multiplyScalar(.25 + .5 * a).lerp(hot, a * .55); somaMesh.setColorAt(i, tmpCol);
+    for (let f = 0; f < 4; f++) { const r = ringAct[f][i] = lerp(ringAct[f][i], ringTgt[f][i], k); tmpCol.copy(axBase).multiplyScalar(.18 + 1.1 * r); rings[f].setColorAt(i, tmpCol); }
+  }
+  somaMesh.instanceColor.needsUpdate = true; rings.forEach(r => r.instanceColor.needsUpdate = true);
+  axonLines.material.opacity = .1 + .25 * blocks.axon.glow;
+  // hubs
+  for (const h of Object.values(hubs)) {
+    h.glow = lerp(h.glow, h.target, k); h.scale = lerp(h.scale, h.alive ? 1 + h.glow * .45 : .001, k);
+    h.mesh.scale.setScalar(Math.max(.001, h.scale)); h.mat.emissiveIntensity = .12 + h.glow * 1.1;
+    h.mesh.rotation.y += dt * (.2 + h.glow); h.wire.material.opacity = h.alive ? .07 + h.glow * .6 : 0;
+    h.label.el.classList.toggle("hot", h.glow > RHO * .95);
+    if (h.axiom) { h.axiom.position.copy(h.pos); h.axiom.scale.setScalar(Math.max(.001, h.scale)); }
+  }
+  for (const p of Object.values(parents)) { p.glow = lerp(p.glow, p.target, k); p.mat.emissiveIntensity = .08 + p.glow; p.mesh.rotation.y += dt * .3; }
+  if (hypothesis) hypothesis.mesh.rotation.y += dt * 1.5;
+  bridges.forEach(b => b.line.material.dashOffset = -(now / 600));
+  // pulses
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    const p = pulses[i]; const t = (now - p.t0) / p.dur;
+    if (t < 0) continue; if (t > 1) { scene.remove(p.m); p.m.material.dispose(); pulses.splice(i, 1); continue; }
+    let vis = true; let o = p.layer; while (o) { if (!o.visible) vis = false; o = o.parent; }
+    p.m.visible = vis; p.curve.getPoint(t, p.m.position);
+  }
+  renderer.render(scene, camera);
+  }
+  // HTML labels
+  const w = canvas.clientWidth, hgt = canvas.clientHeight;
+  for (const L of labels) {
+    if (L.tab !== tab) { L.el.style.display = "none"; continue; }
+    if (L.el.hidden) continue;
+    const layerVis = !L.layer || layers[L.layer].visible;
+    const pos = L.obj && L.obj.parent && L.layer === "user" ? L.obj.position.clone().add(new V3(0, 1.4, 0)) : L.pos;
+    proj.copy(pos).project(camera);
+    const dist = camera.position.distanceTo(pos);
+    if (!layerVis || proj.z > 1 || dist > 150) { L.el.style.display = "none"; continue; }
+    L.el.style.display = "";
+    const x = (proj.x * .5 + .5) * w, y = (-proj.y * .5 + .5) * hgt;
+    const sc = Math.max(.7, Math.min(1.25, 55 / dist));
+    L.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%) scale(${sc})`;
+    L.el.style.opacity = Math.max(.25, Math.min(1, 95 / dist));
+  }
+  requestAnimationFrame(frame);
+}
+if (window.innerWidth <= 860) { orbit.r = 125; VIEWS.all.r = 125; }
+const archOrbit = orbit, cellOrbit = { theta: -.62, phi: 1.12, r: window.innerWidth <= 860 ? 78 : 50, target: new V3(5, -.5, -1.5) };
+function setTab(t) {
+  tab = t; fly = null; orbit = t === "cell" ? cellOrbit : archOrbit;
+  document.getElementById("archCtl").hidden = t !== "arch"; document.getElementById("cellCtl").hidden = t !== "cell";
+  document.getElementById("meter").hidden = t !== "arch"; document.getElementById("cellMeter").hidden = t !== "cell";
+  document.getElementById("tab-arch").classList.toggle("on", t === "arch"); document.getElementById("tab-cell").classList.toggle("on", t === "cell");
+  document.getElementById("tab-arch").setAttribute("aria-selected", t === "arch"); document.getElementById("tab-cell").setAttribute("aria-selected", t === "cell");
+  if (t === "cell") { cellReadout(); inspect("cell:overview"); }
+  else { caption("Architecture", "Drag to orbit, scroll or pinch to zoom, right-drag or shift-drag to pan. Click any block to read about it, then show the model something."); inspect(null); }
+  try { history.replaceState(null, "", t === "cell" ? "#cell" : "#architecture"); } catch (e) { }
+}
+document.getElementById("tab-arch").onclick = () => setTab("arch");
+document.getElementById("tab-cell").onclick = () => setTab("cell");
+function bindSlider(id, key, fmt, after) {
+  const el = document.getElementById(id), out = document.getElementById(id + "v");
+  const show = () => { out.textContent = fmt(+el.value); };
+  el.oninput = () => { CP[key] = +el.value; show(); (after || simulate)(); }; show();
+}
+bindSlider("cGain", "gain", v => v.toFixed(2));
+bindSlider("cAlpha", "alpha", v => v.toFixed(2));
+bindSlider("cTheta", "theta", v => v.toFixed(2));
+bindSlider("cRho", "rho", v => v.toFixed(2));
+bindSlider("cW", "w", v => { if (v === 0) return "0"; const g = (a, b) => b ? g(b, a % b) : a, d = g(v, 16), n = v / d, m = 16 / d; return (n === 1 ? "" : n) + "π" + (m === 1 ? "" : "/" + m); });
+bindSlider("cSpeed", "speed", v => v + "×", () => { });
+const cTime = document.getElementById("cTime");
+cTime.oninput = () => { CP.playing = false; document.getElementById("cPlay").textContent = "Play"; CP.t = +cTime.value; };
+setInterval(() => { document.getElementById("cTimev").textContent = Math.min(CP.T - 1, Math.floor(CP.t)) + " / " + (CP.T - 1); }, 120);
+document.getElementById("cPlay").onclick = () => { CP.playing = !CP.playing; document.getElementById("cPlay").textContent = CP.playing ? "Pause" : "Play"; if (CP.playing && CP.t >= CP.T - 1) CP.t = 0; };
+document.getElementById("cRestart").onclick = () => { CP.t = 0; CP.playing = true; document.getElementById("cPlay").textContent = "Pause"; };
+document.getElementById("cInput").onchange = e => { CP.input = e.target.value; document.getElementById("cWrow").hidden = CP.input !== "sine"; CP.t = 0; simulate(); };
+["32", "64"].forEach(n => document.getElementById("cT" + n).onclick = () => {
+  CP.T = +n; cTime.max = CP.T - 1; CP.t = 0;
+  document.getElementById("cT32").classList.toggle("on", n === "32"); document.getElementById("cT64").classList.toggle("on", n === "64"); simulate();
+});
+simulate();
+
+inspect(null); loadUser(); requestAnimationFrame(frame);
+window.__pg = { play, resetAll, setV1, flyTo, VIEWS, setTab, CP, simulate };
+if (location.hash === "#cell") setTab("cell");
+})();
+</script>
+</body>
+</html>
