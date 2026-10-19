@@ -40,6 +40,9 @@ STATIC = [
     ("exp6", EXPERIMENTS / "exp6_alphabet", "Exp6 · alphabet and words",
      "The same resonance machinery learns letters, numbers and words from images, then words name colour patches with no "
      "stored labels. Includes a 3D view: watch the eye read a word, or a patch evoke its word."),
+    ("exp6_live", EXPERIMENTS / "exp6_live", "Exp6 live · the model in your browser",
+     "The trained exp6 model runs in the page: type a word in any font, draw a character or pick a colour, and see which "
+     "letter, word and naming structures resonate, with a 3D view driven by the computed values."),
 ]
 HUB_LINK = ('<a href="{root}exp2/index.html" style="color:var(--muted)">Experiment 2</a> '
             '<a href="{root}index.html" style="color:var(--muted)" data-hub>Paper portfolio</a>')
@@ -225,7 +228,7 @@ Bank of Canada rate. No costs or interest.{fx}</p>
 <div class="cards">{sleeve_card(t, "exp1", "Exp1 · pairs", "exp1/index.html", "Long the stock Exp1 favours in each pair, short the other.", exp1_positions(t))}
 {sleeve_card(t, "exp2", "Exp2 · volatility-timed", "exp2/index.html", "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", e(t.get("exp2_position") or ""))}</div>"""
     shown = [x for x in STATIC if (site / x[0] / "index.html").exists()]
-    exp4_nav = "".join(f'\n<a href="{d}/index.html">Experiment {d[3:]}</a>' for d, *_ in shown)
+    exp4_nav = "".join(f'\n<a href="{d}/index.html">Experiment {d[3:].replace("_", " ")}</a>' for d, *_ in shown)
     exp4_card = ('<h2 style="font-size:18px;margin:28px 0 10px">Other experiments</h2><div class="cards">'
                  + "".join(f'<div class="card"><div class="tag">{e(title)}</div><p>{e(text)}</p>'
                            f'<a class="go" href="{d}/index.html">Open →</a></div>' for d, _, title, text in shown)
