@@ -88,6 +88,7 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
 .chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
 .chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .chip .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.gl-fail { padding: 16px 18px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); line-height: 1.5; }
 #scene3d { width: 100%; height: min(70vh, 560px); display: block; border: 1px solid var(--rule); background: var(--paper); touch-action: none; cursor: grab; }
 .tabs a.site { font-family: var(--display); font-weight: 700; margin-right: auto; padding-right: 12px; color: var(--ink); text-decoration: none; }
 .tabs a.pg { font: 500 0.92rem var(--display); color: var(--muted); border: 1px solid transparent; padding: 7px 12px; border-radius: 4px; text-decoration: none; }
@@ -205,7 +206,25 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
   const readTokens = () => { T = { bg: css("--paper"), ink: css("--ink"), muted: css("--muted"), rule: css("--rule"), accent: css("--accent"), warm: css("--warm") }; };
   readTokens();
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  function glGuard(canvas, opts) {
+    // Chrome turns WebGL off for a site after its pages lose the GPU context a few times; say so instead of a blank page.
+    const fail = msg => {
+      if (canvas.nextElementSibling && canvas.nextElementSibling.classList.contains("gl-fail")) return;
+      const d = document.createElement("div"); d.className = "gl-fail"; d.setAttribute("role", "status"); d.innerHTML = msg;
+      canvas.style.visibility = "hidden"; canvas.insertAdjacentElement("afterend", d);
+    };
+    const BLOCKED = "<b>The 3D view could not start.</b> Your browser has turned off WebGL for this site, usually after a page lost its graphics context. Quit the browser completely (every window) and open this page again. If it still fails, check that hardware acceleration is on in the browser settings.";
+    let r;
+    try { r = new THREE.WebGLRenderer(Object.assign({ canvas }, opts)); } catch (e) { fail(BLOCKED); return null; }
+    const state = { renderer: r, lost: false };
+    canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); state.lost = true; fail("<b>The 3D view lost its graphics context.</b> It will come back on its own if the browser restores it; otherwise reload the page."); });
+    canvas.addEventListener("webglcontextrestored", () => location.reload());
+    window.addEventListener("pagehide", e => { if (e.persisted) return; r.dispose(); r.forceContextLoss(); });
+    return state;
+  }
+  const gl = glGuard(canvas, { antialias: true, alpha: false });
+  if (!gl) return;
+  const renderer = gl.renderer;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
@@ -457,6 +476,7 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
   // ---------- loop
   let last = performance.now();
   function frame(now) {
+    if (gl.lost) return;
     const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
     while (queue.length && queue[0].at <= clock) queue.shift().run();
     if (!drag && !reduce) theta += dt * 0.04;
