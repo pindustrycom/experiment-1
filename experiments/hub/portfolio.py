@@ -8,11 +8,13 @@ Three pots, each starting with a fake 1000 CAD on START:
       the same amount, so the day's return of a slice is r_long - r_short.
   Exp2 portfolio: follows Experiment 2's combined portfolio; each session earns its scored return (real_ret).
   Combined (the main dashboard): 500 CAD in each of the two.
+  Exp7 portfolio (its own pot, not in the combined one): the VWAP + 9 EMA day-trading rule on SPY; each session earns the
+      day's result of the rule's trades after 0.3 bp per side (exp7/data/daily.csv, built by experiments/exp7_vwap).
 The pots are invested in US markets, so each day's value is converted to CAD at the Bank of Canada USD/CAD rate.
 No costs, borrow fees or interest are included.
 
 Inputs are files the site already has: exp1/data/pairs.json and pair_prices.json (built by backend/app/static_site.py)
-and exp2/data/predictions.csv (built by exp2/live_site.py). Experiment 1's books need a history, so they are kept in
+exp2/data/predictions.csv (built by exp2/live_site.py) and exp7/data/daily.csv (built by exp7/live.py). Experiment 1's books need a history, so they are kept in
 a small state file (portfolio.json) that only the full nightly run updates; Experiment 2 and the FX rates are re-read
 every time. Standard library only.
 """
@@ -146,6 +148,29 @@ def exp2_position(site: Path) -> str:
     return f"{r['date']}: " + ", ".join(bits)
 
 
+# ---------------------------------------------------------------- Experiment 7
+
+def exp7_returns(site: Path) -> list[tuple[str, float]]:
+    """Sessions from START on, as (date, return as a fraction, after costs)."""
+    try:
+        with (site / "exp7" / "data" / "daily.csv").open() as fh:
+            rows = list(csv.DictReader(fh))
+    except OSError:
+        return []
+    out = []
+    for r in rows:
+        try:
+            if r["date"] >= START:
+                out.append((r["date"], float(r["ret"])))
+        except (KeyError, ValueError):
+            continue
+    return sorted(out)
+
+
+def exp7_position(site: Path) -> str:
+    return (_json(site / "exp7" / "data" / "summary.json", {}) or {}).get("position", "")
+
+
 # ---------------------------------------------------------------- FX and the daily table
 
 def fetch_fx(start: str) -> dict[str, float]:
@@ -168,25 +193,29 @@ def table(state: dict, site: Path) -> dict:
     for d, r in exp2_returns(site):
         idx2 *= 1 + r
         e2[d] = idx2
-    dates = sorted({d for d, _ in e1} | set(e2))
+    e7, idx7 = {}, 1.0
+    for d, r in exp7_returns(site):
+        idx7 *= 1 + r
+        e7[d] = idx7
+    dates = sorted({d for d, _ in e1} | set(e2) | set(e7))
     base_day = (date.fromisoformat(START) - timedelta(days=1)).isoformat()
     fx0 = _asof(fx, base_day) or (fx[min(fx)] if fx else None)
     e1d = dict(e1)
     pre = [r["index"] for r in state.get("exp1", []) if r["date"] < START]
     i1 = pre[-1] if pre else 1.0
     base1 = i1
-    rows = [{"date": base_day, "exp1": CAPITAL, "exp2": CAPITAL, "combined": CAPITAL, "fx": fx0}]
-    i2 = 1.0
+    rows = [{"date": base_day, "exp1": CAPITAL, "exp2": CAPITAL, "combined": CAPITAL, "exp7": CAPITAL, "fx": fx0}]
+    i2 = i7 = 1.0
     for d in dates:
-        i1, i2 = e1d.get(d, i1), e2.get(d, i2)
+        i1, i2, i7 = e1d.get(d, i1), e2.get(d, i2), e7.get(d, i7)
         f = _asof(fx, d) or fx0
         k = f / fx0 if f and fx0 else 1.0
         v1, v2 = CAPITAL * i1 / base1 * k, CAPITAL * i2 * k
-        rows.append({"date": d, "exp1": v1, "exp2": v2, "combined": (v1 + v2) / 2, "fx": f})
+        rows.append({"date": d, "exp1": v1, "exp2": v2, "combined": (v1 + v2) / 2, "exp7": CAPITAL * i7 * k, "fx": f})
     last = state["exp1"][-1] if state.get("exp1") else None
     return {"start": START, "rows": rows, "fx_known": fx0 is not None,
             "exp1_book": last["book"] if last else [], "exp1_book_date": last["date"] if last else None,
-            "exp2_position": exp2_position(site)}
+            "exp2_position": exp2_position(site), "exp7": bool(e7) or (site / "exp7" / "index.html").exists(), "exp7_position": exp7_position(site)}
 
 
 def run(site: Path, state_file: Path, update: bool) -> dict:

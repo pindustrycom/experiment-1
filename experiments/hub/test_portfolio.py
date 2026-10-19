@@ -112,3 +112,27 @@ def test_glass_theme_on_every_page_once(tmp_path):
     for f in ("index.html", "exp1/index.html", "exp2/index.html"):
         assert "backdrop-filter" in (site / f).read_text()
     assert (site / "exp1" / "index.html").read_text().count("<!--glass-->") == 1
+
+
+def test_exp7_pot_is_separate_from_the_combined_one(tmp_path, fx):
+    site, state = tmp_path / "site", tmp_path / "p.json"
+    make_site(site, [("2026-10-16", 100, 100), ("2026-10-19", 100, 100)], direction="neutral", z=None)
+    d = site / "exp7" / "data"
+    d.mkdir(parents=True)
+    (site / "exp7" / "index.html").write_text("<html><head></head><body><main class=\"wrap\">exp7</main></body></html>")
+    (d / "daily.csv").write_text("date,ret,trades\n2026-10-16,0.5,3\n2026-10-19,0.02,3\n")   # the day before START is ignored
+    (d / "summary.json").write_text(json.dumps({"position": "2026-10-19: 3 trades, day +2.00%; flat overnight"}))
+    build_hub.build(site, state, update=True)
+    last = json.loads((site / "data" / "portfolio.json").read_text())["rows"][-1]
+    assert last["exp7"] == pytest.approx(1020.0) and last["combined"] == pytest.approx(1000.0)
+    hub = (site / "index.html").read_text()
+    assert "Exp7 · VWAP + 9 EMA" in hub and 'href="exp7/index.html">Experiment 7' in hub
+    page = (site / "exp7" / "index.html").read_text()
+    assert "Exp7 paper portfolio" in page and "3 trades" in page and "backdrop-filter" in page
+
+
+def test_no_exp7_card_without_exp7(tmp_path):
+    site = tmp_path / "site"
+    make_site(site, [("2026-10-16", 100, 100), ("2026-10-19", 100, 100)])
+    build_hub.build(site, tmp_path / "p.json", update=True)
+    assert "Exp7" not in (site / "index.html").read_text()

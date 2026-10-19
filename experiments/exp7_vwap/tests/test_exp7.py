@@ -43,3 +43,28 @@ def test_costs_lower_returns():
     days = pd.Index(sorted(d.day.unique()))
     assert strategy.daily(tr, days, 1.0).sum() < strategy.daily(tr, days, 0.0).sum()
     assert backtest.stats(strategy.daily(tr, days, 0.0), tr)["trades"] == len(tr)
+
+
+def test_live_replay_starts_at_start_and_charges_costs(tmp_path):
+    from exp7 import live
+    p = list(np.linspace(100, 99, 60)) + list(np.linspace(99, 103, 330))
+    d1 = pd.concat([_day(p, "2026-10-16"), _day(p, "2026-10-19")])
+    daily, tr = live.replay(d1, "2026-10-19")
+    assert list(daily.date) == ["2026-10-19"] and set(tr.day) == {"2026-10-19"}
+    gross = strategy.trades(strategy.indicators(strategy.resample(d1, 3)).query("day == '2026-10-19'"), "flip").ret.sum()
+    assert abs(daily.ret.iloc[0] - (gross - len(tr) * 2 * 0.3 / 1e4)) < 1e-12
+
+
+def test_live_run_writes_site(tmp_path):
+    from exp7 import live
+    p = list(np.linspace(100, 99, 60)) + list(np.linspace(99, 103, 330))
+    data = tmp_path / "data" / "SPY"
+    data.mkdir(parents=True)
+    d = _day(p, "2026-10-19").reset_index(names="date")
+    d["date"] = d["date"].dt.tz_convert("UTC").dt.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    d.to_csv(data / "2026-10.csv", index=False)
+    r = live.run(tmp_path / "data", tmp_path / "site")
+    assert r["sessions"] == 1
+    html = (tmp_path / "site" / "index.html").read_text()
+    assert '<main class="wrap">' in html and "</head>" in html
+    assert (tmp_path / "site" / "data" / "daily.csv").read_text().startswith("date,ret,trades")
