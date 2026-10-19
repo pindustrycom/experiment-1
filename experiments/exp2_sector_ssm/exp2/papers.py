@@ -31,6 +31,8 @@ import numpy as np
 import pandas as pd
 import requests
 
+from . import openbb_src
+
 log = logging.getLogger("exp2.papers")
 TRAIN_END = "2018-12-31"
 START = "1998-01-01"
@@ -146,8 +148,28 @@ def update(data: Path, tickers: list[str], pause: float = 0.3, max_age_days: flo
                 out["failed"].append(t)
         except Exception:  # noqa: BLE001 - delisted names are expected to fail
             out["failed"].append(t)
+        if out["failed"][-1:] == [t] and openbb_src.supported(t):
+            _openbb_fallback(t, f, out)
         time.sleep(pause)
     return out
+
+
+def _openbb_fallback(t: str, f: Path, out: dict) -> None:
+    """Yahoo failed for an index only it carries: fetch it through OpenBB instead, unless that series disagrees with
+    the stored one (then the stored file is kept and the ticker stays failed)."""
+    try:
+        df = openbb_src.fetch(t, START)
+        old = pd.read_csv(f, dtype={"date": str}) if f.exists() else None
+        if len(df) <= 60 or not openbb_src.agrees(t, old, df):
+            out.setdefault("openbb_refused", []).append(t)
+            return
+        df.to_csv(f, index=False)
+        out["failed"].remove(t)
+        out["fetched"] += 1
+        out.setdefault("openbb", []).append(t)
+    except Exception as e:  # noqa: BLE001 - the fallback must never stop a run
+        out.setdefault("openbb_refused", []).append(t)
+        log.warning("OpenBB fallback for %s failed: %s", t, e)
 
 
 def load(data: Path, tickers: list[str]) -> dict[str, pd.DataFrame]:
