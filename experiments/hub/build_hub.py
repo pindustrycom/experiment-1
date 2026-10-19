@@ -6,8 +6,8 @@ The root page is the combined 1000 CAD paper portfolio (portfolio.py); each expe
 1000 CAD portfolio box at the top.
 
 Expects each experiment's pages already in place (_site/exp1/, _site/exp2/); a missing one is shown
-as "not published yet" rather than failing the build. Experiment 4 is a static page kept in this repository
-(experiments/exp4_resonance/) and is copied to _site/exp4/. It also:
+as "not published yet" rather than failing the build. Experiments 4 to 6 are static pages kept in this repository
+(experiments/exp4_resonance/, exp5_vision/, exp6_alphabet/) and are copied to _site/exp4/ to _site/exp6/. It also:
   - adds "Experiment 2" and "Paper portfolio" links to Exp1's page headers,
   - keeps Exp1's old addresses working: every Exp1 page that used to live at the site root gets a
     redirect page there, and its data files are copied back to /data/ (files can't redirect).
@@ -27,7 +27,20 @@ from portfolio import CAPITAL
 
 e = html.escape
 REPO_URL = "https://github.com/pindustrycom/experiment-1"
-EXP4 = Path(__file__).resolve().parent.parent / "exp4_resonance"
+EXPERIMENTS = Path(__file__).resolve().parent.parent
+EXP4 = EXPERIMENTS / "exp4_resonance"
+# Static experiment pages: (site folder, source folder, card title, card text). No money involved in any of them.
+STATIC = [
+    ("exp4", EXP4, "Exp4 · resonance playground",
+     "A 3D model of the resonance architecture by Joaquin Philco: retina and V1, time-based somas with resonators on the axon, "
+     "concept structures and the rules that ask, allocate and sleep. Show it a digit in a colour, blur it, or open one cell."),
+    ("exp5", EXPERIMENTS / "exp5_vision", "Exp5 · vision stack",
+     "Can better vision make Joaquin Philco's resonance agent see natural images? Eleven methods on CIFAR and Imagenette: Gabor and "
+     "learned V1, somas with an axon resonance machine, a deeper somatic stack, feedback from memory and super labels."),
+    ("exp6", EXPERIMENTS / "exp6_alphabet", "Exp6 · alphabet and words",
+     "The same resonance machinery learns letters, numbers and words from images, then words name colour patches with no "
+     "stored labels. Includes a 3D view: watch the eye read a word, or a patch evoke its word."),
+]
 HUB_LINK = ('<a href="{root}exp2/index.html" style="color:var(--muted)">Experiment 2</a> '
             '<a href="{root}index.html" style="color:var(--muted)" data-hub>Paper portfolio</a>')
 
@@ -211,13 +224,12 @@ def hub_page(site: Path, t: dict | None = None) -> str:
 Bank of Canada rate. No costs or interest.{fx}</p>
 <div class="cards">{sleeve_card(t, "exp1", "Exp1 · pairs", "exp1/index.html", "Long the stock Exp1 favours in each pair, short the other.", exp1_positions(t))}
 {sleeve_card(t, "exp2", "Exp2 · volatility-timed", "exp2/index.html", "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", e(t.get("exp2_position") or ""))}</div>"""
-    has4 = (site / "exp4" / "index.html").exists()
-    exp4_nav = '\n<a href="exp4/index.html">Experiment 4</a>' if has4 else ""
-    exp4_card = ('<h2 style="font-size:18px;margin:28px 0 10px">Other experiments</h2><div class="cards"><div class="card">'
-                 '<div class="tag">Exp4 · resonance playground</div><p>A 3D model of the resonance architecture by Joaquin Philco: '
-                 'retina and V1, time-based somas with resonators on the axon, concept structures and the rules that ask, '
-                 'allocate and sleep. Show it a digit in a colour, blur it, or open one cell. No money involved.</p>'
-                 '<a class="go" href="exp4/index.html">Open →</a></div></div>') if has4 else ""
+    shown = [x for x in STATIC if (site / x[0] / "index.html").exists()]
+    exp4_nav = "".join(f'\n<a href="{d}/index.html">Experiment {d[3:]}</a>' for d, *_ in shown)
+    exp4_card = ('<h2 style="font-size:18px;margin:28px 0 10px">Other experiments</h2><div class="cards">'
+                 + "".join(f'<div class="card"><div class="tag">{e(title)}</div><p>{e(text)}</p>'
+                           f'<a class="go" href="{d}/index.html">Open →</a></div>' for d, _, title, text in shown)
+                 + '</div>') if shown else ""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>Paper portfolio</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}</style></head><body>
@@ -268,17 +280,23 @@ def keep_old_addresses(site: Path) -> int:
     return n
 
 
-def add_exp4(site: Path, src: Path = EXP4) -> bool:
-    """Copy Experiment 4's static page into the site."""
+def add_static(site: Path, name: str, src: Path) -> bool:
+    """Copy one static experiment page (folder with an index.html) into the site."""
     if not (src / "index.html").exists():
         return False
-    shutil.copytree(src, site / "exp4", dirs_exist_ok=True)
+    shutil.copytree(src, site / name, dirs_exist_ok=True)
     return True
+
+
+def add_exp4(site: Path, src: Path = EXP4) -> bool:
+    """Copy Experiment 4's static page into the site."""
+    return add_static(site, "exp4", src)
 
 
 def build(site: Path, state: Path | None = None, update: bool = False) -> dict:
     site.mkdir(parents=True, exist_ok=True)
-    add_exp4(site)
+    for name, src, *_ in STATIC:
+        add_static(site, name, src)
     linked = link_exp1_to_hub(site) if (site / "exp1").is_dir() else 0
     moved = keep_old_addresses(site) if (site / "exp1").is_dir() else 0
     t, rep = None, {}
