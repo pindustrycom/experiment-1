@@ -50,6 +50,20 @@ def test_exp4_page_copied_and_linked(tmp_path):
     assert 'href="exp4/index.html">Experiment 4</a>' in hub and "Exp4 · resonance playground" in hub
 
 
+def test_exp5_and_exp6_pages_copied_and_linked(tmp_path):
+    make_exp1(tmp_path)
+    build_hub.build(tmp_path)
+    five = (tmp_path / "exp5" / "index.html").read_text()
+    six = (tmp_path / "exp6" / "index.html").read_text()
+    assert "<title>Exp5 Vision Stack</title>" in five and "Joaquin Philco" in five
+    assert "<title>Exp6 Alphabet and Words</title>" in six and "Joaquin Philco" in six and 'id="scene3d"' in six
+    assert 'href="../exp6/index.html"' in five and 'href="../exp5/index.html"' in six
+    hub = (tmp_path / "index.html").read_text()
+    for n in (4, 5, 6):
+        assert f'href="exp{n}/index.html">Experiment {n}</a>' in hub
+    assert "Exp5 · vision stack" in hub and "Exp6 · alphabet and words" in hub
+
+
 def test_hub_without_exp4(tmp_path):
     assert build_hub.add_exp4(tmp_path, tmp_path / "missing") is False
     (tmp_path / "index.html").write_text(build_hub.hub_page(tmp_path))

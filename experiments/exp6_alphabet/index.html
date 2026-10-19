@@ -1,0 +1,491 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);box-sizing:border-box}body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Exp6 Alphabet and Words</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a lab notebook. One reading column, each method an entry with a setup, a result line and a verdict. */
+:root {
+  --bg: #f4f6f6;
+  --paper: #ffffff;
+  --ink: #15212a;
+  --muted: #56636c;
+  --rule: #d5dcdf;
+  --accent: #0d6b6b;
+  --accent-soft: #dcefee;
+  --warm: #a3561a;
+  --warm-soft: #f6e7da;
+  --bar: #0d6b6b;
+  --bar2: #b7c4c9;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1619; --paper: #152026; --ink: #e3eaec; --muted: #9aa8ae; --rule: #2a3a41;
+  --accent: #5cc2bd; --accent-soft: #173533; --warm: #e39a5f; --warm-soft: #3a2a1c; --bar: #5cc2bd; --bar2: #3d4f56; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1619; --paper: #152026; --ink: #e3eaec; --muted: #9aa8ae; --rule: #2a3a41;
+  --accent: #5cc2bd; --accent-soft: #173533; --warm: #e39a5f; --warm-soft: #3a2a1c; --bar: #5cc2bd; --bar2: #3d4f56; color-scheme: dark }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.55rem; font-weight: 700; margin-top: 56px; padding-top: 18px; border-top: 2px solid var(--ink); }
+h3 { font-size: 1.15rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.eyebrow { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.15rem; color: var(--muted); }
+.meta { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+.answer { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 18px 20px; }
+.answer p { max-width: none; }
+code, .mono { font-family: var(--mono); font-size: 0.85em; }
+ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; max-width: 68ch; }
+.tbl { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { font-family: var(--display); font-weight: 500; color: var(--muted); font-size: 0.85rem; }
+td.n { text-align: right; font-family: var(--mono); white-space: nowrap; }
+tr.best td { font-weight: 600; }
+.entry { background: var(--paper); border: 1px solid var(--rule); padding: 22px 22px 20px; display: flex; flex-direction: column; gap: 12px; }
+.entry header { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.entry .num { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); min-width: 2.2em; }
+.verdict { font-family: var(--mono); font-size: 0.78rem; padding: 2px 8px; border-radius: 3px; white-space: nowrap; }
+.v-yes { background: var(--accent-soft); color: var(--accent); }
+.v-no { background: var(--warm-soft); color: var(--warm); }
+.v-mid { background: var(--bg); color: var(--muted); border: 1px solid var(--rule); }
+.label { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+figure { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+figure img { border: 1px solid var(--rule); background: #fff; }
+figcaption { font-size: 0.85rem; color: var(--muted); }
+.pipe { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.pipe div { border: 1px solid var(--rule); background: var(--paper); padding: 10px 12px; font-size: 0.85rem; line-height: 1.4; }
+.pipe b { display: block; font-family: var(--display); font-size: 0.95rem; color: var(--accent); }
+.bars { display: flex; flex-direction: column; gap: 10px; }
+.bar { display: grid; grid-template-columns: minmax(0, 15em) 1fr; gap: 10px; align-items: center; font-size: 0.88rem; }
+.bar .track { position: relative; height: 22px; background: var(--bg); border: 1px solid var(--rule); }
+.bar .lin { position: absolute; inset: 0 auto 0 0; background: var(--bar2); }
+.bar .ag { position: absolute; top: 5px; bottom: 5px; left: 0; background: var(--bar); }
+.bar .val { position: absolute; right: 6px; top: 1px; font-family: var(--mono); font-size: 0.75rem; color: var(--ink); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px 4px; align-items: center; border-bottom: 1px solid var(--rule); padding-bottom: 10px; }
+.tabs .site { font-family: var(--display); font-weight: 700; margin-right: auto; padding-right: 12px; }
+.tabs button { font: 500 0.92rem var(--display); color: var(--muted); background: none; border: 1px solid transparent; padding: 7px 12px; cursor: pointer; border-radius: 4px; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-color: var(--rule); background: var(--paper); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.scene-wrap { display: flex; flex-direction: column; gap: 10px; }
+.scene-bar { display: flex; flex-wrap: wrap; gap: 12px 28px; }
+.ctrl { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 0.85rem var(--mono); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+#scene3d { width: 100%; height: min(70vh, 560px); display: block; border: 1px solid var(--rule); background: var(--paper); touch-action: none; cursor: grab; }
+.tabs a.site { font-family: var(--display); font-weight: 700; margin-right: auto; padding-right: 12px; color: var(--ink); text-decoration: none; }
+.tabs a.pg { font: 500 0.92rem var(--display); color: var(--muted); border: 1px solid transparent; padding: 7px 12px; border-radius: 4px; text-decoration: none; }
+.tabs a.pg[aria-current="page"] { color: var(--ink); border-color: var(--rule); background: var(--paper); }
+.legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); }
+.sw { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 6px; }
+@media (max-width: 560px) { .bar { grid-template-columns: 1fr; gap: 4px; } body { font-size: 16px; } .entry { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="wrap stack" style="gap:22px">
+  <nav class="tabs" aria-label="Experiments">
+    <a class="site" href="../index.html">All experiments</a>
+    <a class="pg" href="../exp5/index.html">Exp5 · Vision stack</a>
+    <a class="pg" href="../exp6/index.html" aria-current="page">Exp6 · Alphabet and words</a>
+  </nav>
+
+    <div class="stack" style="gap:10px">
+      <div class="eyebrow">Experiment 6 · first run 19 Oct 2026</div>
+      <h1>Exp6: an alphabet, numbers and words, learned from images</h1>
+      <p class="lede">The same machinery as exp5 (retina, V1, resonators, somatic cells, structures) in a world where the sets are clean. Letters and numbers come first, then words read letter by letter, then words that name things.</p>
+      <p class="meta">Resonance index, resonance-based semantics and the rule set: Joaquin Philco.</p>
+    </div>
+    <div class="answer stack"><span class="label">Answer so far</span>
+      <p><b>Words can name things without a stored label.</b> A colour patch evokes the word structure that was resonating when the patch was shown with the image of its word: 85% correct on new shades and shapes (chance 25%; 2% with shuffled pairs). The image of a word in a font never seen picks the right patch among 4 in 90% of trials. Words are read at 86% on unseen fonts once the axon also reads resonator phase. Without phase, "no" is read as "on" 26 times in 30.</p>
+    </div>
+
+    <h2>The model in 3D</h2>
+    <p>Pick a word to watch the eye read it, or a colour to watch a patch evoke its word. The layout follows the data flow from left to right; patches enter at the bottom.</p>
+    <div class="scene-wrap">
+      <div class="scene-bar">
+        <div class="ctrl">
+          <span class="label">Read a word</span>
+          <div class="chips" id="wordChips"></div>
+        </div>
+        <div class="ctrl">
+          <span class="label">Show a colour patch</span>
+          <div class="chips" id="patchChips"></div>
+        </div>
+      </div>
+      <canvas id="scene3d" aria-label="3D view of the exp6 model: the eye reads a word letter by letter, letter structures fire, the word structure and its set resonate, and colour patches evoke the word that named them"></canvas>
+      <p class="meta" id="sceneCaption">Drag to turn the model, scroll or pinch to zoom.</p>
+    </div>
+
+
+    <h2>How each stage works</h2>
+    <div class="stack" style="gap:16px">
+      <article class="entry">
+        <header><span class="num">A</span><h3>Letters and numbers, with their sets</h3><span class="verdict v-yes">54% on unseen fonts</span></header>
+        <p>Capital letters A to Z and digits 0 to 9, rendered at 28 px in a random ink colour, size, slant and offset. 7 font families are used for training (80 images per character) and 3 families are never seen (Inter, Liberation Serif, FreeMono). The oracle teaches each character and its set, "letter" or "number". Each level grows its own structures with exp4's rule (co-resonance above background, discrimination in sleep).</p>
+        <div class="tbl"><table>
+          <tr><th>Unseen fonts, 1,440 images</th><th>Character (36)</th><th>Letter / number</th></tr>
+          <tr><td>Most resonant character, no sets</td><td class="n">54.3%</td><td class="n"></td></tr>
+          <tr><td>Set structure on its own</td><td class="n"></td><td class="n">50.5%</td></tr>
+          <tr><td>Set read through its members</td><td class="n"></td><td class="n">79.2%</td></tr>
+          <tr><td>Suppression from the set read through its members</td><td class="n">48.4%</td><td class="n"></td></tr>
+          <tr class="best"><td>Suppression from the true set (ceiling)</td><td class="n">62.0%</td><td class="n">100%</td></tr>
+          <tr><td>Linear probe on the same nodes (reference)</td><td class="n">75.3%</td><td class="n">86.5%</td></tr>
+        </table></div>
+        <p>The set "letter" has no shape of its own: averaged over 26 shapes, its structure is no better than chance. A set read through its members works much better. Pairs that cross the sets stay hard on their own: O and 0, I and 1, Z and 2. In many fonts they are nearly the same shape, and people tell them apart by context, which is what words give.</p>
+      </article>
+
+      <article class="entry">
+        <header><span class="num">B</span><h3>Words, read letter by letter</h3><span class="verdict v-yes">86% on unseen fonts</span></header>
+        <p>A word is rendered in one font and ink, one character per cell. The eye fixates each cell for 3 steps, then makes a 1-step saccade. At each step the letter structures from stage A resonate on what the eye sees, and their resonance is the input current of 36 letter cells. Each soma integrates with a leak, and its axon drives resonators at 4 frequencies. Word structures form over those axon nodes. The oracle teaches the word and its set: <b>logic</b> (yes, no, maybe), <b>colour</b> (red, green, blue, yellow) and <b>other</b> (on, bed, bay, sea), which holds anagrams and near neighbours on purpose.</p>
+        <div class="tbl"><table>
+          <tr><th>Unseen fonts, 330 word images</th><th>Axon reads energy</th><th>Axon reads energy + phase</th></tr>
+          <tr><td>Word (11, chance 9%)</td><td class="n">62.4%</td><td class="n">85.8%</td></tr>
+          <tr><td>Set structure (logic / colour / other)</td><td class="n">61.8%</td><td class="n">88.8%</td></tr>
+          <tr><td>"no" read as "on" (out of 30)</td><td class="n">26</td><td class="n">0</td></tr>
+          <tr><td>"bed" read as "red" (out of 30)</td><td class="n">11</td><td class="n">2</td></tr>
+          <tr><td>Linear probe (reference)</td><td class="n">74.2%</td><td class="n">95.5%</td></tr>
+        </table></div>
+        <p>Resonator energy is almost blind to order: N then O rings the same as O then N. The phase of each resonator at the end of the word says when each letter came, and adding it (as ON and OFF cells) removes the order errors. Letters that stage A reads at 54% still give words at 86%, because a word has several letters.</p>
+      </article>
+
+      <article class="entry">
+        <header><span class="num">C</span><h3>Words name colour patches</h3><span class="verdict v-yes">85% naming, 90% comprehension</span></header>
+        <p>400 colour patches (red, green, blue, yellow; random shade, size and position) are each shown together with the image of their word, never a string. The word structure that resonates on the word image gates Hebbian learning on the patch nodes, so the colour's structure is indexed by a word structure. Cyan and magenta patches are never paired with a word.</p>
+        <div class="tbl"><table>
+          <tr><th>New patches and unseen fonts</th><th>Naming</th><th>Comprehension</th></tr>
+          <tr><td>Every resonating word learns, in proportion</td><td class="n">43.8%</td><td class="n">89.0%</td></tr>
+          <tr class="best"><td>Only the winning word structure learns</td><td class="n">85.3%</td><td class="n">90.0%</td></tr>
+          <tr><td>Control: patches paired with random words</td><td class="n">2.3%</td><td class="n">23.0%</td></tr>
+        </table></div>
+        <p><b>Naming</b>: a patch evokes the word structure whose association resonates most (chance 25% among the 4 colour words). <b>Comprehension</b>: the image of a word in an unseen font evokes its word structure, which picks the matching patch among 4. With energy-only words and suppression outside the words that were used for naming (learned from the pairing), naming reaches 100% and comprehension 71.5%.</p>
+        <p><b>Not working yet: asking about a colour with no word.</b> Only 20% of cyan and magenta patches fall below vigilance. Instead, cyan evokes "green" (96%) and magenta evokes "red" (44%), the nearest named hue. That is a reasonable guess, but under rule 1a the agent should ask.</p>
+      </article>
+    </div>
+
+    <h2>Next</h2>
+    <ul>
+      <li>Make vigilance work for naming, so an unnamed colour leads to a question and a new word, as in the purple test of earlier experiments.</li>
+      <li>Give characters context: read O and 0 from the word they sit in (letters around them) instead of in isolation.</li>
+      <li>Use the logic words: answer "yes", "no" or "maybe" as word images to questions such as "is this red?", with "maybe" when two structures resonate equally (a bridge).</li>
+    </ul>
+
+    <h2>Files</h2>
+    <div class="tbl"><table>
+      <tr><th>Stage</th><th>Code</th><th>Results</th></tr>
+      <tr><td>A</td><td class="mono">alphabet/alphabet_world.py</td><td class="mono">alphabet/runs/stageA.json</td></tr>
+      <tr><td>B, C</td><td class="mono">alphabet/words_world.py (--phase)</td><td class="mono">alphabet/runs/stageBC.json, stageBC_phase.json</td></tr>
+    </table></div>
+
+  
+</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script>
+(function () {
+  const canvas = document.getElementById("scene3d");
+  if (!canvas || !window.THREE) return;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || "#888";
+  let T = {};
+  const readTokens = () => { T = { bg: css("--paper"), ink: css("--ink"), muted: css("--muted"), rule: css("--rule"), accent: css("--accent"), warm: css("--warm") }; };
+  readTokens();
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(5, 10, 8); scene.add(sun);
+
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""), DIGITS = "0123456789".split("");
+  const WORDS = { logic: ["yes", "no", "maybe"], colour: ["red", "green", "blue", "yellow"], other: ["on", "bed", "bay", "sea"] };
+  const RGB = { red: 0xe23b3b, green: 0x2fb84a, blue: 0x3f63e8, yellow: 0xe7c62a, cyan: 0x2fc8d0, magenta: 0xd03fd0 };
+
+  // ---------- helpers
+  const all = [];
+  function label(text, size = 0.42, color, weight = 600) {
+    const c = document.createElement("canvas"), ctx = c.getContext("2d");
+    const px = 64; ctx.font = `${weight} ${px}px "Bricolage Grotesque", system-ui, sans-serif`;
+    const w = Math.ceil(ctx.measureText(text).width) + 16; c.width = w; c.height = px + 20;
+    ctx.font = `${weight} ${px}px "Bricolage Grotesque", system-ui, sans-serif`;
+    ctx.fillStyle = color || T.ink; ctx.textBaseline = "middle"; ctx.fillText(text, 8, c.height / 2);
+    const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    s.scale.set(size * w / c.height, size, 1); s.userData = { text, size, color, weight }; all.push(s);
+    return s;
+  }
+  function node(r, color, x, y, z) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 12), new THREE.MeshStandardMaterial({ color, roughness: 0.6, emissive: 0x000000 }));
+    m.position.set(x, y, z); scene.add(m); return m;
+  }
+  function line(a, b, color, opacity = 0.35) {
+    const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+    scene.add(l); return l;
+  }
+  function halo(x, y, z, r, color) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.07, depthWrite: false }));
+    m.position.set(x, y, z); scene.add(m); return m;
+  }
+  const accent = () => new THREE.Color(T.accent), warm = () => new THREE.Color(T.warm);
+
+  // ---------- stages along x
+  const stageTitles = [];
+  function stageTitle(text, x, y) { const s = label(text, 0.36, T.muted, 500); s.position.set(x, y, 0); scene.add(s); stageTitles.push(s); }
+
+  // 1. input: word tiles and patch tile
+  const tiles = [];
+  const tileGroup = new THREE.Group(); scene.add(tileGroup);
+  for (let i = 0; i < 6; i++) {
+    const c = document.createElement("canvas"); c.width = c.height = 96;
+    const tex = new THREE.CanvasTexture(c);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    m.position.set(-10.5, 2.6 - i * 1.08, 0); m.rotation.y = Math.PI / 2.6; tileGroup.add(m);
+    tiles.push({ m, c, tex });
+  }
+  function drawTile(t, ch, ink) {
+    const ctx = t.c.getContext("2d"); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 96, 96);
+    if (ch) { ctx.fillStyle = ink || "#fff"; ctx.font = "700 70px 'DejaVu Sans', Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(ch, 48, 52); }
+    t.tex.needsUpdate = true;
+  }
+  tiles.forEach(t => drawTile(t, ""));
+  const eye = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.05, 8, 40), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  eye.rotation.y = Math.PI / 2.6; scene.add(eye); eye.visible = false;
+  const patch = new THREE.Mesh(new THREE.CircleGeometry(0.75, 40), new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide }));
+  patch.position.set(-10.5, -5.2, 0); patch.rotation.y = Math.PI / 2.6; scene.add(patch);
+  stageTitle("image", -10.5, 4.1); stageTitle("patch", -10.5, -6.4);
+
+  // 2. retina channels
+  const chColors = [0xbfbfbf, 0xd94b4b, 0x3fb35b, 0x4b6be0, 0xd9bf3a];
+  const retina = chColors.map((c, i) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.5, 1.5), new THREE.MeshStandardMaterial({ color: c, transparent: true, opacity: 0.55 }));
+    m.position.set(-7.6 + i * 0.28, 0, 0); scene.add(m); return m;
+  });
+  stageTitle("retina", -7, 1.6);
+
+  // 3. V1: oriented stripes
+  const v1 = [];
+  for (let k = 0; k < 8; k++) {
+    const c = document.createElement("canvas"); c.width = c.height = 64; const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 64, 64); ctx.translate(32, 32); ctx.rotate((k % 4) * Math.PI / 4);
+    const w = k < 4 ? 8 : 14; ctx.fillStyle = "#222"; for (let x = -64; x < 64; x += w * 2) ctx.fillRect(x, -64, w, 128);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), side: THREE.DoubleSide }));
+    m.position.set(-4.6, 1.2 - Math.floor(k / 2) * 0.72, (k % 2 ? 0.36 : -0.36)); m.rotation.y = Math.PI / 2; scene.add(m); v1.push(m);
+  }
+  stageTitle("V1 Gabor", -4.6, 2.2);
+
+  // 4. resonator body
+  const res = [];
+  [[32, 1.25, -2.4], [24, 0.95, -1.4], [16, 0.65, -0.5]].forEach(([n, r, x]) => {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      res.push(node(0.07, 0x8aa0a8, x, Math.cos(a) * r, Math.sin(a) * r));
+    }
+  });
+  stageTitle("resonators", -1.4, 2.0);
+
+  // 5. character structures + sets
+  const chars = {};
+  LETTERS.forEach((L, i) => { const a = (i / 26) * Math.PI * 2; chars[L] = node(0.13, 0x9fb0b6, 2.4, 2.4 + Math.cos(a) * 1.3, Math.sin(a) * 1.3); });
+  DIGITS.forEach((D, i) => { const a = (i / 10) * Math.PI * 2; chars[D] = node(0.13, 0x9fb0b6, 2.4, -2.6 + Math.cos(a) * 0.8, Math.sin(a) * 0.8); });
+  const charLabels = {};
+  for (const k in chars) { const s = label(k, 0.26); s.position.copy(chars[k].position).add(new THREE.Vector3(0, 0.25, 0)); scene.add(s); charLabels[k] = s; }
+  const haloLetter = halo(2.4, 2.4, 0, 1.75, 0x5aa5a0), haloNumber = halo(2.4, -2.6, 0, 1.2, 0x5aa5a0);
+  const tl = label("letter", 0.36, T.accent); tl.position.set(2.4, 4.5, 0); scene.add(tl);
+  const tn = label("number", 0.36, T.accent); tn.position.set(2.4, -4.1, 0); scene.add(tn);
+  stageTitle("stage A: characters and their sets", 2.4, 5.2);
+
+  // 6. letter cells: soma + axon resonators
+  const cells = {};
+  LETTERS.concat(DIGITS).forEach((k, i) => {
+    const row = Math.floor(i / 6), col = i % 6;
+    const g = new THREE.Group(); g.position.set(5.6, 2.2 - row * 0.85, -1.9 + col * 0.76); scene.add(g);
+    const soma = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.12, 14), new THREE.MeshStandardMaterial({ color: 0x9fb0b6 }));
+    const axon = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.025, 6, 24), new THREE.MeshBasicMaterial({ color: 0x9fb0b6, transparent: true, opacity: 0.5 }));
+    axon.rotation.y = Math.PI / 2; axon.position.x = 0.32; g.add(soma); g.add(axon);
+    cells[k] = { g, soma, axon, v: 0, spin: 0 };
+  });
+  stageTitle("letter cells: soma + axon resonators", 5.6, 3.3);
+
+  // 7. word structures and sets
+  const words = {}, sets = {};
+  const setPos = { logic: [9.4, 2.6, 0], colour: [9.4, -0.6, 0], other: [9.4, -3.9, 0] };
+  for (const s in WORDS) {
+    const [x, y, z] = setPos[s]; sets[s] = halo(x, y, z, 1.25, 0x5aa5a0);
+    const sl = label(s, 0.34, T.accent); sl.position.set(x + 0.2, y + 1.45, 0); scene.add(sl);
+    WORDS[s].forEach((w, i) => {
+      const a = (i / WORDS[s].length) * Math.PI * 2 + 0.4;
+      words[w] = node(0.2, RGB[w] && s === "colour" ? RGB[w] : 0x9fb0b6, x, y + Math.cos(a) * 0.7, Math.sin(a) * 0.7);
+      const l = label(w, 0.3); l.position.copy(words[w].position).add(new THREE.Vector3(0, 0.36, 0)); scene.add(l);
+    });
+  }
+  stageTitle("stage B: words and their sets", 9.4, 4.6);
+
+  // 8. patch path and associations (stage C)
+  const patchNodes = node(0.32, 0x9fb0b6, -1.4, -5.2, 0);
+  line(patch.position, patchNodes.position, 0x8aa0a8, 0.3);
+  const assoc = {};
+  WORDS.colour.forEach(w => { assoc[w] = line(patchNodes.position, words[w].position, RGB[w], 0.12); });
+  stageTitle("stage C: a patch evokes the word that named it", 3, -6.3);
+
+  // static wiring hints
+  line(new THREE.Vector3(-10.2, 0, 0), new THREE.Vector3(-7.7, 0, 0), 0x8aa0a8, 0.2);
+  line(new THREE.Vector3(-6.4, 0, 0), new THREE.Vector3(-4.8, 0, 0), 0x8aa0a8, 0.2);
+  line(new THREE.Vector3(-4.3, 0, 0), new THREE.Vector3(-2.4, 0, 0), 0x8aa0a8, 0.2);
+  line(new THREE.Vector3(-0.5, 0, 0), new THREE.Vector3(2.0, 0, 0), 0x8aa0a8, 0.2);
+
+  // ---------- pulses
+  const pulses = [];
+  function pulse(from, to, color, dur = 0.5) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color }));
+    scene.add(m); pulses.push({ m, from: from.clone(), to: to.clone(), t: 0, dur });
+  }
+
+  // ---------- state and timeline
+  const glow = new Map();
+  function light(mesh, amount, color) { glow.set(mesh, { a: amount, color: color || accent() }); }
+  let queue = [], clock = 0;
+  const caption = document.getElementById("sceneCaption");
+  function say(t) { if (caption) caption.textContent = t; }
+  function schedule(steps) { queue = steps.map(s => ({ ...s })); clock = 0; }
+
+  function readWord(w) {
+    const ink = ["#ffffff", "#ff5050", "#50ff70", "#6f8bff", "#ffe650", "#50ffff"][Math.floor(Math.random() * 6)];
+    tiles.forEach((t, i) => drawTile(t, w[i] ? w[i].toUpperCase() : "", ink));
+    const set = Object.keys(WORDS).find(s => WORDS[s].includes(w));
+    const steps = [];
+    for (const k in cells) { cells[k].v = 0; }
+    w.toUpperCase().split("").forEach((ch, i) => {
+      steps.push({ at: i * 0.9, run: () => {
+        eye.visible = true; eye.position.copy(tiles[i].m.position);
+        pulse(tiles[i].m.position, new THREE.Vector3(-7, 0, 0), 0xffffff, 0.3);
+        setTimeout(() => pulse(new THREE.Vector3(-4.6, 0, 0), new THREE.Vector3(-1.4, 0, 0), 0xffffff, 0.3), 200);
+        setTimeout(() => { pulse(new THREE.Vector3(-0.5, 0, 0), chars[ch].position, accent(), 0.3); light(chars[ch], 1); light(DIGITS.includes(ch) ? haloNumber : haloLetter, 0.6); }, 450);
+        setTimeout(() => { pulse(chars[ch].position, cells[ch].g.position, accent(), 0.3); cells[ch].v = 1; }, 700);
+        say(`Fixation ${i + 1}: the eye holds "${ch}" for 3 steps. The ${ch} structure resonates, its letter cell's soma charges and its axon resonators ring.`);
+      } });
+    });
+    const end = w.length * 0.9 + 0.4;
+    steps.push({ at: end, run: () => {
+      eye.visible = false;
+      for (const k of w.toUpperCase()) pulse(cells[k].g.position, words[w].position, accent(), 0.5);
+      setTimeout(() => { light(words[w], 1.2); light(sets[set], 0.9); say(`After the last saccade, the frequency signature over the letter cells makes the "${w}" structure resonate, and with it the "${set}" set.`); }, 520);
+    } });
+    schedule(steps);
+  }
+
+  function showPatch(c) {
+    patch.material.color.set(RGB[c]);
+    const named = WORDS.colour.includes(c);
+    schedule([{ at: 0, run: () => {
+      pulse(patch.position, patchNodes.position, new THREE.Color(RGB[c]), 0.6);
+      setTimeout(() => {
+        light(patchNodes, 0.8, new THREE.Color(RGB[c]));
+        if (named) {
+          assoc[c].material.opacity = 0.9; light(words[c], 1.2); light(sets.colour, 0.9);
+          pulse(patchNodes.position, words[c].position, new THREE.Color(RGB[c]), 0.7);
+          say(`The ${c} patch resonates with the association that was learned while the image of the word "${c}" was resonating, so it evokes that word structure. No string "${c}" is stored anywhere.`);
+        } else {
+          say(`${c[0].toUpperCase() + c.slice(1)} was never shown with a word. No association resonates above vigilance, so the agent should ask for a word.`);
+        }
+      }, 620);
+    } }]);
+  }
+
+  // chips
+  const mkChip = (host, text, fn, color) => {
+    const b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.textContent = text;
+    if (color) { const d = document.createElement("span"); d.className = "dot"; d.style.background = "#" + color.toString(16).padStart(6, "0"); b.prepend(d); }
+    b.addEventListener("click", () => { host.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true"); fn(); });
+    host.appendChild(b); return b;
+  };
+  const wc = document.getElementById("wordChips"), pc = document.getElementById("patchChips");
+  Object.values(WORDS).flat().forEach(w => mkChip(wc, w, () => readWord(w)));
+  ["red", "green", "blue", "yellow", "cyan", "magenta"].forEach(c => mkChip(pc, c, () => showPatch(c), RGB[c]));
+
+  // ---------- camera orbit
+  let theta = -0.55, phi = 1.15, radius = 26, target = new THREE.Vector3(0, -0.4, 0), drag = null;
+  function placeCamera() {
+    camera.position.set(target.x + radius * Math.sin(phi) * Math.sin(theta), target.y + radius * Math.cos(phi), target.z + radius * Math.sin(phi) * Math.cos(theta));
+    camera.lookAt(target);
+  }
+  canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener("pointermove", e => {
+    if (!drag) return; theta -= (e.clientX - drag.x) * 0.006; phi = Math.min(2.6, Math.max(0.35, phi - (e.clientY - drag.y) * 0.006));
+    drag = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener("pointerup", () => drag = null);
+  canvas.addEventListener("wheel", e => { e.preventDefault(); radius = Math.min(45, Math.max(10, radius * (1 + Math.sign(e.deltaY) * 0.08))); }, { passive: false });
+
+  function resize() {
+    const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
+    renderer.setSize(w, h, false); camera.aspect = w / h;
+    radius = Math.max(radius, w < 520 ? 34 : 24); camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize); window.addEventListener("tabshown", () => setTimeout(resize, 30));
+  function applyTheme() {
+    readTokens(); scene.background = new THREE.Color(T.bg);
+    const sprites = all.splice(0);   // label() registers each new sprite in `all`; rebuild from a fixed copy
+    for (const s of sprites) {
+      const d = s.userData; const fresh = label(d.text, d.size, d.color === undefined ? undefined : (stageTitles.includes(s) ? T.muted : T.accent), d.weight);
+      all.pop();
+      s.material.map.dispose(); s.material.map = fresh.material.map; s.material.needsUpdate = true;
+    }
+    all.push(...sprites);
+  }
+  scene.background = new THREE.Color(T.bg);
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  if (mq.addEventListener) mq.addEventListener("change", () => setTimeout(applyTheme, 50));
+  new MutationObserver(() => setTimeout(applyTheme, 50)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(applyTheme);
+
+  // ---------- loop
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+    while (queue.length && queue[0].at <= clock) queue.shift().run();
+    if (!drag && !reduce) theta += dt * 0.04;
+    placeCamera();
+    for (let i = pulses.length - 1; i >= 0; i--) {
+      const p = pulses[i]; p.t += dt / p.dur;
+      p.m.position.lerpVectors(p.from, p.to, Math.min(1, p.t));
+      if (p.t >= 1) { scene.remove(p.m); p.m.geometry.dispose(); pulses.splice(i, 1); }
+    }
+    for (const [m, g] of glow) {
+      g.a *= Math.pow(0.35, dt);
+      if (m.material.emissive) { m.material.emissive.copy(g.color).multiplyScalar(Math.min(1, g.a)); m.scale.setScalar(1 + 0.6 * Math.min(1, g.a)); }
+      else m.material.opacity = 0.07 + 0.25 * Math.min(1, g.a);
+      if (g.a < 0.02) { glow.delete(m); if (m.material.emissive) { m.material.emissive.set(0x000000); m.scale.setScalar(1); } else m.material.opacity = 0.07; }
+    }
+    for (const k in cells) {
+      const c = cells[k]; c.v *= Math.pow(0.5, dt * 2);
+      c.soma.scale.y = 1 + 6 * c.v; c.soma.material.color.lerpColors(new THREE.Color(0x9fb0b6), accent(), Math.min(1, c.v * 1.5));
+      c.axon.rotation.x += dt * 8 * c.v; c.axon.material.opacity = 0.35 + 0.65 * Math.min(1, c.v * 2);
+    }
+    WORDS.colour.forEach(w => { const m = assoc[w].material; m.opacity = Math.max(0.12, m.opacity - dt * 0.4); });
+    res.forEach((r, i) => { r.scale.setScalar(1 + 0.35 * Math.sin(now / 300 + i * 0.7) * (reduce ? 0 : 1)); });
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  resize(); readWord("yes"); wc.querySelector(".chip").setAttribute("aria-pressed", "true");
+  requestAnimationFrame(frame);
+})();
+
+</script>
+</body>
+</html>
