@@ -3,6 +3,12 @@
 anthropic==1.14.0
 cryptography==50.0.1
 numpy==2.5.4
+# OpenBB (official packages, github.com/OpenBB-finance/OpenBB): VIX and T-bill fallback when Yahoo fails (exp2/openbb_src.py)
+openbb-core==2.0.1
+openbb-index==2.0.0
+openbb-fixedincome==2.0.0
+openbb-cboe==2.0.0
+openbb-federal-reserve==2.0.0
 pandas==3.0.6
 pydantic==2.14.1
 pytest==9.1.1

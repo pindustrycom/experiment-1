@@ -61,6 +61,29 @@ jobs:
       - name: Tests
         run: ruff check exp2 tests && python -m pytest -q && python -m pytest -q ../hub
 
+      - name: Check the OpenBB fallback against Yahoo (VIX, T-bills)
+        if: env.TRIAL == 'true'
+        run: |
+          python - <<'PY' | tee -a "$GITHUB_STEP_SUMMARY"
+          from exp2 import openbb_src, papers
+          print("\n| Series | OpenBB source | OpenBB last | Yahoo last | Median gap | Within tolerance |\n|---|---|---|---|---|---|")
+          for t in openbb_src.SOURCES:
+              try:
+                  o = openbb_src.fetch(t, "2019-01-01")
+              except Exception as e:
+                  print(f"| {t} | {openbb_src.SOURCES[t]} | failed: {type(e).__name__}: {str(e)[:120]} | | | no |")
+                  continue
+              try:
+                  y = papers.fetch_yahoo(t, "2019-01-01")
+                  g = openbb_src.gap(t, y, o)
+                  ylast, ok = f"{y['date'].iloc[-1]} {y['close'].iloc[-1]:.2f}", openbb_src.agrees(t, y, o)
+              except Exception as e:
+                  ylast, g, ok = f"failed: {type(e).__name__}", None, "n/a"
+              unit = "%" if openbb_src.TOLERANCE[t][0] == "rel" else " pts"
+              gs = "" if g is None else (f"{g:.2%}" if unit == "%" else f"{g:.3f}{unit}")
+              print(f"| {t} | {openbb_src.SOURCES[t]} | {o['date'].iloc[-1]} {o['close'].iloc[-1]:.2f} ({len(o)} days) | {ylast} | {gs} | {ok} |")
+          PY
+
       - name: Restore state from the last run
         run: |
           mkdir -p state
