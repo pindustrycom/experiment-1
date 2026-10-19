@@ -48,7 +48,7 @@ def fetch_extra(data: Path, start: str = "2004-01-01") -> dict:
         spy = papers.load(data, ["SPY"])["SPY"]
         ends = spy.groupby(spy.index.to_period("M")).tail(1).index
         ends = [d.strftime("%Y-%m-%d") for d in ends if d >= pd.Timestamp("2006-01-01")]
-        vx = obb.derivatives.futures.curve(symbol="VX_EOD", provider="cboe", date=ends).to_df().reset_index()
+        vx = vx_history(ends)
         vx.to_csv(data / "vx_curve_monthly.csv", index=False)
         rep["vx_curve"] = {"rows": len(vx), "first": str(vx["date"].min()), "last": str(vx["date"].max())}
     except Exception as e:  # noqa: BLE001 - report and carry on with what there is
@@ -60,6 +60,17 @@ def fetch_extra(data: Path, start: str = "2004-01-01") -> dict:
     except Exception as e:  # noqa: BLE001
         rep["treasury_curve"] = f"failed: {type(e).__name__}: {str(e)[:300]}"
     return rep
+
+
+def vx_history(dates: list[str]) -> pd.DataFrame:
+    """The VX futures curve on each date, one row per contract: date, expiration, symbol, price. OpenBB's
+    derivatives.futures.curve pivots several dates into one column per date and drops the expirations, so this calls
+    the Cboe helper underneath it (openbb_cboe.utils.vix, pinned in requirements.txt) to keep them."""
+    import asyncio
+
+    from openbb_cboe.utils.vix import get_vx_by_date
+    df = asyncio.run(get_vx_by_date(date=dates, vx_type="eod", use_cache=False))
+    return df.reset_index() if "date" not in df.columns else df
 
 
 def timing(data: Path, train_end: str = TRAIN_END) -> dict:
@@ -94,6 +105,8 @@ def etp_month(px: pd.DataFrame) -> pd.Series:
 def vx_roll(curve: pd.DataFrame) -> pd.Series:
     """Short the second VX contract at each month end and buy it back at the next month end (by then the front month):
     P&L in vol points, indexed by the month it is earned. Matching by expiration month keeps it the same contract."""
+    if "price" not in curve.columns:
+        raise ValueError(f"VX curve has no price column: {list(curve.columns)[:12]}")
     c = curve.dropna(subset=["price"]).copy()
     c["m"] = pd.to_datetime(c["date"]).dt.to_period("M")
     c["exp"] = c["expiration"].astype(str).str[:7]
@@ -133,11 +146,14 @@ def vol_products(data: Path, T: dict) -> tuple[dict, dict]:
         sl[f"{name}_timed"] = held * ex - trade * ETP_COST_BP / 100
     f = data / "vx_curve_monthly.csv"
     if f.exists():
-        roll = vx_roll(pd.read_csv(f))
-        held = _next(on).reindex(roll.index).fillna(0.0)
-        pnl = VEGA * (roll - VX_COST)
-        sl["vxfut_always"], sl["vxfut_timed"] = pnl, pnl.where(held > 0, 0.0)
-        notes["vx_months"] = int(len(roll))
+        try:
+            roll = vx_roll(pd.read_csv(f))
+            held = _next(on).reindex(roll.index).fillna(0.0)
+            pnl = VEGA * (roll - VX_COST)
+            sl["vxfut_always"], sl["vxfut_timed"] = pnl, pnl.where(held > 0, 0.0)
+            notes["vx_months"] = int(len(roll))
+        except Exception as e:  # noqa: BLE001 - keep the other products
+            notes["vxfut"] = f"{type(e).__name__}: {str(e)[:300]}"
     else:
         notes["vxfut"] = "no VX curve file"
     # the synthetic variance swap, rebuilt here so every sleeve uses the same timing and dates
