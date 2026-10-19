@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Exp6 Live Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&family=Inter:wght@500;700&family=Roboto+Slab:wght@500&family=Courier+Prime:wght@700&family=Caveat:wght@700&family=Playfair+Display:wght@700&display=swap">
+<style>
+:root {
+  --bg: #f4f6f6; --paper: #ffffff; --ink: #15212a; --muted: #56636c; --rule: #d5dcdf;
+  --accent: #0d6b6b; --accent-soft: #dcefee; --warm: #a3561a; --warm-soft: #f6e7da; --bar: #0d6b6b; --bar2: #b7c4c9;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1619; --paper: #152026; --ink: #e3eaec; --muted: #9aa8ae; --rule: #2a3a41;
+  --accent: #5cc2bd; --accent-soft: #173533; --warm: #e39a5f; --warm-soft: #3a2a1c; --bar: #5cc2bd; --bar2: #3d4f56; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1619; --paper: #152026; --ink: #e3eaec; --muted: #9aa8ae; --rule: #2a3a41;
+  --accent: #5cc2bd; --accent-soft: #173533; --warm: #e39a5f; --warm-soft: #3a2a1c; --bar: #5cc2bd; --bar2: #3d4f56; color-scheme: dark }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 3.1rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.55rem; font-weight: 700; margin-top: 48px; padding-top: 18px; border-top: 2px solid var(--ink); }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 70ch; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+.eyebrow { font-family: var(--mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { font-size: 1.15rem; color: var(--muted); }
+.meta { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); }
+.answer { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 18px 20px; }
+.label { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px 4px; align-items: center; border-bottom: 1px solid var(--rule); padding-bottom: 10px; }
+.tabs a.site { font-family: var(--display); font-weight: 700; margin-right: auto; padding-right: 12px; color: var(--ink); text-decoration: none; }
+.tabs a.pg { font: 500 0.92rem var(--display); color: var(--muted); border: 1px solid transparent; padding: 7px 12px; border-radius: 4px; text-decoration: none; }
+.tabs a.pg[aria-current="page"] { color: var(--ink); border-color: var(--rule); background: var(--paper); }
+.panel { background: var(--paper); border: 1px solid var(--rule); padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; }
+.ctrl { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+input[type=text], select { font: 600 1rem var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 4px; padding: 7px 10px; }
+input[type=text] { width: 9.5em; text-transform: uppercase; letter-spacing: 0.08em; }
+input[type=range] { width: 130px; accent-color: var(--accent); }
+input[type=color] { width: 44px; height: 36px; border: 1px solid var(--rule); background: var(--bg); padding: 2px; border-radius: 4px; }
+button.btn { font: 600 0.9rem var(--display); color: var(--paper); background: var(--accent); border: 0; border-radius: 4px; padding: 8px 14px; cursor: pointer; }
+button.btn.ghost { color: var(--ink); background: var(--bg); border: 1px solid var(--rule); }
+button:disabled { opacity: 0.5; cursor: progress; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 0.82rem var(--mono); color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 999px; padding: 4px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.chip .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1px solid var(--rule); }
+.cells { display: flex; flex-wrap: wrap; gap: 10px; }
+.cell { display: flex; flex-direction: column; gap: 4px; width: 112px; }
+.cell canvas { width: 112px; height: 112px; image-rendering: pixelated; border: 1px solid var(--rule); background: #000; }
+.cell .top { font: 0.78rem/1.35 var(--mono); }
+.cell .top b { font-size: 0.95rem; }
+.cell .set { font: 0.72rem var(--mono); color: var(--muted); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.bars { display: flex; flex-direction: column; gap: 5px; }
+.bar { display: grid; grid-template-columns: 5.2em 1fr 4.4em; gap: 8px; align-items: center; font: 0.82rem var(--mono); }
+.bar .track { position: relative; height: 16px; background: var(--bg); border: 1px solid var(--rule); }
+.bar .fill { position: absolute; inset: 0 auto 0 0; background: var(--bar2); }
+.bar.win .fill { background: var(--bar); }
+.bar.win { font-weight: 600; }
+.bar .num { text-align: right; color: var(--muted); }
+.bar .vig { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--warm); }
+.verdict { font: 600 1rem var(--display); }
+.verdict.ask { color: var(--warm); }
+.note { font-size: 0.9rem; color: var(--muted); }
+#pad { width: 196px; height: 196px; background: #000; border: 1px solid var(--rule); touch-action: none; cursor: crosshair; }
+#patchImg { width: 112px; height: 112px; image-rendering: pixelated; border: 1px solid var(--rule); background: #000; }
+#scene3d { width: 100%; height: min(70vh, 540px); display: block; border: 1px solid var(--rule); background: var(--paper); touch-action: none; cursor: grab; }
+.gl-fail { padding: 16px 18px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); line-height: 1.5; }
+.loading { font: 0.85rem var(--mono); color: var(--muted); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+td.n { text-align: right; font-family: var(--mono); }
+ol { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
+@media (max-width: 560px) { body { font-size: 16px; } .panel { padding: 14px; } .cell { width: 92px; } .cell canvas { width: 92px; height: 92px; } }
+</style>
+</head>
+<body>
+<div class="wrap stack" style="gap:22px">
+  <nav class="tabs" aria-label="Experiments">
+    <a class="site" href="../index.html">All experiments</a>
+    <a class="pg" href="../exp5/index.html">Exp5 · Vision stack</a>
+    <a class="pg" href="../exp6/index.html">Exp6 · Alphabet and words</a>
+    <a class="pg" href="../exp6_live/index.html" aria-current="page">Exp6 live</a>
+  </nav>
+
+  <div class="stack" style="gap:10px">
+    <div class="eyebrow">Experiment 6 · live model</div>
+    <h1>Exp6 live: the trained model, running in your browser</h1>
+    <p class="lede">Type a word, draw a character or pick a colour. Every number on this page is computed from the image by the trained exp6 model: retina, Gabor V1, resonator body, letter structures, letter cells with soma and axon resonators, word structures and the naming associations.</p>
+    <p class="meta">Resonance index, resonance-based semantics and the rule set: Joaquin Philco.</p>
+  </div>
+  <div class="answer stack"><span class="label">What is live</span>
+    <p>Nothing here is scripted. The page loads the structures the model learned in training (<span id="modelSize">…</span>) and runs the same forward pass as the Python code, step by step. The fonts in your browser were never seen in training, so expect mistakes: on unseen fonts the model reads characters right about half the time and words about 86% of the time. It only knows 11 words; any other word is answered with the closest one.</p>
+    <p class="loading" id="status">Loading the model…</p>
+  </div>
+
+  <h2>Read a word</h2>
+  <div class="panel">
+    <div class="controls">
+      <div class="ctrl"><label class="label" for="word">Word (up to 6 characters)</label><input type="text" id="word" value="YES" maxlength="6" autocomplete="off" spellcheck="false"></div>
+      <div class="ctrl"><label class="label" for="font">Font</label><select id="font"></select></div>
+      <div class="ctrl"><span class="label">Ink</span><div class="chips" id="inks"></div></div>
+      <div class="ctrl"><label class="label" for="slant">Slant <span id="slantV">0°</span></label><input type="range" id="slant" min="-6" max="6" step="1" value="0"></div>
+      <div class="ctrl"><label class="label" for="size">Size <span id="sizeV">68%</span></label><input type="range" id="size" min="55" max="80" step="1" value="68"></div>
+      <button class="btn" id="readBtn" type="button" disabled>Read</button>
+      <button class="btn ghost" id="jitterBtn" type="button" disabled>Render again</button>
+    </div>
+    <p class="note">Quick words: <span class="chips" id="vocab" style="display:inline-flex"></span></p>
+    <div class="stack" style="gap:6px"><span class="label">What the eye sees, one fixation per cell, and the letter structures that resonate most (z-score across the 36)</span>
+      <div class="cells" id="cells"></div></div>
+    <div class="grid2">
+      <div class="stack" style="gap:6px"><span class="label">Word structures (resonance on the letter cells' signature)</span><div class="bars" id="wordBars"></div></div>
+      <div class="stack" style="gap:6px"><span class="label">Word sets</span><div class="bars" id="setBars"></div>
+        <p class="verdict" id="wordVerdict"></p><p class="note" id="wordNote"></p></div>
+    </div>
+  </div>
+
+  <h2>Watch it in 3D</h2>
+  <p>The scene replays the last read or patch with the values the model just computed: how strongly each letter structure resonated at each fixation, how the letter cells charged, and which word and set won.</p>
+  <canvas id="scene3d" aria-label="3D view of the live exp6 model, driven by the values computed for the last word or patch"></canvas>
+  <p class="meta" id="sceneCaption">Drag to turn the model, scroll or pinch to zoom.</p>
+
+  <h2>Draw a character</h2>
+  <div class="panel">
+    <div class="controls" style="align-items:flex-start">
+      <div class="ctrl"><span class="label">Draw one letter or digit</span><canvas id="pad" width="196" height="196"></canvas>
+        <div class="chips"><button class="btn ghost" id="clearPad" type="button">Clear</button></div></div>
+      <div class="ctrl" style="flex:1;min-width:240px"><span class="label">What the eye sees (28 × 28)</span><canvas id="padSmall" width="28" height="28" style="width:84px;height:84px;image-rendering:pixelated;border:1px solid var(--rule)"></canvas>
+        <span class="label" style="margin-top:8px">Letter structures</span><div class="bars" id="padBars"></div><p class="note" id="padSet"></p></div>
+    </div>
+  </div>
+
+  <h2>Name a colour</h2>
+  <div class="panel">
+    <p class="note">During training, colour patches were shown together with the image of a word, never a string. Each word structure that won on the word image learned an association over the patch nodes. Here a new patch is drawn in your colour and every association resonates on it. Cyan, magenta and purple were never paired with any word.</p>
+    <div class="controls">
+      <div class="ctrl"><span class="label">Colour</span><div class="chips" id="colours"></div></div>
+      <div class="ctrl"><label class="label" for="pick">Any colour</label><input type="color" id="pick" value="#ff8800"></div>
+      <button class="btn" id="patchBtn" type="button" disabled>New patch</button>
+    </div>
+    <div class="controls" style="align-items:flex-start">
+      <div class="ctrl"><span class="label">Patch</span><canvas id="patchImg" width="28" height="28"></canvas></div>
+      <div class="ctrl" style="flex:1;min-width:260px"><span class="label">Associations (the orange line is vigilance)</span><div class="bars" id="assocBars"></div>
+        <p class="verdict" id="patchVerdict"></p></div>
+    </div>
+  </div>
+
+  <h2>Check it against Python</h2>
+  <div class="panel">
+    <p class="note">Runs the browser model on test images saved by the Python code (two words in unseen fonts and four patches) and compares every output.</p>
+    <div class="controls"><button class="btn ghost" id="checkBtn" type="button" disabled>Run the check</button></div>
+    <div id="checkOut"></div>
+  </div>
+
+  <h2>What runs, in order</h2>
+  <ol>
+    <li><b>Retina.</b> The 28 × 28 cell is split into luminance and red, green, blue and yellow ON cells.</li>
+    <li><b>V1.</b> Each channel is filtered by complex Gabor cells at 4 orientations and 2 scales.</li>
+    <li><b>Resonator body.</b> Each channel drives its own bank of 32 damped resonators along the scan line, then 3 shared banks of 64. Energy in 4 bands per resonator gives 1,408 nodes.</li>
+    <li><b>Letter structures.</b> 36 structures learned by co-resonance above background each resonate on the nodes (aᵀWa / ‖a‖²).</li>
+    <li><b>Letter cells.</b> The eye holds each cell for 3 steps, then a 1-step saccade. The positive z-scored resonance is the input current of 36 letter cells; each soma integrates it with a leak and its axon drives resonators at 4 frequencies. Energy and end-of-word phase (ON/OFF) give 576 word nodes.</li>
+    <li><b>Word structures</b> (11) and <b>word sets</b> (3) resonate on the word nodes. Colour patches go through steps 1 to 3 and the <b>associations</b> resonate on them.</li>
+  </ol>
+  <p class="meta">Model: alphabet/words_world.py --phase, exported by alphabet/export_live.py. Training fonts: DejaVu, FreeSans, FreeSerif, Liberation Sans and Mono.</p>
+</div>
+
+<script id="engine">
+// Exp6 live: the trained alphabet / words / naming model, run in the browser.
+// A line-for-line port of alphabet/words_world.py --phase (front end: gabor_v1.py, digits_colours_v1.py,
+// resonance_wiring.py; cells: soma_axon.py). Weights come from alphabet/export_live.py (model.json + model.bin).
+(function (root) {
+  "use strict";
+
+  function load(manifest, buf) {
+    const A = {};
+    for (const [name, d] of Object.entries(manifest.arrays)) {
+      const n = d.shape.reduce((a, b) => a * b, 1);
+      A[name] = d.dtype === "<u4" ? new Uint32Array(buf, d.offset, n) : d.dtype === "<f2" ? half(new Uint16Array(buf, d.offset, n)) : new Float32Array(buf, d.offset, n);
+      A[name].shape = d.shape;
+    }
+    return new Model(manifest.consts, A);
+  }
+
+  function half(h) { // IEEE float16 -> Float32Array
+    const out = new Float32Array(h.length);
+    for (let i = 0; i < h.length; i++) {
+      const x = h[i], s = x & 0x8000 ? -1 : 1, e = (x >> 10) & 0x1f, f = x & 0x3ff;
+      out[i] = s * (e === 0 ? f * 2 ** -24 : e === 31 ? (f ? NaN : Infinity) : (1 + f / 1024) * 2 ** (e - 15));
+    }
+    return out;
+  }
+
+  function Model(K, A) {
+    this.K = K; this.A = A;
+    this.layers = [];
+    for (let k = 0; k < K.n_layers; k++) {
+      const M = A[`L${k}_lam_re`].length, din = A[`L${k}_B_re`].length / M;
+      this.layers.push({ M, din, lr: A[`L${k}_lam_re`], li: A[`L${k}_lam_im`], Br: A[`L${k}_B_re`], Bi: A[`L${k}_B_im`],
+        mu: A[`L${k}_mu`], rm: A[`L${k}_r`][0], rs: A[`L${k}_r`][1] });
+    }
+    const sp = name => ({ start: A[name + "_start"], idx: A[name + "_idx"], val: A[name + "_val"] });
+    // dense structures ship as low-rank factors (alphabet/export_live.py): a^T W a = sum_k sgn_k (u_k . a)^2
+    const lr = name => ({ U: A[name + "_U"], sgn: A[name + "_sgn"], n: A[name + "_U"].shape[0], N: A[name + "_U"].shape[1], r: A[name + "_U"].shape[2] });
+    this.chr = lr("chr"); this.word = lr("word"); this.set = lr("set"); this.assoc = sp("assoc");
+  }
+
+  // ---------- retina: (784*3) RGB in [0,1], row-major -> 5 opponent channels (784 each)
+  Model.prototype.opponent = function (X) {
+    const L = 784, Z = [0, 1, 2, 3, 4].map(() => new Float64Array(L));
+    let peak = 0;
+    const lum = new Float64Array(L);
+    for (let t = 0; t < L; t++) { lum[t] = (X[3 * t] + X[3 * t + 1] + X[3 * t + 2]) / 3; if (lum[t] > peak) peak = lum[t]; }
+    for (let t = 0; t < L; t++) {
+      const R = X[3 * t], G = X[3 * t + 1], B = X[3 * t + 2];
+      const rg = R - G, by = B - (R + G) / 2;
+      Z[0][t] = (lum[t] / (peak + 1e-3) - 0.2) / 0.35;
+      Z[1][t] = Math.max(rg, 0) / 0.3; Z[2][t] = Math.max(-rg, 0) / 0.3;
+      Z[3][t] = Math.max(by, 0) / 0.3; Z[4][t] = Math.max(-by, 0) / 0.3;
+    }
+    return Z;
+  };
+
+  // ---------- V1: complex Gabor cells per channel (replicate padding), standardised; plus the channel itself (keep_dc)
+  Model.prototype.v1Input = function (z, c) {
+    const K = this.A.gabor_kernels, ks = this.K.kernel, h = ks >> 1, NG = this.K.n_gabor;
+    const gm = this.A.g_mean, gs = this.A.g_std, out = new Float64Array(784 * (NG + 1));
+    const px = (y, x) => z[Math.min(27, Math.max(0, y)) * 28 + Math.min(27, Math.max(0, x))];
+    const patch = new Float64Array(ks * ks);
+    for (let y = 0; y < 28; y++) for (let x = 0; x < 28; x++) {
+      for (let u = 0; u < ks; u++) for (let v = 0; v < ks; v++) patch[u * ks + v] = px(y + u - h, x + v - h);
+      const t = y * 28 + x;
+      for (let f = 0; f < NG; f++) {
+        let ev = 0, od = 0; const ke = f * ks * ks, ko = (f + NG) * ks * ks;
+        for (let q = 0; q < ks * ks; q++) { ev += patch[q] * K[ke + q]; od += patch[q] * K[ko + q]; }
+        out[t * (NG + 1) + f] = (Math.sqrt(ev * ev + od * od + 1e-6) - gm[c * NG + f]) / gs[c * NG + f];
+      }
+      out[t * (NG + 1) + NG] = z[t];
+    }
+    return out;
+  };
+
+  // ---------- one bank of damped complex resonators read along the scan line -> energy (M x 784), smoothed
+  Model.prototype.energy = function (ly, x) {
+    const L = 784, M = ly.M, d = ly.din, g = this.K.GAMMA, e = new Float64Array(M * L);
+    for (let m = 0; m < M; m++) {
+      const lr = ly.lr[m], li = ly.li[m], o = m * d;
+      let hr = 0, hi = 0, s = 0;
+      for (let t = 0; t < L; t++) {
+        let sr = 0, si = 0; const xo = t * d;
+        for (let j = 0; j < d; j++) { const v = x[xo + j]; sr += ly.Br[o + j] * v; si += ly.Bi[o + j] * v; }
+        const nr = lr * hr - li * hi + sr, ni = lr * hi + li * hr + si; hr = nr; hi = ni;
+        s = g * s + (1 - g) * (hr * hr + hi * hi);
+        e[m * L + t] = s;
+      }
+    }
+    return e;
+  };
+  Model.prototype.band = function (ly, e, feats) {
+    for (let m = 0; m < ly.M; m++) for (let b = 0; b < 4; b++) {
+      let s = 0; for (let t = b * 196; t < (b + 1) * 196; t++) s += e[m * 784 + t];
+      feats.push(Math.log(s / 196 / ly.mu[m] + 1e-3));
+    }
+  };
+  Model.prototype.next = function (ly, e, out, stride, off) { // (M x L) -> out[t * stride + off + m]
+    for (let m = 0; m < ly.M; m++) for (let t = 0; t < 784; t++)
+      out[t * stride + off + m] = (Math.log(e[m * 784 + t] / ly.mu[m] + 1e-3) - ly.rm) / ly.rs;
+  };
+
+  // ---------- image -> 1,408 node activities (positive standardised features)
+  Model.prototype.features = function (X) {
+    const Z = this.opponent(X), feats = [], C = this.K.CH.length, M1 = this.K.M1;
+    let x = new Float64Array(784 * C * M1);
+    for (let c = 0; c < C; c++) {
+      const ly = this.layers[c], e = this.energy(ly, this.v1Input(Z[c], c));
+      this.band(ly, e, feats); this.next(ly, e, x, C * M1, c * M1);
+    }
+    for (let k = C; k < this.layers.length; k++) {
+      const ly = this.layers[k], e = this.energy(ly, x);
+      this.band(ly, e, feats); const nx = new Float64Array(784 * ly.M); this.next(ly, e, nx, ly.M, 0); x = nx;
+    }
+    const mu = this.A.feat_mu, sd = this.A.feat_sd;
+    return Float64Array.from(feats, (f, i) => Math.max(0, (f - mu[i]) / sd[i]));
+  };
+
+  // ---------- resonance of every structure in a block: a^T W a / |a|^2
+  function resonance(S, a) {
+    if (S.U) return lowRank(S, a);
+    const N = a.length, n = S.start.length - 1, R = new Float64Array(n);
+    let nrm = 1e-9; for (let i = 0; i < N; i++) nrm += a[i] * a[i];
+    for (let k = 0; k < n; k++) {
+      let s = 0;
+      for (let q = S.start[k]; q < S.start[k + 1]; q++) { const ij = S.idx[q]; s += S.val[q] * a[(ij / N) | 0] * a[ij % N]; }
+      R[k] = s / nrm;
+    }
+    return R;
+  }
+  function lowRank(S, a) {
+    const { U, sgn, n, N, r } = S, R = new Float64Array(n);
+    let nrm = 1e-9; for (let i = 0; i < N; i++) nrm += a[i] * a[i];
+    const p = new Float64Array(r);
+    for (let k = 0; k < n; k++) {
+      p.fill(0); const o = k * N * r;
+      for (let i = 0; i < N; i++) { const ai = a[i]; if (!ai) continue; const row = o + i * r; for (let j = 0; j < r; j++) p[j] += U[row + j] * ai; }
+      let s = 0; for (let j = 0; j < r; j++) s += sgn[k * r + j] * p[j] * p[j];
+      R[k] = s / nrm;
+    }
+    return R;
+  }
+  function zscore(R) {
+    const n = R.length; let m = 0; for (const r of R) m += r; m /= n;
+    let v = 0; for (const r of R) v += (r - m) ** 2; const sd = Math.sqrt(v / (n - 1)) + 1e-9;
+    return Float64Array.from(R, r => (r - m) / sd);
+  }
+  Model.prototype.letters = function (a) { return resonance(this.chr, a); };
+
+  // ---------- letter cells: soma (leaky) -> axon resonators (energy) + end-of-word phase (ON/OFF) -> word nodes
+  Model.prototype.wordNodes = function (Rcs) {
+    const K = this.K, T = K.HOLD + K.BLANK, nc = K.Lc.length, len = Rcs.length;
+    const steps = Math.max(6, len) * T;                      // training batches were padded to 6 letters ("yellow")
+    const u = []; for (let t = 0; t < steps; t++) u.push(new Float64Array(nc));
+    Rcs.forEach((R, j) => { const z = zscore(R); for (let t = j * T; t < j * T + K.HOLD; t++) for (let i = 0; i < nc; i++) u[t][i] = Math.max(0, z[i]); });
+    const y = []; let v = new Float64Array(nc);
+    for (let t = 0; t < steps; t++) { const nv = new Float64Array(nc); for (let i = 0; i < nc; i++) nv[i] = K.ALPHA * v[i] + (1 - K.ALPHA) * u[t][i]; v = nv; y.push(nv); }
+    const E = new Float64Array(nc * K.OMEGA.length), end = len * T - 1, ph = [];
+    K.OMEGA.forEach((w, f) => {
+      const lr = K.RHO * Math.cos(w), li = K.RHO * Math.sin(w);
+      const hr = new Float64Array(nc), hi = new Float64Array(nc), e = new Float64Array(nc), er = new Float64Array(nc), ei = new Float64Array(nc);
+      for (let t = 0; t < steps; t++) for (let i = 0; i < nc; i++) {
+        const nr = lr * hr[i] - li * hi[i] + y[t][i], ni = lr * hi[i] + li * hr[i]; hr[i] = nr; hi[i] = ni;
+        e[i] += nr * nr + ni * ni; if (t === end) { er[i] = nr; ei[i] = ni; }
+      }
+      for (let i = 0; i < nc; i++) E[i * K.OMEGA.length + f] = Math.log(e[i] / steps + 1e-4);
+      if (f > 0) {
+        let mx = 0; for (let i = 0; i < nc; i++) mx = Math.max(mx, Math.hypot(er[i], ei[i]));
+        const s = 1 / (mx + 1e-6);
+        ph.push(er.map(r => Math.max(0, r * s)), er.map(r => Math.max(0, -r * s)), ei.map(r => Math.max(0, r * s)), ei.map(r => Math.max(0, -r * s)));
+      }
+    });
+    const N = new Float64Array(K.n_word_nodes); N.set(E, 0);
+    let o = E.length; for (const p of ph) for (let i = 0; i < nc; i++) N[o++] = Math.log(p[i] + 0.05);
+    return N;
+  };
+  Model.prototype.wordAct = function (N) {
+    const mu = this.A.word_mu, sd = this.A.word_sd;
+    return Float64Array.from(N, (v, i) => Math.max(0, (v - mu[i]) / sd[i]));
+  };
+
+  // ---------- full read of a word: cells (array of 784*3 images) -> everything the page shows
+  Model.prototype.read = function (cells) {
+    const acts = cells.map(c => this.features(c));
+    const Rc = acts.map(a => this.letters(a));
+    const N = this.wordNodes(Rc), WA = this.wordAct(N);
+    return { acts, Rc, N, WA, Rw: resonance(this.word, WA), Rs: resonance(this.set, WA) };
+  };
+  Model.prototype.name = function (patch) {
+    const a = this.features(patch);
+    return { a, Ra: resonance(this.assoc, a) };
+  };
+  Model.prototype.assocOf = function (k, a) { // one word's association resonating on patch activity a
+    const S = this.assoc, one = { start: [0, S.start[k + 1] - S.start[k]], idx: S.idx.subarray(S.start[k], S.start[k + 1]), val: S.val.subarray(S.start[k], S.start[k + 1]) };
+    return resonance(one, a)[0];
+  };
+  Model.zscore = zscore;
+
+  root.Exp6Live = { load };
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script>
+(function () {
+  const canvas = document.getElementById("scene3d");
+  if (!canvas || !window.THREE) return;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || "#888";
+  let T = {};
+  const readTokens = () => { T = { bg: css("--paper"), ink: css("--ink"), muted: css("--muted"), rule: css("--rule"), accent: css("--accent"), warm: css("--warm") }; };
+  readTokens();
+
+  function glGuard(canvas, opts) {
+    // Chrome turns WebGL off for a site after its pages lose the GPU context a few times; say so instead of a blank page.
+    const fail = msg => {
+      if (canvas.nextElementSibling && canvas.nextElementSibling.classList.contains("gl-fail")) return;
+      const d = document.createElement("div"); d.className = "gl-fail"; d.setAttribute("role", "status"); d.innerHTML = msg;
+      canvas.style.visibility = "hidden"; canvas.insertAdjacentElement("afterend", d);
+    };
+    const BLOCKED = "<b>The 3D view could not start.</b> Your browser has turned off WebGL for this site, usually after a page lost its graphics context. Quit the browser completely (every window) and open this page again. If it still fails, check that hardware acceleration is on in the browser settings.";
+    let r;
+    try { r = new THREE.WebGLRenderer(Object.assign({ canvas }, opts)); } catch (e) { fail(BLOCKED); return null; }
+    const state = { renderer: r, lost: false };
+    canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); state.lost = true; fail("<b>The 3D view lost its graphics context.</b> It will come back on its own if the browser restores it; otherwise reload the page."); });
+    canvas.addEventListener("webglcontextrestored", () => location.reload());
+    window.addEventListener("pagehide", e => { if (e.persisted) return; r.dispose(); r.forceContextLoss(); });
+    return state;
+  }
+  const gl = glGuard(canvas, { antialias: true, alpha: false });
+  if (!gl) return;
+  const renderer = gl.renderer;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.6); sun.position.set(5, 10, 8); scene.add(sun);
+
+  const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""), DIGITS = "0123456789".split("");
+  const WORDS = { logic: ["yes", "no", "maybe"], colour: ["red", "green", "blue", "yellow"], other: ["on", "bed", "bay", "sea"] };
+  const RGB = { red: 0xe23b3b, green: 0x2fb84a, blue: 0x3f63e8, yellow: 0xe7c62a, cyan: 0x2fc8d0, magenta: 0xd03fd0 };
+
+  // ---------- helpers
+  const all = [];
+  function label(text, size = 0.42, color, weight = 600) {
+    const c = document.createElement("canvas"), ctx = c.getContext("2d");
+    const px = 64; ctx.font = `${weight} ${px}px "Bricolage Grotesque", system-ui, sans-serif`;
+    const w = Math.ceil(ctx.measureText(text).width) + 16; c.width = w; c.height = px + 20;
+    ctx.font = `${weight} ${px}px "Bricolage Grotesque", system-ui, sans-serif`;
+    ctx.fillStyle = color || T.ink; ctx.textBaseline = "middle"; ctx.fillText(text, 8, c.height / 2);
+    const tex = new THREE.CanvasTexture(c); tex.minFilter = THREE.LinearFilter;
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    s.scale.set(size * w / c.height, size, 1); s.userData = { text, size, color, weight }; all.push(s);
+    return s;
+  }
+  function node(r, color, x, y, z) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 12), new THREE.MeshStandardMaterial({ color, roughness: 0.6, emissive: 0x000000 }));
+    m.position.set(x, y, z); scene.add(m); return m;
+  }
+  function line(a, b, color, opacity = 0.35) {
+    const g = new THREE.BufferGeometry().setFromPoints([a, b]);
+    const l = new THREE.Line(g, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+    scene.add(l); return l;
+  }
+  function halo(x, y, z, r, color) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 28, 18), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.07, depthWrite: false }));
+    m.position.set(x, y, z); scene.add(m); return m;
+  }
+  const accent = () => new THREE.Color(T.accent), warm = () => new THREE.Color(T.warm);
+
+  // ---------- stages along x
+  const stageTitles = [];
+  function stageTitle(text, x, y) { const s = label(text, 0.36, T.muted, 500); s.position.set(x, y, 0); scene.add(s); stageTitles.push(s); }
+
+  // 1. input: word tiles and patch tile
+  const tiles = [];
+  const tileGroup = new THREE.Group(); scene.add(tileGroup);
+  for (let i = 0; i < 6; i++) {
+    const c = document.createElement("canvas"); c.width = c.height = 96;
+    const tex = new THREE.CanvasTexture(c);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    m.position.set(-10.5, 2.6 - i * 1.08, 0); m.rotation.y = Math.PI / 2.6; tileGroup.add(m);
+    tiles.push({ m, c, tex });
+  }
+  function drawTile(t, ch, ink) {
+    const ctx = t.c.getContext("2d"); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 96, 96);
+    if (ch) { ctx.fillStyle = ink || "#fff"; ctx.font = "700 70px 'DejaVu Sans', Arial, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(ch, 48, 52); }
+    t.tex.needsUpdate = true;
+  }
+  tiles.forEach(t => drawTile(t, ""));
+  const eye = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.05, 8, 40), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  eye.rotation.y = Math.PI / 2.6; scene.add(eye); eye.visible = false;
+  const patch = new THREE.Mesh(new THREE.CircleGeometry(0.75, 40), new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide }));
+  patch.position.set(-10.5, -5.2, 0); patch.rotation.y = Math.PI / 2.6; scene.add(patch);
+  stageTitle("image", -10.5, 4.1); stageTitle("patch", -10.5, -6.4);
+
+  // 2. retina channels
+  const chColors = [0xbfbfbf, 0xd94b4b, 0x3fb35b, 0x4b6be0, 0xd9bf3a];
+  const retina = chColors.map((c, i) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.5, 1.5), new THREE.MeshStandardMaterial({ color: c, transparent: true, opacity: 0.55 }));
+    m.position.set(-7.6 + i * 0.28, 0, 0); scene.add(m); return m;
+  });
+  stageTitle("retina", -7, 1.6);
+
+  // 3. V1: oriented stripes
+  const v1 = [];
+  for (let k = 0; k < 8; k++) {
+    const c = document.createElement("canvas"); c.width = c.height = 64; const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, 64, 64); ctx.translate(32, 32); ctx.rotate((k % 4) * Math.PI / 4);
+    const w = k < 4 ? 8 : 14; ctx.fillStyle = "#222"; for (let x = -64; x < 64; x += w * 2) ctx.fillRect(x, -64, w, 128);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), side: THREE.DoubleSide }));
+    m.position.set(-4.6, 1.2 - Math.floor(k / 2) * 0.72, (k % 2 ? 0.36 : -0.36)); m.rotation.y = Math.PI / 2; scene.add(m); v1.push(m);
+  }
+  stageTitle("V1 Gabor", -4.6, 2.2);
+
+  // 4. resonator body
+  const res = [];
+  [[32, 1.25, -2.4], [24, 0.95, -1.4], [16, 0.65, -0.5]].forEach(([n, r, x]) => {
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      res.push(node(0.07, 0x8aa0a8, x, Math.cos(a) * r, Math.sin(a) * r));
+    }
+  });
+  stageTitle("resonators", -1.4, 2.0);
+
+  // 5. character structures + sets
+  const chars = {};
+  LETTERS.forEach((L, i) => { const a = (i / 26) * Math.PI * 2; chars[L] = node(0.13, 0x9fb0b6, 2.4, 2.4 + Math.cos(a) * 1.3, Math.sin(a) * 1.3); });
+  DIGITS.forEach((D, i) => { const a = (i / 10) * Math.PI * 2; chars[D] = node(0.13, 0x9fb0b6, 2.4, -2.6 + Math.cos(a) * 0.8, Math.sin(a) * 0.8); });
+  const charLabels = {};
+  for (const k in chars) { const s = label(k, 0.26); s.position.copy(chars[k].position).add(new THREE.Vector3(0, 0.25, 0)); scene.add(s); charLabels[k] = s; }
+  const haloLetter = halo(2.4, 2.4, 0, 1.75, 0x5aa5a0), haloNumber = halo(2.4, -2.6, 0, 1.2, 0x5aa5a0);
+  const tl = label("letter", 0.36, T.accent); tl.position.set(2.4, 4.5, 0); scene.add(tl);
+  const tn = label("number", 0.36, T.accent); tn.position.set(2.4, -4.1, 0); scene.add(tn);
+  stageTitle("stage A: characters and their sets", 2.4, 5.2);
+
+  // 6. letter cells: soma + axon resonators
+  const cells = {};
+  LETTERS.concat(DIGITS).forEach((k, i) => {
+    const row = Math.floor(i / 6), col = i % 6;
+    const g = new THREE.Group(); g.position.set(5.6, 2.2 - row * 0.85, -1.9 + col * 0.76); scene.add(g);
+    const soma = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.12, 14), new THREE.MeshStandardMaterial({ color: 0x9fb0b6 }));
+    const axon = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.025, 6, 24), new THREE.MeshBasicMaterial({ color: 0x9fb0b6, transparent: true, opacity: 0.5 }));
+    axon.rotation.y = Math.PI / 2; axon.position.x = 0.32; g.add(soma); g.add(axon);
+    cells[k] = { g, soma, axon, v: 0, spin: 0 };
+  });
+  stageTitle("letter cells: soma + axon resonators", 5.6, 3.3);
+
+  // 7. word structures and sets
+  const words = {}, sets = {};
+  const setPos = { logic: [9.4, 2.6, 0], colour: [9.4, -0.6, 0], other: [9.4, -3.9, 0] };
+  for (const s in WORDS) {
+    const [x, y, z] = setPos[s]; sets[s] = halo(x, y, z, 1.25, 0x5aa5a0);
+    const sl = label(s, 0.34, T.accent); sl.position.set(x + 0.2, y + 1.45, 0); scene.add(sl);
+    WORDS[s].forEach((w, i) => {
+      const a = (i / WORDS[s].length) * Math.PI * 2 + 0.4;
+      words[w] = node(0.2, RGB[w] && s === "colour" ? RGB[w] : 0x9fb0b6, x, y + Math.cos(a) * 0.7, Math.sin(a) * 0.7);
+      const l = label(w, 0.3); l.position.copy(words[w].position).add(new THREE.Vector3(0, 0.36, 0)); scene.add(l);
+    });
+  }
+  stageTitle("stage B: words and their sets", 9.4, 4.6);
+
+  // 8. patch path and associations (stage C)
+  const patchNodes = node(0.32, 0x9fb0b6, -1.4, -5.2, 0);
+  line(patch.position, patchNodes.position, 0x8aa0a8, 0.3);
+  const assoc = {};
+  WORDS.colour.forEach(w => { assoc[w] = line(patchNodes.position, words[w].position, RGB[w], 0.12); });
+  stageTitle("stage C: a patch evokes the word that named it", 3, -6.3);
+
+  // static wiring hints
+  line(new THREE.Vector3(-10.2, 0, 0), new THREE.Vector3(-7.7, 0, 0), 0x8aa0a8, 0.2);
+  line(new THREE.Vector3(-6.4, 0, 0), new THREE.Vector3(-4.8, 0, 0), 0x8aa0a8, 0.2);
+  line(new THREE.Vector3(-4.3, 0, 0), new THREE.Vector3(-2.4, 0, 0), 0x8aa0a8, 0.2);
+  line(new THREE.Vector3(-0.5, 0, 0), new THREE.Vector3(2.0, 0, 0), 0x8aa0a8, 0.2);
+
+  // ---------- pulses
+  const pulses = [];
+  function pulse(from, to, color, dur = 0.5) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshBasicMaterial({ color }));
+    scene.add(m); pulses.push({ m, from: from.clone(), to: to.clone(), t: 0, dur });
+  }
+
+  // ---------- state and timeline
+  const glow = new Map();
+  function light(mesh, amount, color) { glow.set(mesh, { a: amount, color: color || accent() }); }
+  let queue = [], clock = 0;
+  const caption = document.getElementById("sceneCaption");
+  function say(t) { if (caption) caption.textContent = t; }
+  function schedule(steps) { queue = steps.map(s => ({ ...s })); clock = 0; }
+
+  const zs = R => { const n = R.length; let m = 0; for (const r of R) m += r; m /= n; let v = 0; for (const r of R) v += (r - m) ** 2; const sd = Math.sqrt(v / (n - 1)) + 1e-9; return Array.from(R, r => (r - m) / sd); };
+  const top1 = a => { let b = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[b]) b = i; return b; };
+  Object.values(WORDS).flat().forEach(w => { if (!assoc[w]) { assoc[w] = line(patchNodes.position, words[w].position, 0x9fb0b6, 0); assoc[w].userData.base = 0; } else assoc[w].userData.base = 0.12; });
+  function drawTileImg(t, img) {
+    if (!img) return drawTile(t, "");
+    const s = document.createElement("canvas"); s.width = s.height = 28; const sx = s.getContext("2d"), id = sx.createImageData(28, 28);
+    for (let i = 0; i < 784; i++) { for (let c = 0; c < 3; c++) id.data[4 * i + c] = img[3 * i + c] * 255; id.data[4 * i + 3] = 255; }
+    sx.putImageData(id, 0, 0);
+    const ctx = t.c.getContext("2d"); ctx.imageSmoothingEnabled = false; ctx.drawImage(s, 0, 0, 96, 96); t.tex.needsUpdate = true;
+  }
+  // Replays one live read: every intensity below is a value the model computed for this image.
+  function playWord(res, imgs, LC, LW, LS) {
+    tiles.forEach((t, i) => drawTileImg(t, imgs[i]));
+    for (const k in cells) cells[k].v = 0;
+    const steps = [], winners = [];
+    imgs.slice(0, tiles.length).forEach((img, i) => {
+      const z = zs(res.Rc[i]), order = z.map((v, j) => [v, j]).sort((p, q) => q[0] - p[0]), win = LC[order[0][1]];
+      let l = -1e9, d = -1e9; LC.forEach((c, j) => { if (DIGITS.includes(c)) d = Math.max(d, z[j]); else l = Math.max(l, z[j]); });
+      winners.push(win);
+      steps.push({ at: i * 0.9, run: () => {
+        eye.visible = true; eye.position.copy(tiles[i].m.position);
+        pulse(tiles[i].m.position, new THREE.Vector3(-7, 0, 0), 0xffffff, 0.3);
+        setTimeout(() => pulse(new THREE.Vector3(-4.6, 0, 0), new THREE.Vector3(-1.4, 0, 0), 0xffffff, 0.3), 200);
+        setTimeout(() => {
+          order.slice(0, 4).forEach(([v, j]) => { if (v > 0) light(chars[LC[j]], Math.min(1.3, v / 2.5)); });
+          pulse(new THREE.Vector3(-0.5, 0, 0), chars[win].position, accent(), 0.3);
+          light(d > l ? haloNumber : haloLetter, 0.6);
+        }, 450);
+        setTimeout(() => { z.forEach((v, j) => { if (v > 0) cells[LC[j]].v = Math.max(cells[LC[j]].v, Math.min(1, v / 3)); }); pulse(chars[win].position, cells[win].g.position, accent(), 0.3); }, 700);
+        say(`Fixation ${i + 1}: "${win}" resonates most (z ${order[0][0].toFixed(1)}), then ${LC[order[1][1]]} (${order[1][0].toFixed(1)}) and ${LC[order[2][1]]} (${order[2][0].toFixed(1)}). Every letter cell with a positive z-score charges.`);
+      } });
+    });
+    const zw = zs(res.Rw), bw = top1(res.Rw), bs = top1(res.Rs);
+    steps.push({ at: Math.min(imgs.length, tiles.length) * 0.9 + 0.4, run: () => {
+      eye.visible = false;
+      for (const k of winners) pulse(cells[k].g.position, words[LW[bw]].position, accent(), 0.5);
+      setTimeout(() => {
+        LW.forEach((w, k) => { if (zw[k] > 0) light(words[w], Math.min(1.3, zw[k] / 2.2)); });
+        light(sets[LS[bs]], 0.9);
+        say(`After the last saccade the letter cells' frequency signature makes "${LW[bw]}" resonate most (z ${zw[bw].toFixed(1)} across the 11 words); the set that resonates most is "${LS[bs]}".`);
+      }, 520);
+    } });
+    schedule(steps);
+  }
+  function playPatch(Ra, rgbHex, LW, vig) {
+    patch.material.color.set(rgbHex);
+    const b = top1(Ra), mx = Math.max(1e-9, ...Ra), set = Object.keys(WORDS).find(s => WORDS[s].includes(LW[b]));
+    schedule([{ at: 0, run: () => {
+      pulse(patch.position, patchNodes.position, new THREE.Color(rgbHex), 0.6);
+      setTimeout(() => {
+        light(patchNodes, 0.8, new THREE.Color(rgbHex));
+        LW.forEach((w, k) => { if (Ra[k] > 0) assoc[w].material.opacity = 0.15 + 0.75 * Ra[k] / mx; });
+        if (Ra[b] >= vig) {
+          light(words[LW[b]], 1.2); light(sets[set], 0.9);
+          pulse(patchNodes.position, words[LW[b]].position, new THREE.Color(rgbHex), 0.7);
+          say(`The patch evokes "${LW[b]}": its association resonates at ${Ra[b].toFixed(3)}, above vigilance (${vig.toFixed(3)}). No string "${LW[b]}" is stored anywhere.`);
+        } else {
+          say(`No association reaches vigilance (the best, "${LW[b]}", resonates at ${Ra[b].toFixed(3)} against ${vig.toFixed(3)}), so the agent would ask for a word.`);
+        }
+      }, 620);
+    } }]);
+  }
+  window.Exp6Scene = { playWord, playPatch };
+
+  // ---------- camera orbit
+  let theta = -0.55, phi = 1.15, radius = 26, target = new THREE.Vector3(0, -0.4, 0), drag = null;
+  function placeCamera() {
+    camera.position.set(target.x + radius * Math.sin(phi) * Math.sin(theta), target.y + radius * Math.cos(phi), target.z + radius * Math.sin(phi) * Math.cos(theta));
+    camera.lookAt(target);
+  }
+  canvas.addEventListener("pointerdown", e => { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener("pointermove", e => {
+    if (!drag) return; theta -= (e.clientX - drag.x) * 0.006; phi = Math.min(2.6, Math.max(0.35, phi - (e.clientY - drag.y) * 0.006));
+    drag = { x: e.clientX, y: e.clientY };
+  });
+  canvas.addEventListener("pointerup", () => drag = null);
+  canvas.addEventListener("wheel", e => { e.preventDefault(); radius = Math.min(45, Math.max(10, radius * (1 + Math.sign(e.deltaY) * 0.08))); }, { passive: false });
+
+  function resize() {
+    const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
+    renderer.setSize(w, h, false); camera.aspect = w / h;
+    radius = Math.max(radius, w < 520 ? 34 : 24); camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize); window.addEventListener("tabshown", () => setTimeout(resize, 30));
+  function applyTheme() {
+    readTokens(); scene.background = new THREE.Color(T.bg);
+    const sprites = all.splice(0);   // label() registers each new sprite in `all`; rebuild from a fixed copy
+    for (const s of sprites) {
+      const d = s.userData; const fresh = label(d.text, d.size, d.color === undefined ? undefined : (stageTitles.includes(s) ? T.muted : T.accent), d.weight);
+      all.pop();
+      s.material.map.dispose(); s.material.map = fresh.material.map; s.material.needsUpdate = true;
+    }
+    all.push(...sprites);
+  }
+  scene.background = new THREE.Color(T.bg);
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  if (mq.addEventListener) mq.addEventListener("change", () => setTimeout(applyTheme, 50));
+  new MutationObserver(() => setTimeout(applyTheme, 50)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(applyTheme);
+
+  // ---------- loop
+  let last = performance.now();
+  function frame(now) {
+    if (gl.lost) return;
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; clock += dt;
+    while (queue.length && queue[0].at <= clock) queue.shift().run();
+    if (!drag && !reduce) theta += dt * 0.04;
+    placeCamera();
+    for (let i = pulses.length - 1; i >= 0; i--) {
+      const p = pulses[i]; p.t += dt / p.dur;
+      p.m.position.lerpVectors(p.from, p.to, Math.min(1, p.t));
+      if (p.t >= 1) { scene.remove(p.m); p.m.geometry.dispose(); pulses.splice(i, 1); }
+    }
+    for (const [m, g] of glow) {
+      g.a *= Math.pow(0.35, dt);
+      if (m.material.emissive) { m.material.emissive.copy(g.color).multiplyScalar(Math.min(1, g.a)); m.scale.setScalar(1 + 0.6 * Math.min(1, g.a)); }
+      else m.material.opacity = 0.07 + 0.25 * Math.min(1, g.a);
+      if (g.a < 0.02) { glow.delete(m); if (m.material.emissive) { m.material.emissive.set(0x000000); m.scale.setScalar(1); } else m.material.opacity = 0.07; }
+    }
+    for (const k in cells) {
+      const c = cells[k]; c.v *= Math.pow(0.5, dt * 2);
+      c.soma.scale.y = 1 + 6 * c.v; c.soma.material.color.lerpColors(new THREE.Color(0x9fb0b6), accent(), Math.min(1, c.v * 1.5));
+      c.axon.rotation.x += dt * 8 * c.v; c.axon.material.opacity = 0.35 + 0.65 * Math.min(1, c.v * 2);
+    }
+    Object.values(assoc).forEach(l => { l.material.opacity = Math.max(l.userData.base, l.material.opacity - dt * 0.4); });
+    res.forEach((r, i) => { r.scale.setScalar(1 + 0.35 * Math.sin(now / 300 + i * 0.7) * (reduce ? 0 : 1)); });
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const status = t => { $("status").textContent = t; };
+  const randn = () => { let u = 0; while (!u) u = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * Math.random()); };
+  const argmax = a => { let b = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[b]) b = i; return b; };
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let model = null, K = null;
+
+  // The published site stores every data file encrypted under the session key (see experiments/hub/lock_site.py).
+  async function fetchBytes(url) {
+    const r = await fetch(url, { cache: "no-cache" });
+    if (!r.ok) throw new Error(`${url}: ${r.status}`);
+    let b = await r.arrayBuffer();
+    try {
+      const k = JSON.parse(sessionStorage.getItem("exp1-site-key") || "null");
+      if (k && k.key) {
+        const key = await crypto.subtle.importKey("raw", Uint8Array.from(atob(k.key), c => c.charCodeAt(0)), "AES-GCM", false, ["decrypt"]);
+        const u = new Uint8Array(b);
+        b = await crypto.subtle.decrypt({ name: "AES-GCM", iv: u.slice(0, 12) }, key, u.slice(12));
+      }
+    } catch (e) { /* not encrypted (local copy): use the bytes as they are */ }
+    return b;
+  }
+  const fetchJSON = async url => JSON.parse(new TextDecoder().decode(await fetchBytes(url)));
+
+  // ---------- rendering, as alphabet_world.render: glyph centred on its box in a 3x canvas, rotated, cropped with jitter
+  const FONTS = [["Inter (never seen in training)", "Inter"], ["Sans serif (your system)", "sans-serif"], ["Serif (your system)", "serif"],
+    ["Monospace (your system)", "monospace"], ["Roboto Slab", "'Roboto Slab'"], ["Courier Prime", "'Courier Prime'"],
+    ["Playfair Display", "'Playfair Display'"], ["Caveat (handwriting)", "Caveat"]];
+  const big = document.createElement("canvas"); big.width = big.height = 84;
+  function renderCell(ch, font, size, rot, ink) {
+    const ctx = big.getContext("2d", { willReadFrequently: true });
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 84, 84);
+    ctx.font = `${font.weight} ${size}px ${font.css}`; ctx.textBaseline = "alphabetic"; ctx.textAlign = "left"; ctx.fillStyle = "#fff";
+    const m = ctx.measureText(ch);
+    const x0 = 42 - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2, y0 = 42 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+    ctx.translate(42, 42); ctx.rotate(-rot * Math.PI / 180); ctx.translate(-42, -42);  // PIL rotates counter-clockwise
+    ctx.fillText(ch, x0, y0);
+    const dx = Math.trunc((Math.random() * 0.16 - 0.08) * 28), dy = Math.trunc((Math.random() * 0.16 - 0.08) * 28);
+    const px = ctx.getImageData(28 + dx, 28 + dy, 28, 28).data;
+    return inked(px, ink);
+  }
+  function inked(px, ink) {
+    const X = new Float64Array(784 * 3);
+    for (let i = 0; i < 784; i++) for (let c = 0; c < 3; c++) X[3 * i + c] = Math.min(1, Math.max(0, px[4 * i] / 255 * ink[c] + 0.04 * Math.random()));
+    return X;
+  }
+  function paint(canvas, X) {
+    const ctx = canvas.getContext("2d"), id = ctx.createImageData(28, 28);
+    for (let i = 0; i < 784; i++) { for (let c = 0; c < 3; c++) id.data[4 * i + c] = X[3 * i + c] * 255; id.data[4 * i + 3] = 255; }
+    ctx.putImageData(id, 0, 0);
+  }
+
+  // ---------- small views
+  function bars(host, items, opts = {}) {
+    const max = Math.max(1e-9, ...items.map(d => d.v), opts.mark || 0);
+    host.innerHTML = items.map(d => `<div class="bar${d.win ? " win" : ""}"><span>${esc(d.k)}</span><span class="track"><span class="fill" style="width:${Math.max(0, d.v / max * 100).toFixed(1)}%"></span>${opts.mark ? `<span class="vig" style="left:${(opts.mark / max * 100).toFixed(1)}%"></span>` : ""}</span><span class="num">${d.v.toFixed(opts.dp || 3)}</span></div>`).join("");
+  }
+  function memberSet(z) { // letter or number, read through the members (logsumexp of their z-scores)
+    const lse = js => { let mx = -1e9; for (const j of js) mx = Math.max(mx, z[j]); let s = 0; for (const j of js) s += Math.exp(z[j] - mx); return mx + Math.log(s); };
+    const L = [], D = []; K.Lc.forEach((c, j) => (/[0-9]/.test(c) ? D : L).push(j));
+    const l = lse(L), d = lse(D); return { set: l >= d ? "letter" : "number", l, d };
+  }
+
+  // ---------- read a word
+  const st = { ink: [1, 1, 1], cells: null, word: "" };
+  function currentFont() { const [name, css] = FONTS[+$("font").value]; return { name, css, weight: css === "Caveat" || css.includes("Courier") || css.includes("Playfair") ? 700 : 600 }; }
+  function renderWord() {
+    const w = $("word").value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+    $("word").value = w; st.word = w;
+    const size = Math.floor(+$("size").value / 100 * 28), rot = +$("slant").value, font = currentFont();
+    st.cells = w.split("").map(ch => renderCell(ch, font, size, rot, st.ink));
+  }
+  async function readWord(rerender = true) {
+    if (!model) return;
+    if (rerender || !st.cells) { await document.fonts.load(`${currentFont().weight} 20px ${currentFont().css}`).catch(() => {}); renderWord(); }
+    if (!st.cells.length) { status("Type a word first."); return; }
+    $("readBtn").disabled = $("jitterBtn").disabled = true; status("Reading…");
+    await new Promise(r => setTimeout(r, 20));
+    const t0 = performance.now(), r = model.read(st.cells), ms = performance.now() - t0;
+    $("readBtn").disabled = $("jitterBtn").disabled = false;
+    status(`Read "${st.word}" in ${ms.toFixed(0)} ms: ${st.cells.length} fixations through 1,408 nodes each, then the letter cells and 576 word nodes.`);
+    const host = $("cells"); host.innerHTML = "";
+    r.Rc.forEach((R, i) => {
+      const z = Array.from(model.constructor.zscore ? model.constructor.zscore(R) : R);
+      const top = z.map((v, j) => [v, j]).sort((a, b) => b[0] - a[0]).slice(0, 3);
+      const div = document.createElement("div"); div.className = "cell";
+      const cv = document.createElement("canvas"); cv.width = cv.height = 28; paint(cv, st.cells[i]); div.appendChild(cv);
+      const ok = K.Lc[top[0][1]] === st.word[i];
+      div.insertAdjacentHTML("beforeend", `<div class="top"><b style="color:${ok ? "var(--accent)" : "var(--warm)"}">${esc(K.Lc[top[0][1]])}</b> ${top[0][0].toFixed(1)} · ${top.slice(1).map(([v, j]) => `${esc(K.Lc[j])} ${v.toFixed(1)}`).join(" · ")}</div><div class="set">set via members: ${memberSet(z).set}</div>`);
+      host.appendChild(div);
+    });
+    const bw = argmax(r.Rw), bs = argmax(r.Rs);
+    bars($("wordBars"), K.Lw.map((k, i) => ({ k, v: r.Rw[i], win: i === bw })).sort((a, b) => b.v - a.v));
+    bars($("setBars"), K.Ls.map((k, i) => ({ k, v: r.Rs[i], win: i === bs })));
+    const typed = st.word.toLowerCase(), known = K.Lw.includes(typed);
+    $("wordVerdict").textContent = `Read as "${K.Lw[bw]}", set "${K.Ls[bs]}"`;
+    $("wordNote").textContent = known ? (K.Lw[bw] === typed ? "That is the word you typed." : `You typed "${typed}"; the model got it wrong this time. Try Render again or another font.`)
+      : `"${typed}" was never taught. The model only has 11 word structures, so it answers with the one whose signature is closest.`;
+    if (window.Exp6Scene) window.Exp6Scene.playWord(r, st.cells, K.Lc, K.Lw, K.Ls);
+  }
+
+  // ---------- draw a character
+  function setupPad() {
+    const pad = $("pad"), ctx = pad.getContext("2d"); let down = false, last = null;
+    const clear = () => { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, 196, 196); $("padBars").innerHTML = ""; $("padSet").textContent = "Draw large, filling most of the box, as the training glyphs do."; };
+    clear();
+    const pos = e => { const b = pad.getBoundingClientRect(); return [(e.clientX - b.left) * 196 / b.width, (e.clientY - b.top) * 196 / b.height]; };
+    pad.addEventListener("pointerdown", e => { down = true; last = pos(e); pad.setPointerCapture(e.pointerId); });
+    pad.addEventListener("pointermove", e => {
+      if (!down) return; const p = pos(e);
+      ctx.strokeStyle = "#fff"; ctx.lineWidth = 17; ctx.lineCap = ctx.lineJoin = "round";
+      ctx.beginPath(); ctx.moveTo(...last); ctx.lineTo(...p); ctx.stroke(); last = p;
+    });
+    const up = () => { if (!down) return; down = false; readPad(); };
+    pad.addEventListener("pointerup", up); pad.addEventListener("pointercancel", up);
+    $("clearPad").addEventListener("click", clear);
+  }
+  function readPad() {
+    if (!model) return;
+    const small = document.createElement("canvas"); small.width = small.height = 28;
+    const sctx = small.getContext("2d", { willReadFrequently: true }); sctx.imageSmoothingEnabled = true; sctx.imageSmoothingQuality = "high";
+    sctx.drawImage($("pad"), 0, 0, 28, 28);
+    const X = inked(sctx.getImageData(0, 0, 28, 28).data, st.ink); paint($("padSmall"), X);
+    const R = model.letters(model.features(X)), z = Array.from(model.constructor.zscore(R));
+    const top = z.map((v, j) => ({ k: K.Lc[j], v })).sort((a, b) => b.v - a.v).slice(0, 6); top[0].win = true;
+    bars($("padBars"), top, { dp: 2 });
+    $("padSet").textContent = `Read as "${top[0].k}" (z-score shown). Set via members: ${memberSet(z).set}.`;
+  }
+
+  // ---------- name a colour, as digits_colours.colour_blobs
+  const COLOURS = [["red", [1, 0, 0]], ["green", [0, 1, 0]], ["blue", [0, 0, 1]], ["yellow", [1, 1, 0]], ["cyan", [0, 1, 1]], ["magenta", [1, 0, 1]], ["purple", [0.5, 0, 1]], ["orange", [1, 0.5, 0]]];
+  let rgb = [1, 0, 0];
+  function patchImage(c) {
+    const cx = 6 + 16 * Math.random(), cy = 6 + 16 * Math.random(), rx = 4 + 8 * Math.random(), ry = 4 + 8 * Math.random();
+    const s = 0.7 + 0.3 * Math.random(), col = c.map(v => Math.min(1, Math.max(0, v + 0.08 * randn())) * s);
+    const X = new Float64Array(784 * 3);
+    for (let y = 0; y < 28; y++) for (let x = 0; x < 28; x++) {
+      const m = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1 ? 1 : 0, v = Math.min(1, Math.max(0, m + 0.05 * randn())), i = y * 28 + x;
+      for (let k = 0; k < 3; k++) X[3 * i + k] = v * col[k];
+    }
+    return X;
+  }
+  const hex = c => "#" + c.map(v => Math.round(v * 255).toString(16).padStart(2, "0")).join("");
+  async function showPatch() {
+    if (!model) return;
+    const X = patchImage(rgb); paint($("patchImg"), X);
+    await new Promise(r => setTimeout(r, 10));
+    const { Ra } = model.name(X), vig = K.vigilance;
+    const has = K.Lw.map((w, k) => model.assoc.start[k + 1] > model.assoc.start[k]);
+    const b = argmax(Ra);
+    bars($("assocBars"), K.Lw.map((k, i) => ({ k, v: Ra[i], win: i === b })).filter((d, i) => has[i]).sort((a, c) => c.v - a.v), { mark: vig });
+    const v = $("patchVerdict");
+    if (Ra[b] >= vig) { v.className = "verdict"; v.textContent = `Evokes "${K.Lw[b]}" (${Ra[b].toFixed(3)}, above vigilance ${vig.toFixed(3)})`; }
+    else { v.className = "verdict ask"; v.textContent = `Nothing reaches vigilance (best "${K.Lw[b]}" at ${Ra[b].toFixed(3)}): the agent would ask for a word`; }
+    if (window.Exp6Scene) window.Exp6Scene.playPatch(Ra, hex(rgb), K.Lw, vig);
+  }
+
+  // ---------- check against Python
+  async function check() {
+    $("checkBtn").disabled = true; $("checkOut").innerHTML = '<p class="loading">Running…</p>';
+    await new Promise(r => setTimeout(r, 20));
+    const T = await fetchJSON("tests.json");
+    const flat = a => Float64Array.from(a.flat(2));
+    const diff = (a, b) => { let d = 0, s = 0; for (let i = 0; i < a.length; i++) { d = Math.max(d, Math.abs(a[i] - b[i])); s = Math.max(s, Math.abs(b[i])); } return [d, s]; };
+    const rows = [];
+    const cells = T.cells.map(flat), acts = cells.map(c => model.features(c));
+    let dA = 0, sA = 0, dR = 0, sR = 0, agree = 0;
+    acts.forEach((a, i) => { const [d, s] = diff(a, T.act[i]); dA = Math.max(dA, d); sA = Math.max(sA, s);
+      const R = model.letters(a), [d2, s2] = diff(R, T.Rc[i]); dR = Math.max(dR, d2); sR = Math.max(sR, s2); agree += argmax(R) === argmax(T.Rc[i]); });
+    rows.push(["1,408 node activities", cells.length + " cells", dA, sA], ["letter resonance (36)", `${agree}/${cells.length} same winner`, dR, sR]);
+    let k = 0, dN = 0, sN = 0, dW = 0, sW = 0, wa = 0;
+    T.words.forEach((w, i) => { const r = model.read(cells.slice(k, k + w.length)); k += w.length;
+      let [d, s] = diff(r.N, T.word_nodes[i]); dN = Math.max(dN, d); sN = Math.max(sN, s);
+      [d, s] = diff(r.Rw, T.Rw[i]); dW = Math.max(dW, d); sW = Math.max(sW, s); wa += argmax(r.Rw) === argmax(T.Rw[i]); });
+    rows.push(["576 word nodes", T.words.map(w => `"${w}"`).join(", "), dN, sN], ["word resonance (11)", `${wa}/${T.words.length} same winner`, dW, sW]);
+    let dP = 0, sP = 0, pa = 0;
+    T.patches.forEach((p, i) => { const { Ra } = model.name(flat(p)); const [d, s] = diff(Ra, T.Ra[i]); dP = Math.max(dP, d); sP = Math.max(sP, s); pa += argmax(Ra) === argmax(T.Ra[i]); });
+    rows.push(["patch associations (11)", `${pa}/${T.patches.length} same winner`, dP, sP]);
+    $("checkOut").innerHTML = `<table><tr><th>Output</th><th>Cases</th><th>Largest difference</th><th>Largest value</th></tr>${rows.map(r => `<tr><td>${r[0]}</td><td>${esc(r[1])}</td><td class="n">${r[2].toExponential(1)}</td><td class="n">${r[3].toFixed(3)}</td></tr>`).join("")}</table><p class="note" style="margin-top:8px">The browser runs the front end in 64-bit floats (Python uses 32-bit), and the letter, word and set structures ship compressed (rank ${K.rank.chr}, ${K.rank.word} and ${K.rank.set}, 16-bit factors) so the page downloads 15 MB instead of 579 MB. On held-out inputs the compressed structures pick the same winner as the full ones for ${(100 * K.rank_agreement.chr[K.rank.chr]).toFixed(1)}% of letters and ${(100 * K.rank_agreement.word[K.rank.word]).toFixed(1)}% of words, so differences of about 1e-3 are expected.</p>`;
+    $("checkBtn").disabled = false;
+  }
+
+  // ---------- controls
+  function setup() {
+    FONTS.forEach(([n], i) => $("font").insertAdjacentHTML("beforeend", `<option value="${i}">${esc(n)}</option>`));
+    K.inks.forEach((ink, i) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.setAttribute("aria-label", "ink " + hex(ink));
+      b.innerHTML = `<span class="dot" style="background:${hex(ink)}"></span>`; b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+      b.addEventListener("click", () => { st.ink = ink; $("inks").querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", String(x === b))); readWord(); });
+      $("inks").appendChild(b);
+    });
+    K.Lw.slice().sort().forEach(w => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = w; b.addEventListener("click", () => { $("word").value = w.toUpperCase(); readWord(); }); $("vocab").appendChild(b); });
+    COLOURS.forEach(([n, c], i) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.innerHTML = `<span class="dot" style="background:${hex(c)}"></span>${n}`;
+      b.setAttribute("aria-pressed", i === 0 ? "true" : "false");
+      b.addEventListener("click", () => { rgb = c; $("colours").querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", String(x === b))); showPatch(); });
+      $("colours").appendChild(b);
+    });
+    $("pick").addEventListener("input", e => { const h = e.target.value; rgb = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255); $("colours").querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", "false")); showPatch(); });
+    $("slant").addEventListener("input", e => { $("slantV").textContent = e.target.value + "°"; });
+    $("size").addEventListener("input", e => { $("sizeV").textContent = e.target.value + "%"; });
+    ["slant", "size", "font"].forEach(id => $(id).addEventListener("change", () => readWord()));
+    $("word").addEventListener("keydown", e => { if (e.key === "Enter") readWord(); });
+    $("readBtn").addEventListener("click", () => readWord());
+    $("jitterBtn").addEventListener("click", () => readWord());
+    $("patchBtn").addEventListener("click", showPatch);
+    $("checkBtn").addEventListener("click", () => check().catch(e => { $("checkOut").textContent = "Check failed: " + e.message; $("checkBtn").disabled = false; }));
+    setupPad();
+    ["readBtn", "jitterBtn", "patchBtn", "checkBtn"].forEach(id => $(id).disabled = false);
+  }
+
+  (async () => {
+    try {
+      const man = await fetchJSON("model.json"), bin = await fetchBytes("model.bin");
+      model = Exp6Live.load(man, bin); K = man.consts;
+      $("modelSize").textContent = `${(bin.byteLength / 1e6).toFixed(1)} MB: 36 letter structures, 11 word structures, 3 word sets and 11 naming associations`;
+      setup(); status("Model loaded.");
+      await readWord(); await showPatch();
+    } catch (e) { status("Could not load the model: " + e.message); }
+  })();
+})();
+
+</script>
+</body>
+</html>

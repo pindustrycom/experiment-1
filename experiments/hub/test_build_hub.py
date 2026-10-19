@@ -64,6 +64,16 @@ def test_exp5_and_exp6_pages_copied_and_linked(tmp_path):
     assert "Exp5 · vision stack" in hub and "Exp6 · alphabet and words" in hub
 
 
+def test_exp6_live_page_copied_and_linked(tmp_path):
+    make_exp1(tmp_path)
+    build_hub.build(tmp_path)
+    live = (tmp_path / "exp6_live" / "index.html").read_text()
+    assert "<title>Exp6 Live Model</title>" in live and 'id="engine"' in live and "Joaquin Philco" in live
+    assert 'href="../exp6_live/index.html"' in (tmp_path / "exp6" / "index.html").read_text()
+    hub = (tmp_path / "index.html").read_text()
+    assert 'href="exp6_live/index.html">Experiment 6 live</a>' in hub and "Exp6 live · the model in your browser" in hub
+
+
 def test_hub_without_exp4(tmp_path):
     assert build_hub.add_exp4(tmp_path, tmp_path / "missing") is False
     (tmp_path / "index.html").write_text(build_hub.hub_page(tmp_path))
