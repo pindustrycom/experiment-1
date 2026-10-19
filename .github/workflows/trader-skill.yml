@@ -1,0 +1,95 @@
+name: trader-skill backtest
+
+# Research only, paper only: backtests the two signals in github.com/Jakeschincariol/trader-skill (MIT) with the pack's own
+# readers, pinned to the commit that was read before running it.
+# - copycat: the 13F top holdings of the 23 investors the pack lists, bought the day after each filing (SEC EDGAR)
+# - pelosi:  the stock buys House members disclose in their PTRs, 2019 onward (House Clerk PDFs, read with pdftotext)
+# Prices are Yahoo daily adjusted closes, so Tiingo's monthly symbol quota stays free for Exp1/Exp2.
+# What was collected is cached in the "trader-skill-data" release, so a rerun only reads new filings. Results go to the
+# "trader-skill-results" release and the run's artifact, and are printed in the log. Nothing is deployed.
+
+on:
+  pull_request:
+    paths: ["research/trader_skill/**", ".github/workflows/trader-skill.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the cache and results releases
+
+concurrency:
+  group: trader-skill
+  cancel-in-progress: false
+
+env:
+  SKILL_REPO: https://github.com/Jakeschincariol/trader-skill.git
+  SKILL_COMMIT: 5189e79b9a480755a3733ac9713f5353981dbe18
+  DATA_TAG: trader-skill-data
+  RESULTS_TAG: trader-skill-results
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: research/trader_skill
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/trader_skill/requirements.txt
+      - run: pip install -r requirements.txt && sudo apt-get install -y -q poppler-utils
+      - name: Tests
+        run: ruff check . && python -m pytest -q
+
+      - name: Check out trader-skill at the reviewed commit
+        run: |
+          git init -q /tmp/trader-skill
+          git -C /tmp/trader-skill fetch -q --depth 1 "$SKILL_REPO" "$SKILL_COMMIT"
+          git -C /tmp/trader-skill checkout -q FETCH_HEAD
+          test "$(git -C /tmp/trader-skill rev-parse HEAD)" = "$SKILL_COMMIT"
+          echo "TRADER_SKILL=/tmp/trader-skill" >> "$GITHUB_ENV"
+          echo "TRADER_SKILL_COMMIT=$SKILL_COMMIT" >> "$GITHUB_ENV"
+
+      - name: Restore the cache
+        run: |
+          mkdir -p cache
+          if gh release view "$DATA_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx cache.tar.gz; then
+            gh release download "$DATA_TAG" --repo "$GITHUB_REPOSITORY" --pattern cache.tar.gz --dir /tmp/prev
+            tar xzf /tmp/prev/cache.tar.gz -C cache
+          fi
+
+      - name: Collect 13F filings
+        run: python run.py collect13f
+      - name: Collect House PTRs
+        run: python run.py collectptr --years 2019-2026 --minutes 150
+      - name: Fetch prices
+        run: python run.py prices --minutes 90
+
+      - name: Save the cache
+        if: always()
+        run: |
+          tar czf /tmp/cache.tar.gz -C cache .
+          gh release view "$DATA_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$DATA_TAG" --repo "$GITHUB_REPOSITORY" --title "trader-skill backtest cache" --notes "13F tops, House PTR rows and Yahoo prices for research/trader_skill. Research only." --latest=false
+          gh release upload "$DATA_TAG" /tmp/cache.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
+
+      - name: Backtest
+        run: |
+          set -o pipefail
+          mkdir -p results
+          python run.py backtest --out results | tee results/log.txt
+      - name: Publish results
+        run: |
+          gh release view "$RESULTS_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$RESULTS_TAG" --repo "$GITHUB_REPOSITORY" --title "trader-skill backtest results" --notes "Output of research/trader_skill/run.py. Research only." --latest=false
+          gh release upload "$RESULTS_TAG" results/* --repo "$GITHUB_REPOSITORY" --clobber
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trader-skill-results
+          path: research/trader_skill/results
