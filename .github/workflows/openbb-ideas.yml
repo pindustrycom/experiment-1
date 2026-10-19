@@ -64,10 +64,10 @@ jobs:
       - name: Ideas 1 and 2
         run: |
           set -o pipefail
-          python -m exp2 openbb-ideas --data papers_data --out openbb_results --ref-sleeves /tmp/res/collapse/sleeves_monthly.csv | tee /tmp/ideas.json
+          python -m exp2 openbb-ideas --data papers_data --out openbb_results --ref-sleeves /tmp/res/collapse/sleeves_monthly.csv > /tmp/ideas.log
           python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
           import json
-          s = json.load(open("/tmp/ideas.json"))
+          s = json.load(open("openbb_results/summary.json"))   # stdout also carries OpenBB's start-up lines
           print("\n**Fetch:**", json.dumps(s.get("fetch", {}), default=str)[:600])
           print("\n| Sleeve | From | Sharpe before 2019 | Sharpe 2019+ | Worst month 2019+ | Feb 2018 | Mar 2020 |\n|---|---|---|---|---|---|---|")
           for k, v in s["vol_products"].items():
