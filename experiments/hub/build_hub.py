@@ -169,8 +169,8 @@ def portfolio_banner(t: dict | None, which: str, root: str) -> str:
     """The big P/L box put at the top of an experiment's page."""
     if not t:
         return ""
-    name = {"exp1": "Exp1 paper portfolio", "exp2": "Exp2 paper portfolio"}[which]
-    pos = exp1_positions(t) if which == "exp1" else e(t.get("exp2_position") or "No positions yet.")
+    name = {"exp1": "Exp1 paper portfolio", "exp2": "Exp2 paper portfolio", "exp7": "Exp7 paper portfolio"}[which]
+    pos = exp1_positions(t) if which == "exp1" else e(t.get(f"{which}_position") or "No positions yet.")
     return (f'{MARK}<style>{BANNER_CSS}</style><div class="pf">{big_number(t["rows"], which, name + ": profit / loss", t.get("start"))}'
             f'<div class="pos-line">{pos}</div><div class="muted small">Paper money only, traded daily from this experiment\'s signals. '
             f'<a href="{root}index.html">Combined portfolio →</a></div></div>{MARK_END}')
@@ -191,7 +191,7 @@ def inject(f: Path, block: str) -> bool:
 def theme(site: Path) -> int:
     """Lay the glass theme over every experiment page (replacing any earlier copy)."""
     n = 0
-    for d in ("exp1", "exp2"):
+    for d in ("exp1", "exp2", "exp7"):
         for f in (site / d).rglob("*.html") if (site / d).is_dir() else []:
             s = f.read_text()
             if GLASS in s:
@@ -212,6 +212,16 @@ def sleeve_card(t: dict, key: str, title: str, href: str, what: str, pos: str) -
             f'<a class="go" href="{href}">Open →</a></div>')
 
 
+def exp7_card(t: dict) -> str:
+    """Exp7 has its own 1000 CAD pot, kept outside the combined one."""
+    if not t.get("exp7") or "exp7" not in t["rows"][-1]:
+        return ""
+    return ('<h2 style="font-size:18px;margin:28px 0 10px">Separate pot</h2><div class="cards">'
+            + sleeve_card(t, "exp7", "Exp7 · VWAP + 9 EMA day trades", "exp7/index.html",
+                          "Day-trades SPY on a 3-minute chart: long when the 9 EMA is above the day's VWAP, short below, flat overnight.",
+                          e(t.get("exp7_position") or "")) + "</div>")
+
+
 def hub_page(site: Path, t: dict | None = None) -> str:
     built = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     if t is None:
@@ -226,8 +236,10 @@ def hub_page(site: Path, t: dict | None = None) -> str:
 <p class="small muted">Half of the money follows each experiment. Trades every trading day; US positions, valued in CAD at the
 Bank of Canada rate. No costs or interest.{fx}</p>
 <div class="cards">{sleeve_card(t, "exp1", "Exp1 · pairs", "exp1/index.html", "Long the stock Exp1 favours in each pair, short the other.", exp1_positions(t))}
-{sleeve_card(t, "exp2", "Exp2 · volatility-timed", "exp2/index.html", "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", e(t.get("exp2_position") or ""))}</div>"""
+{sleeve_card(t, "exp2", "Exp2 · volatility-timed", "exp2/index.html", "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", e(t.get("exp2_position") or ""))}</div>
+{exp7_card(t)}"""
     shown = [x for x in STATIC if (site / x[0] / "index.html").exists()]
+    exp7_nav = '\n<a href="exp7/index.html">Experiment 7</a>' if (site / "exp7" / "index.html").exists() else ""
     exp4_nav = "".join(f'\n<a href="{d}/index.html">Experiment {d[3:].replace("_", " ")}</a>' for d, *_ in shown)
     exp4_card = ('<h2 style="font-size:18px;margin:28px 0 10px">Other experiments</h2><div class="cards">'
                  + "".join(f'<div class="card"><div class="tag">{e(title)}</div><p>{e(text)}</p>'
@@ -237,7 +249,7 @@ Bank of Canada rate. No costs or interest.{fx}</p>
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>Paper portfolio</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}</style></head><body>
 <header><div class="wrap"><a class="brand" href="index.html">Paper portfolio</a> <span class="nav"><a href="exp1/index.html">Experiment 1</a>
-<a href="exp2/index.html">Experiment 2</a>{exp4_nav}</span></div></header>
+<a href="exp2/index.html">Experiment 2</a>{exp7_nav}{exp4_nav}</span></div></header>
 <main class="wrap">{body}{exp4_card}</main>
 <footer><div class="wrap">Fake money: no orders are placed anywhere and nothing here is investment advice. Built {built}.
 <a href="{REPO_URL}">Source</a>.</div></footer></body></html>"""
@@ -308,6 +320,7 @@ def build(site: Path, state: Path | None = None, update: bool = False) -> dict:
         t, rep = r["table"], r["portfolio"]
         inject(site / "exp1" / "index.html", portfolio_banner(t, "exp1", "../"))
         inject(site / "exp2" / "index.html", portfolio_banner(t, "exp2", "../"))
+        inject(site / "exp7" / "index.html", portfolio_banner(t, "exp7", "../"))
     theme(site)
     (site / "index.html").write_text(hub_page(site, t))
     (site / ".nojekyll").write_text("")

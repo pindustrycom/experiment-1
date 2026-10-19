@@ -2,7 +2,8 @@ name: Update dashboard
 
 # Runs the research pipeline after each US market close and publishes the read-only dashboard to
 # GitHub Pages. The site root is the combined 1000 CAD paper portfolio (experiments/hub/portfolio.py); Experiment 1 (this pipeline) is under /exp1/ and
-# Experiment 2 (built by exp2.yml) under /exp2/. The database lives only for the length of a run: it is restored from the latest
+# Experiment 2 (built by exp2.yml) under /exp2/,
+# Experiment 7 (built by exp7.yml) under /exp7/. The database lives only for the length of a run: it is restored from the latest
 # dump in the "state" release, updated, dumped back, and the site is rebuilt from it.
 # Experiment 2 runs twice a day and then asks for a publish-only run, which skips the pipeline and reuses Experiment 1's
 # pages from the last full run (saved as exp1-site.tar.gz in the "state" release).
@@ -220,6 +221,10 @@ jobs:
             tar xzf /tmp/exp2/exp2-site.tar.gz -C _site/exp2
           else
             echo "Experiment 2 has no pages yet; the hub shows it as not published." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # Experiment 7 (exp7.yml, after each close) saves its pages to the "exp7-state" release.
+          if gh release download exp7-state --repo "$GITHUB_REPOSITORY" --pattern exp7-site.tar.gz --dir /tmp/exp7 2>/dev/null; then
+            mkdir -p _site/exp7 && tar xzf /tmp/exp7/exp7-site.tar.gz -C _site/exp7
           fi
           # The paper portfolios (experiments/hub/portfolio.py): Experiment 1's daily books are kept in the "portfolio-state"
           # release. Only the full run moves them forward and saves them; a publish-only run just re-reads them.
