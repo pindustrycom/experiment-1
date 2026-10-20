@@ -2,8 +2,9 @@
 
     python experiments/hub/build_hub.py --site _site --state state/portfolio.json [--update]
 
-The root page lists every experiment, grouped into the market experiments (traded on paper, with the combined
-1000 CAD paper portfolio from portfolio.py) and the resonance research pages. Each market experiment's page gets
+The root page is one column per group of experiments (GROUPS below): the market experiments (traded on paper, with the
+combined 1000 CAD paper portfolio from portfolio.py) and the resonance research pages. Clicking a column opens that group
+over the whole page (root/index.html#markets, ...). Each market experiment's page gets
 its own 1000 CAD portfolio box at the top.
 
 Expects each market experiment's pages already in place (_site/exp1/, _site/exp2/, _site/exp7/); a missing one is
@@ -58,6 +59,13 @@ CATALOG = [
     ("exp6_live", RESONANCE, "Exp6 live", "Exp6 live · the model in your browser",
      "The trained exp6 model runs in the page: type a word in any font, draw a character or pick a colour, and see which "
      "letter, word and naming structures resonate, with a 3D view driven by the computed values.", EXPERIMENTS / "exp6_live"),
+]
+# The overview page is one column per group, side by side; clicking a column opens that group over the whole page. A new
+# project adds its group here and its experiments to CATALOG: (group, page anchor, colour, moving background drawn behind
+# the column: "price" or "rings", one-line description).
+GROUPS = [
+    (MARKETS, "markets", "#e3ac5b", "price", "Strategies traded every day with fake money: 1,000 CAD each, no orders placed anywhere."),
+    (RESONANCE, "resonance", "#a593d4", "rings", "Joaquin Philco's resonance architecture: models and results you can run in the browser."),
 ]
 # Static experiment pages: (site folder, source folder, card title, card text). No money involved in any of them.
 STATIC = [(d, src, title, text) for d, _, _, title, text, src in CATALOG if src is not None]
@@ -128,6 +136,53 @@ HUB_CSS = """
 section.group{margin:0 0 34px}section.group h2{font-size:20px;margin:0 0 2px;letter-spacing:-.01em}section.group .intro{margin:0 0 14px}
 .card .go{font-weight:600}.card .tag{text-transform:none;letter-spacing:-.01em;font-size:16px;font-weight:650;color:var(--text)}
 """
+# The overview page: the group columns, and a group opened over the whole page (the column whose anchor is in the address).
+SPLIT_CSS = """
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.split{display:flex;min-height:calc(100vh - var(--site-nav-h));min-height:calc(100svh - var(--site-nav-h))}
+.half{flex:1 1 0;min-width:0;position:relative;overflow:hidden;border-right:1px solid var(--glass-line);scroll-margin-top:100vh;
+transition:flex-grow .6s cubic-bezier(.2,.8,.2,1)}
+.half:last-child{border-right:0}.split:not(:has(.half:target)) .half:hover{flex-grow:1.35}
+.half>canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+.door{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:32px clamp(20px,4vw,52px) 40px;
+color:var(--text);background:linear-gradient(0deg,rgba(0,0,0,.8),rgba(0,0,0,0) 65%)}
+.door:hover{text-decoration:none}.door:focus-visible{outline:2px solid var(--c);outline-offset:-6px}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.door .k{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.door h2{font-size:clamp(44px,6.5vw,84px);line-height:.95;letter-spacing:-.045em;font-weight:800;margin:0;color:var(--c);text-wrap:balance}
+.door p{margin:0;max-width:40ch;color:var(--muted)}.door .v{font-size:26px;font-weight:500}
+.door .exps{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--text)}.door .cta{font-weight:600;color:var(--c)}
+.open{display:none}
+.half:target{flex:1 0 100%;overflow:visible;border:0}.split:has(.half:target) .half:not(:target){display:none}
+.half:target>canvas{position:fixed;opacity:.3}.half:target .door{display:none}
+.half:target .open{display:block;position:relative;padding:22px 0 40px;animation:open .5s cubic-bezier(.2,.8,.2,1) both}
+.open .back{display:inline-block;font-size:13px;color:var(--muted);margin:0 0 14px}.open .back:hover{color:var(--text);text-decoration:none}
+.open h2{font-size:clamp(34px,5vw,52px);letter-spacing:-.04em;font-weight:800;margin:0 0 4px;color:var(--c)}
+@keyframes open{from{opacity:0;transform:translateY(16px)}}
+@media (max-width:640px){.split{flex-direction:column}.half{border-right:0;border-bottom:1px solid var(--glass-line);min-height:300px}}
+@media (prefers-reduced-motion:reduce){.half{transition:none}.half:target .open{animation:none}}
+"""
+# Draws each column's moving background: only while the column is on screen and the tab is visible; one still frame when
+# the reader asks for reduced motion.
+SPLIT_SCRIPT = """<script>(()=>{
+const still=matchMedia("(prefers-reduced-motion: reduce)").matches,cs=[...document.querySelectorAll("canvas[data-bg]")],seen=new Set();
+let s=7,v=0;const walk=Array.from({length:700},()=>(v+=(s=(s*9301+49297)%233280)/233280-.485));
+function price(x,W,H,d,c,t){const off=Math.floor(t/90)%500,vals=walk.slice(off,off+180),lo=Math.min(...vals),hi=Math.max(...vals);
+x.strokeStyle="rgba(255,255,255,.06)";x.lineWidth=d;for(let i=1;i<8;i++){x.beginPath();x.moveTo(0,H*i/8);x.lineTo(W,H*i/8);x.stroke()}
+const pt=i=>[i/(vals.length-1)*W,H*.08+(1-(vals[i]-lo)/(hi-lo||1))*H*.34];x.beginPath();vals.forEach((_,i)=>x.lineTo(...pt(i)));
+x.strokeStyle=c;x.lineWidth=2*d;x.stroke();const end=pt(vals.length-1);x.lineTo(W,H);x.lineTo(0,H);x.closePath();
+const g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,c+"55");g.addColorStop(1,c+"00");x.fillStyle=g;x.fill();
+x.beginPath();x.arc(end[0]-4*d,end[1],4*d,0,7);x.fillStyle=c;x.fill()}
+function rings(x,W,H,d,c,t){const cx=W*.6,cy=H*.38,ph=t/1400,R=Math.hypot(W,H)*.75;x.strokeStyle=c;x.lineWidth=1.2*d;
+for(let k=0;k<16;k++){x.globalAlpha=.5*(1-(k+ph%1)/16);x.beginPath();x.arc(cx,cy,(k+ph%1)/16*R,0,7);x.stroke()}
+x.globalAlpha=.9;x.fillStyle=c;for(let k=0;k<5;k++){const a=k*1.3+ph*.4;x.beginPath();x.arc(cx+Math.cos(a)*W*.25,cy+Math.sin(a)*H*.2,3*d,0,7);x.fill()}
+x.globalAlpha=1}
+let pending=0;const go=()=>{if(!pending)pending=requestAnimationFrame(t=>{pending=0;frame(t)})};
+function frame(t){for(const c of cs){if(!still&&!seen.has(c))continue;const r=c.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2),
+W=Math.round(r.width*d),H=Math.round(r.height*d);if(!W||!H)continue;if(c.width!==W||c.height!==H){c.width=W;c.height=H}
+const x=c.getContext("2d");x.clearRect(0,0,W,H);(c.dataset.bg==="price"?price:rings)(x,W,H,d,c.dataset.color,still?0:t)}if(!still)go()}
+const io=new IntersectionObserver(es=>{es.forEach(x=>x.isIntersecting?seen.add(x.target):seen.delete(x.target));go()});cs.forEach(c=>io.observe(c));
+addEventListener("visibilitychange",go);addEventListener("resize",go);addEventListener("hashchange",go);go()})()</script>"""
 MARK, MARK_END = "<!--portfolio-->", "<!--/portfolio-->"
 BANNER_CSS = """
 .big,.pf{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:0 0 16px}
@@ -257,11 +312,11 @@ def nav_bar(current: str, root: str, site: Path | None = None) -> str:
         cur = ' aria-current="page"' if d == current else ""
         return f'<a href="{root}{d}/index.html"{cur}>{e(label)}</a>'
     groups = []
-    for g in (MARKETS, RESONANCE):
+    for g, anchor, *_ in GROUPS:
         links = "".join(link(d, label) for d, grp, label, *_ in CATALOG
                         if grp == g and (site is None or (site / d / "index.html").exists()))
         if links:
-            groups.append(f'<span class="ln-grp"><span class="ln-g">{g}</span>{links}</span>')
+            groups.append(f'<span class="ln-grp"><a class="ln-g" href="{root}index.html#{anchor}">{g}</a>{links}</span>')
     home = ' aria-current="page"' if current == "" else ""
     return (f'{NAV}<style>{NAV_CSS}</style><nav id="labnav" aria-label="Experiments">'
             f'<a class="ln-home" href="{root}index.html"{home}>All experiments</a>{"".join(groups)}</nav>{NAV_SCRIPT}{NAV_END}')
@@ -289,8 +344,14 @@ def add_nav(site: Path) -> int:
     return n
 
 
-def section(title: str, intro: str, body: str) -> str:
-    return f'<section class="group"><h2>{e(title)}</h2><p class="muted small intro">{intro}</p>{body}</section>'
+def half(group: str, anchor: str, color: str, bg: str, intro: str, labels: list[str], stat: str, body: str) -> str:
+    """One group's column on the overview page, and the full page it opens into."""
+    count = f'{len(labels)} experiment{"s" * (len(labels) != 1)}'
+    return (f'<section class="half" id="{anchor}" style="--c:{color}"><canvas data-bg="{bg}" data-color="{color}" aria-hidden="true"></canvas>'
+            f'<a class="door" href="#{anchor}"><span class="k mono">{count}</span><h2>{e(group)}</h2><p>{e(intro)}</p>{stat}'
+            f'<span class="exps">{"".join(f"<span>{e(x)}</span>" for x in labels)}</span><span class="cta">Open {e(group)} →</span></a>'
+            f'<div class="open"><div class="wrap"><a class="back" href="#">← All groups</a><h2>{e(group)}</h2>'
+            f'<p class="muted small intro">{e(intro)}</p>{body}</div></div></section>')
 
 
 def plain_card(d: str, title: str, text: str, published: bool) -> str:
@@ -321,18 +382,23 @@ Bank of Canada rate. No costs or interest.{fx}</p>"""
                                  e(t.get("exp7_position") or ""))
         elif have("exp7"):
             cards += plain_card("exp7", *info["exp7"], True)
-    research = [d for d, grp, *_ in CATALOG if grp == RESONANCE and have(d)]
-    markets = section("Markets", "Strategies traded every day with fake money: 1,000 CAD each, no orders placed anywhere.",
-                      money + f'<div class="cards">{cards}</div>')
-    resonance = section("Resonance research", "Joaquin Philco's resonance architecture: models and results you can run in the browser.",
-                        '<div class="cards">' + "".join(plain_card(d, *info[d], True) for d in research) + "</div>") if research else ""
+    body = {MARKETS: money + f'<div class="cards">{cards}</div>'}
+    stat = {MARKETS: "" if t is None else (f'<span class="v mono {pl_class(t["rows"][-1]["combined"] - CAPITAL)}">'
+                                           f'{cad(t["rows"][-1]["combined"] - CAPITAL, True)}</span>')}
+    halves = []
+    for g, anchor, color, bg, intro in GROUPS:
+        shown = [(d, label) for d, grp, label, *_ in CATALOG if grp == g and have(d)]
+        if g not in body:
+            if not shown:
+                continue
+            body[g] = '<div class="cards">' + "".join(plain_card(d, *info[d], True) for d, _ in shown) + "</div>"
+        halves.append(half(g, anchor, color, bg, intro, [label for _, label in shown], stat.get(g, ""), body[g]))
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
-<meta name="referrer" content="no-referrer"><title>All experiments</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}{HUB_CSS}</style></head><body>
-<main class="wrap"><h1>All experiments</h1>
-<p class="sub">Every project in one place. The bar at the top of each page leads to all the others.</p>
-{markets}{resonance}</main>
-<footer><div class="wrap">Fake money: no orders are placed anywhere and nothing here is investment advice. Built {built}.</div></footer></body></html>"""
+<meta name="referrer" content="no-referrer"><title>All experiments</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}{HUB_CSS}{SPLIT_CSS}</style></head><body>
+<main><h1 class="sr">All experiments</h1><div class="split">{"".join(halves)}</div></main>
+<footer><div class="wrap">Fake money: no orders are placed anywhere and nothing here is investment advice. Built {built}.</div></footer>
+{SPLIT_SCRIPT}</body></html>"""
 
 
 def redirect_page(target: str) -> str:

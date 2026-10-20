@@ -95,3 +95,14 @@ def test_hub_without_exp4(tmp_path):
     assert build_hub.add_exp4(tmp_path, tmp_path / "missing") is False
     (tmp_path / "index.html").write_text(build_hub.hub_page(tmp_path))
     assert "Exp4" not in (tmp_path / "index.html").read_text()
+
+
+def test_overview_is_one_column_per_group(tmp_path):
+    make_exp1(tmp_path)
+    build_hub.build(tmp_path)
+    hub = (tmp_path / "index.html").read_text()
+    assert hub.count('class="half"') == len(build_hub.GROUPS)
+    for _g, anchor, *_ in build_hub.GROUPS:
+        assert f'id="{anchor}"' in hub and f'class="door" href="#{anchor}"' in hub
+    assert 'class="ln-g" href="index.html#resonance">Resonance</a>' in hub
+    assert 'href="../index.html#markets"' in (tmp_path / "exp1" / "index.html").read_text()
