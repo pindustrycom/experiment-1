@@ -90,9 +90,6 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
 .chip .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .gl-fail { padding: 16px 18px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); line-height: 1.5; }
 #scene3d { width: 100%; height: min(70vh, 560px); display: block; border: 1px solid var(--rule); background: var(--paper); touch-action: none; cursor: grab; }
-.tabs a.site { font-family: var(--display); font-weight: 700; margin-right: auto; padding-right: 12px; color: var(--ink); text-decoration: none; }
-.tabs a.pg { font: 500 0.92rem var(--display); color: var(--muted); border: 1px solid transparent; padding: 7px 12px; border-radius: 4px; text-decoration: none; }
-.tabs a.pg[aria-current="page"] { color: var(--ink); border-color: var(--rule); background: var(--paper); }
 .legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.82rem; color: var(--muted); }
 .sw { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 6px; }
 @media (max-width: 560px) { .bar { grid-template-columns: 1fr; gap: 4px; } body { font-size: 16px; } .entry { padding: 16px; } }
@@ -100,12 +97,6 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
 </head>
 <body>
 <div class="wrap stack" style="gap:22px">
-  <nav class="tabs" aria-label="Experiments">
-    <a class="site" href="../index.html">All experiments</a>
-    <a class="pg" href="../exp5/index.html">Exp5 · Vision stack</a>
-    <a class="pg" href="../exp6/index.html" aria-current="page">Exp6 · Alphabet and words</a>
-    <a class="pg" href="../exp6_live/index.html">Exp6 live</a>
-  </nav>
 
     <div class="stack" style="gap:10px">
       <div class="eyebrow">Experiment 6 · first run 19 Oct 2026</div>
@@ -197,7 +188,8 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
 
   
 </div>
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js" integrity="sha384-vV17nr/rMaJqmeZkFUzXLpHdQ+ME5QHKdydaqqN+3Ga39RJlNrTatJxHwGV4ml2C" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="../hub/gl_runtime.js"></script>
 <script>
 (function () {
   const canvas = document.getElementById("scene3d");
@@ -208,26 +200,9 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
   const readTokens = () => { T = { bg: css("--paper"), ink: css("--ink"), muted: css("--muted"), rule: css("--rule"), accent: css("--accent"), warm: css("--warm") }; };
   readTokens();
 
-  function glGuard(canvas, opts) {
-    // Chrome turns WebGL off for a site after its pages lose the GPU context a few times; say so instead of a blank page.
-    const fail = msg => {
-      if (canvas.nextElementSibling && canvas.nextElementSibling.classList.contains("gl-fail")) return;
-      const d = document.createElement("div"); d.className = "gl-fail"; d.setAttribute("role", "status"); d.innerHTML = msg;
-      canvas.style.visibility = "hidden"; canvas.insertAdjacentElement("afterend", d);
-    };
-    const BLOCKED = "<b>The 3D view could not start.</b> Your browser has turned off WebGL for this site, usually after a page lost its graphics context. Quit the browser completely (every window) and open this page again. If it still fails, check that hardware acceleration is on in the browser settings.";
-    let r;
-    try { r = new THREE.WebGLRenderer(Object.assign({ canvas }, opts)); } catch (e) { fail(BLOCKED); return null; }
-    const state = { renderer: r, lost: false };
-    canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); state.lost = true; fail("<b>The 3D view lost its graphics context.</b> It will come back on its own if the browser restores it; otherwise reload the page."); });
-    canvas.addEventListener("webglcontextrestored", () => location.reload());
-    window.addEventListener("pagehide", e => { if (e.persisted) return; r.dispose(); r.forceContextLoss(); });
-    return state;
-  }
-  const gl = glGuard(canvas, { antialias: true, alpha: false });
+  const gl = LabGL.start(canvas, { antialias: true, alpha: false });
   if (!gl) return;
   const renderer = gl.renderer;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
   scene.add(new THREE.AmbientLight(0xffffff, 0.75));
@@ -465,7 +440,7 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
     for (const s of sprites) {
       const d = s.userData; const fresh = label(d.text, d.size, d.color === undefined ? undefined : (stageTitles.includes(s) ? T.muted : T.accent), d.weight);
       all.pop();
-      s.material.map.dispose(); s.material.map = fresh.material.map; s.material.needsUpdate = true;
+      s.material.map.dispose(); s.material.map = fresh.material.map; s.material.needsUpdate = true; fresh.material.dispose();
     }
     all.push(...sprites);
   }
@@ -486,7 +461,7 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
     for (let i = pulses.length - 1; i >= 0; i--) {
       const p = pulses[i]; p.t += dt / p.dur;
       p.m.position.lerpVectors(p.from, p.to, Math.min(1, p.t));
-      if (p.t >= 1) { scene.remove(p.m); p.m.geometry.dispose(); pulses.splice(i, 1); }
+      if (p.t >= 1) { scene.remove(p.m); LabGL.dispose(p.m); pulses.splice(i, 1); }
     }
     for (const [m, g] of glow) {
       g.a *= Math.pow(0.35, dt);
@@ -502,10 +477,9 @@ figcaption { font-size: 0.85rem; color: var(--muted); }
     WORDS.colour.forEach(w => { const m = assoc[w].material; m.opacity = Math.max(0.12, m.opacity - dt * 0.4); });
     res.forEach((r, i) => { r.scale.setScalar(1 + 0.35 * Math.sin(now / 300 + i * 0.7) * (reduce ? 0 : 1)); });
     renderer.render(scene, camera);
-    requestAnimationFrame(frame);
   }
   resize(); readWord("yes"); wc.querySelector(".chip").setAttribute("aria-pressed", "true");
-  requestAnimationFrame(frame);
+  gl.loop(frame);
 })();
 
 </script>

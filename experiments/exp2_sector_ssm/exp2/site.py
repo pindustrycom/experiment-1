@@ -55,8 +55,7 @@ def page(title: str, active: str, body: str, built: str) -> str:
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>{e(title)} · Experiment 2</title><style>{CSS}</style></head><body>
-<header><div class="wrap"><a class="brand" href="index.html">Exp 2 · Tech sector state-space model</a><nav>{nav}</nav>
-<a class="muted" href="../index.html">All experiments</a></div></header>
+<header><div class="wrap"><a class="brand" href="index.html">Exp 2 · Tech sector state-space model</a><nav>{nav}</nav></div></header>
 <main class="wrap">{body}</main>
 <footer><div class="wrap">Research experiment that forward-tests a model's predictions for the US tech sector. Paper tracking only:
 nothing here is investment advice and no orders are placed anywhere. Built {e(built)}. <a href="{REPO_URL}">Source</a>.</div></footer></body></html>"""

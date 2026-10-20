@@ -84,7 +84,7 @@ def test_site_builds(tmp_path):
     rep = live_site.build(tmp_path, L, plans, df)
     assert rep["scored"] == len(L)
     page = (tmp_path / "index.html").read_text()
-    assert "../exp1/index.html" in page and "Prediction log" in page
+    assert "Experiment 2 · volatility-timed portfolio" in page and "Prediction log" in page
     assert (tmp_path / "data" / "summary.json").exists()
 
 

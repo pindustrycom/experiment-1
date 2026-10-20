@@ -126,7 +126,7 @@ def test_exp7_pot_is_separate_from_the_combined_one(tmp_path, fx):
     last = json.loads((site / "data" / "portfolio.json").read_text())["rows"][-1]
     assert last["exp7"] == pytest.approx(1020.0) and last["combined"] == pytest.approx(1000.0)
     hub = (site / "index.html").read_text()
-    assert "Exp7 · VWAP + 9 EMA" in hub and 'href="exp7/index.html">Experiment 7' in hub
+    assert "Exp7 · VWAP + 9 EMA" in hub and 'href="exp7/index.html">Exp7 VWAP</a>' in hub
     page = (site / "exp7" / "index.html").read_text()
     assert "Exp7 paper portfolio" in page and "3 trades" in page and "backdrop-filter" in page
 
