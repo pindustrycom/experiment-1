@@ -16,6 +16,9 @@ name: Update dashboard
 #
 # Required secret PASSWORD: the whole site is encrypted with it (experiments/hub/lock_site.py) and visitors
 # unlock it in the browser. Without it nothing is published and the last deployed site stays up.
+# The releases are public like the repository, so every file this workflow keeps there (database dumps, Experiment 1's
+# pages, the paper portfolio) is encrypted with experiments/hub/state_crypt.sh under the STATE_KEY secret, or under
+# PASSWORD when STATE_KEY is not set. Set STATE_KEY before ever changing PASSWORD, or the saved state can't be read.
 
 on:
   schedule:
@@ -67,6 +70,8 @@ jobs:
       ALPHAVANTAGE_API_KEY: ${{ secrets.ALPHAVANTAGE_API_KEY }}
       SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
       GH_TOKEN: ${{ github.token }}
+      STATE_KEY: ${{ secrets.STATE_KEY || secrets.PASSWORD }}
+      CRYPT: ${{ github.workspace }}/experiments/hub/state_crypt.sh
     defaults:
       run:
         working-directory: backend
@@ -90,6 +95,7 @@ jobs:
         run: |
           if gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
              && gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --pattern db-latest.dump --dir /tmp/state; then
+            "$CRYPT" open /tmp/state/db-latest.dump
             $PG pg_restore -U sm -d sm --no-owner --exit-on-error < /tmp/state/db-latest.dump
             echo "Restored the database from the previous run." >> "$GITHUB_STEP_SUMMARY"
           else
@@ -201,6 +207,7 @@ jobs:
         run: |
           python -m app.static_site --out "$GITHUB_WORKSPACE/_site/exp1"
           tar czf /tmp/exp1-site.tar.gz -C "$GITHUB_WORKSPACE/_site/exp1" .
+          "$CRYPT" seal /tmp/exp1-site.tar.gz
           gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && \
             gh release upload "$STATE_TAG" /tmp/exp1-site.tar.gz --repo "$GITHUB_REPOSITORY" --clobber || true
 
@@ -210,6 +217,7 @@ jobs:
         run: |
           # Never publish a site without Experiment 1: if its pages were never saved, stop here.
           gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --pattern exp1-site.tar.gz --dir /tmp/exp1
+          "$CRYPT" open /tmp/exp1/exp1-site.tar.gz
           mkdir -p _site/exp1 && tar xzf /tmp/exp1/exp1-site.tar.gz -C _site/exp1
 
       - name: Add Experiment 2 and the paper portfolio
@@ -218,12 +226,14 @@ jobs:
           # Experiment 2 runs in its own workflow (exp2.yml) and saves its pages to the "exp2-state" release.
           mkdir -p _site/exp2
           if gh release download exp2-state --repo "$GITHUB_REPOSITORY" --pattern exp2-site.tar.gz --dir /tmp/exp2 2>/dev/null; then
+            "$CRYPT" open /tmp/exp2/exp2-site.tar.gz
             tar xzf /tmp/exp2/exp2-site.tar.gz -C _site/exp2
           else
             echo "Experiment 2 has no pages yet; the hub shows it as not published." >> "$GITHUB_STEP_SUMMARY"
           fi
           # Experiment 7 (exp7.yml, after each close) saves its pages to the "exp7-state" release.
           if gh release download exp7-state --repo "$GITHUB_REPOSITORY" --pattern exp7-site.tar.gz --dir /tmp/exp7 2>/dev/null; then
+            "$CRYPT" open /tmp/exp7/exp7-site.tar.gz
             mkdir -p _site/exp7 && tar xzf /tmp/exp7/exp7-site.tar.gz -C _site/exp7
           fi
           # The paper portfolios (experiments/hub/portfolio.py): Experiment 1's daily books are kept in the "portfolio-state"
@@ -231,13 +241,15 @@ jobs:
           mkdir -p /tmp/pf
           if gh release view portfolio-state --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx portfolio.json; then
             gh release download portfolio-state --repo "$GITHUB_REPOSITORY" --pattern portfolio.json --dir /tmp/pf
+            "$CRYPT" open /tmp/pf/portfolio.json
           fi
           python experiments/hub/build_hub.py --site _site --state /tmp/pf/portfolio.json ${{ !inputs.publish_only && '--update' || '' }} | tee -a "$GITHUB_STEP_SUMMARY"
           if [ "${{ inputs.publish_only }}" != "true" ]; then
             gh release view portfolio-state --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
               gh release create portfolio-state --repo "$GITHUB_REPOSITORY" --title "Paper portfolio state" --latest=false \
                 --notes "Experiment 1's daily paper books and USD/CAD rates for the 1000 CAD paper portfolios. Updated by each nightly run."
-            gh release upload portfolio-state /tmp/pf/portfolio.json --repo "$GITHUB_REPOSITORY" --clobber
+            mkdir -p /tmp/pf-out && cp /tmp/pf/portfolio.json /tmp/pf-out/ && "$CRYPT" seal /tmp/pf-out/portfolio.json
+            gh release upload portfolio-state /tmp/pf-out/portfolio.json --repo "$GITHUB_REPOSITORY" --clobber
           fi
 
       - name: Save the database for the next run
@@ -246,6 +258,7 @@ jobs:
           mkdir -p /tmp/out
           $PG pg_dump -U sm -d sm -Fc --no-owner > /tmp/out/db-latest.dump
           cp /tmp/out/db-latest.dump "/tmp/out/db-$(date -u +%Y%m%d).dump"
+          "$CRYPT" seal /tmp/out/*.dump
           gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --title "Dashboard database" --latest=false \
               --notes "Database dumps used by the dashboard workflow. db-latest.dump is restored at the start of each run; dated copies are kept for 30 days."

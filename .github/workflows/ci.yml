@@ -55,6 +55,22 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  site:
+    # The GitHub Pages site: hub, navigation, password lock and the shared WebGL runtime
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experiments/hub
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install pytest cryptography==50.0.1 ruff
+      - run: ruff check --config ../exp2_sector_ssm/pyproject.toml --extend-ignore E501 .
+      - run: python -m pytest -q
+      - run: node --check gl_runtime.js && bash -n state_crypt.sh
+
   docker:
     runs-on: ubuntu-latest
     steps:

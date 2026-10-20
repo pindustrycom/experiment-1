@@ -21,60 +21,77 @@ def make_exp1(site):
 def test_hub_with_exp1_only(tmp_path):
     make_exp1(tmp_path)
     r = build_hub.build(tmp_path)
-    assert r == {"exp1_pages_linked": 3, "old_addresses_kept": 4, "exp2": False}
-    assert "first run" in (tmp_path / "index.html").read_text()
+    assert r["old_addresses_kept"] == 4 and r["exp2"] is False
+    hub = (tmp_path / "index.html").read_text()
+    assert "first nightly run" in hub and "Not published yet." in hub
     # old addresses redirect into /exp1/, data files are still served at the old path
     assert 'url=exp1/about.html' in (tmp_path / "about.html").read_text()
     assert 'url=../exp1/pairs/ko-pep.html' in (tmp_path / "pairs" / "ko-pep.html").read_text()
     assert (tmp_path / "data" / "scores.csv").read_text() == "a,b\n1,2\n"
-    # exp1 pages link back to the hub with the right depth, once
-    assert 'href="../../index.html"' in (tmp_path / "exp1" / "pairs" / "ko-pep.html").read_text()
-    assert 'href="../index.html" style' in (tmp_path / "exp1" / "index.html").read_text()
-    build_hub.build(tmp_path)
-    assert (tmp_path / "exp1" / "index.html").read_text().count("Paper portfolio") == 1
+    assert "Disallow: /" in (tmp_path / "robots.txt").read_text()
 
 
-def test_exp1_links_to_exp2(tmp_path):
+def test_every_page_gets_one_nav_with_the_right_depth(tmp_path):
     make_exp1(tmp_path)
     build_hub.build(tmp_path)
-    assert 'href="../exp2/index.html"' in (tmp_path / "exp1" / "index.html").read_text()
-    assert 'href="../../exp2/index.html"' in (tmp_path / "exp1" / "pairs" / "ko-pep.html").read_text()
-
-
-def test_exp4_page_copied_and_linked(tmp_path):
-    make_exp1(tmp_path)
-    build_hub.build(tmp_path)
-    page = (tmp_path / "exp4" / "index.html").read_text()
-    assert "<title>Resonance Playground</title>" in page and "Joaquin Philco" in page
+    r = build_hub.build(tmp_path)   # a second build replaces the bar instead of adding another
+    deep = (tmp_path / "exp1" / "pairs" / "ko-pep.html").read_text()
+    assert deep.count('id="labnav"') == 1
+    assert 'href="../../index.html"' in deep and 'href="../../exp4/index.html"' in deep
+    assert 'href="../../exp1/index.html" aria-current="page"' in deep
+    # experiments without pages are left out of the bar
+    assert "exp2/index.html" not in deep and "exp7/index.html" not in deep
     hub = (tmp_path / "index.html").read_text()
-    assert 'href="exp4/index.html">Experiment 4</a>' in hub and "Exp4 · resonance playground" in hub
+    assert hub.count('id="labnav"') == 1 and 'class="ln-home" href="index.html" aria-current="page"' in hub
+    six = (tmp_path / "exp6" / "index.html").read_text()
+    assert six.index('id="labnav"') < six.index("<h1>")
+    for d in ("exp1", "exp4", "exp5", "exp6", "exp6_live"):
+        assert f'href="../{d}/index.html"' in six
+    # redirect pages stay plain
+    assert "labnav" not in (tmp_path / "about.html").read_text()
+    assert r["pages_with_nav"] == 3 + 4 + 1
 
 
-def test_exp5_and_exp6_pages_copied_and_linked(tmp_path):
+def test_nav_links_exp2_and_exp7_once_published(tmp_path):
+    make_exp1(tmp_path)
+    for d in ("exp2", "exp7"):
+        (tmp_path / d).mkdir()
+        (tmp_path / d / "index.html").write_text(HEAD.format(r="", b=d))
+    build_hub.build(tmp_path)
+    page = (tmp_path / "exp1" / "index.html").read_text()
+    assert 'href="../exp2/index.html">Exp2 volatility</a>' in page and 'href="../exp7/index.html">Exp7 VWAP</a>' in page
+    assert 'href="../exp2/index.html" aria-current="page"' in (tmp_path / "exp2" / "index.html").read_text()
+
+
+def test_static_pages_copied_with_shared_script_inlined(tmp_path):
     make_exp1(tmp_path)
     build_hub.build(tmp_path)
+    four = (tmp_path / "exp4" / "index.html").read_text()
+    assert "<title>Resonance Playground</title>" in four and "Joaquin Philco" in four
+    assert '<script src="../hub/gl_runtime.js"></script>' not in four and "window.LabGL = { start, dispose }" in four
+    assert 'integrity="sha384-' in four
     five = (tmp_path / "exp5" / "index.html").read_text()
     six = (tmp_path / "exp6" / "index.html").read_text()
-    assert "<title>Exp5 Vision Stack</title>" in five and "Joaquin Philco" in five
-    assert "<title>Exp6 Alphabet and Words</title>" in six and "Joaquin Philco" in six and 'id="scene3d"' in six
-    assert 'href="../exp6/index.html"' in five and 'href="../exp5/index.html"' in six
-    hub = (tmp_path / "index.html").read_text()
-    for n in (4, 5, 6):
-        assert f'href="exp{n}/index.html">Experiment {n}</a>' in hub
-    assert "Exp5 · vision stack" in hub and "Exp6 · alphabet and words" in hub
-
-
-def test_exp6_live_page_copied_and_linked(tmp_path):
-    make_exp1(tmp_path)
-    build_hub.build(tmp_path)
     live = (tmp_path / "exp6_live" / "index.html").read_text()
-    assert "<title>Exp6 Live Model</title>" in live and 'id="engine"' in live and "Joaquin Philco" in live
-    assert 'href="../exp6_live/index.html"' in (tmp_path / "exp6" / "index.html").read_text()
+    assert "<title>Exp5 Vision Stack</title>" in five and "Joaquin Philco" in five
+    assert "<title>Exp6 Alphabet and Words</title>" in six and 'id="scene3d"' in six and "window.LabGL" in six
+    assert "<title>Exp6 Live Model</title>" in live and 'id="engine"' in live and "window.LabGL" in live
     hub = (tmp_path / "index.html").read_text()
-    assert 'href="exp6_live/index.html">Experiment 6 live</a>' in hub and "Exp6 live · the model in your browser" in hub
+    for d, title in (("exp4", "Exp4 · resonance playground"), ("exp5", "Exp5 · vision stack"),
+                     ("exp6", "Exp6 · alphabet and words"), ("exp6_live", "Exp6 live · the model in your browser")):
+        assert f'href="{d}/index.html"' in hub and title in hub
+
+
+def test_source_pages_load_the_shared_runtime_locally():
+    # opened from the repository, ../hub/gl_runtime.js resolves to this folder
+    for d in ("exp4_resonance", "exp6_alphabet", "exp6_live"):
+        page = (build_hub.EXPERIMENTS / d / "index.html").read_text()
+        assert '<script src="../hub/gl_runtime.js"></script>' in page and "LabGL.start(" in page
+        assert "requestAnimationFrame(frame)" not in page
+    assert (build_hub.HUB / "gl_runtime.js").exists()
 
 
 def test_hub_without_exp4(tmp_path):
     assert build_hub.add_exp4(tmp_path, tmp_path / "missing") is False
     (tmp_path / "index.html").write_text(build_hub.hub_page(tmp_path))
-    assert "Experiment 4" not in (tmp_path / "index.html").read_text()
+    assert "Exp4" not in (tmp_path / "index.html").read_text()

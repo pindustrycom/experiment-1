@@ -1,14 +1,18 @@
-"""Assemble the GitHub Pages site: the paper portfolio at the root, one folder per experiment.
+"""Assemble the GitHub Pages site: an overview of every experiment at the root, one folder per experiment.
 
     python experiments/hub/build_hub.py --site _site --state state/portfolio.json [--update]
 
-The root page is the combined 1000 CAD paper portfolio (portfolio.py); each experiment's page gets its own
-1000 CAD portfolio box at the top.
+The root page lists every experiment, grouped into the market experiments (traded on paper, with the combined
+1000 CAD paper portfolio from portfolio.py) and the resonance research pages. Each market experiment's page gets
+its own 1000 CAD portfolio box at the top.
 
-Expects each experiment's pages already in place (_site/exp1/, _site/exp2/); a missing one is shown
-as "not published yet" rather than failing the build. Experiments 4 to 6 are static pages kept in this repository
-(experiments/exp4_resonance/, exp5_vision/, exp6_alphabet/) and are copied to _site/exp4/ to _site/exp6/. It also:
-  - adds "Experiment 2" and "Paper portfolio" links to Exp1's page headers,
+Expects each market experiment's pages already in place (_site/exp1/, _site/exp2/, _site/exp7/); a missing one is
+shown as "not published yet" rather than failing the build. The resonance experiments are static pages kept in this
+repository (experiments/exp4_resonance/, ...) and are copied in. It also:
+  - puts the same navigation bar at the top of every page, so each page links to all the others (CATALOG below is
+    the one list it is built from),
+  - inlines the shared scripts the static pages load from ../hub/ (the published site encrypts every file that
+    is not a page, so a page cannot load a script file),
   - keeps Exp1's old addresses working: every Exp1 page that used to live at the site root gets a
     redirect page there, and its data files are copied back to /data/ (files can't redirect).
 Standard library only, so it runs in any job.
@@ -18,6 +22,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -29,24 +34,53 @@ e = html.escape
 REPO_URL = "https://github.com/pindustrycom/experiment-1"
 EXPERIMENTS = Path(__file__).resolve().parent.parent
 EXP4 = EXPERIMENTS / "exp4_resonance"
-# Static experiment pages: (site folder, source folder, card title, card text). No money involved in any of them.
-STATIC = [
-    ("exp4", EXP4, "Exp4 · resonance playground",
-     "A 3D model of the resonance architecture by Joaquin Philco: retina and V1, time-based somas with resonators on the axon, "
-     "concept structures and the rules that ask, allocate and sleep. Show it a digit in a colour, blur it, or open one cell."),
-    ("exp5", EXPERIMENTS / "exp5_vision", "Exp5 · vision stack",
-     "Can better vision make Joaquin Philco's resonance agent see natural images? Eleven methods on CIFAR and Imagenette: Gabor and "
-     "learned V1, somas with an axon resonance machine, a deeper somatic stack, feedback from memory and super labels."),
-    ("exp6", EXPERIMENTS / "exp6_alphabet", "Exp6 · alphabet and words",
-     "The same resonance machinery learns letters, numbers and words from images, then words name colour patches with no "
-     "stored labels. Includes a 3D view: watch the eye read a word, or a patch evoke its word."),
-    ("exp6_live", EXPERIMENTS / "exp6_live", "Exp6 live · the model in your browser",
-     "The trained exp6 model runs in the page: type a word in any font, draw a character or pick a colour, and see which "
-     "letter, word and naming structures resonate, with a 3D view driven by the computed values."),
-]
-HUB_LINK = ('<a href="{root}exp2/index.html" style="color:var(--muted)">Experiment 2</a> '
-            '<a href="{root}index.html" style="color:var(--muted)" data-hub>Paper portfolio</a>')
+HUB = Path(__file__).resolve().parent
 
+MARKETS, RESONANCE = "Markets", "Resonance"
+# Every experiment on the site, in menu order: (site folder, group, menu label, card title, card text, source folder of a
+# static page, or None when another workflow builds the pages). The navigation bar and the overview page both come from it.
+CATALOG = [
+    ("exp1", MARKETS, "Exp1 pairs", "Exp1 · pairs", "Long the stock Exp1 favours in each pair, short the other.", None),
+    ("exp2", MARKETS, "Exp2 volatility", "Exp2 · volatility-timed",
+     "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", None),
+    ("exp7", MARKETS, "Exp7 VWAP", "Exp7 · VWAP + 9 EMA day trades",
+     "Day-trades SPY on a 3-minute chart: long when the 9 EMA is above the day's VWAP, short below, flat overnight.", None),
+    ("exp4", RESONANCE, "Exp4 playground", "Exp4 · resonance playground",
+     "A 3D model of the resonance architecture by Joaquin Philco: retina and V1, time-based somas with resonators on the axon, "
+     "concept structures and the rules that ask, allocate and sleep. Show it a digit in a colour, blur it, or open one cell.", EXP4),
+    ("exp5", RESONANCE, "Exp5 vision", "Exp5 · vision stack",
+     "Can better vision make Joaquin Philco's resonance agent see natural images? Eleven methods on CIFAR and Imagenette: Gabor and "
+     "learned V1, somas with an axon resonance machine, a deeper somatic stack, feedback from memory and super labels.",
+     EXPERIMENTS / "exp5_vision"),
+    ("exp6", RESONANCE, "Exp6 alphabet", "Exp6 · alphabet and words",
+     "The same resonance machinery learns letters, numbers and words from images, then words name colour patches with no "
+     "stored labels. Includes a 3D view: watch the eye read a word, or a patch evoke its word.", EXPERIMENTS / "exp6_alphabet"),
+    ("exp6_live", RESONANCE, "Exp6 live", "Exp6 live · the model in your browser",
+     "The trained exp6 model runs in the page: type a word in any font, draw a character or pick a colour, and see which "
+     "letter, word and naming structures resonate, with a 3D view driven by the computed values.", EXPERIMENTS / "exp6_live"),
+]
+# Static experiment pages: (site folder, source folder, card title, card text). No money involved in any of them.
+STATIC = [(d, src, title, text) for d, _, _, title, text, src in CATALOG if src is not None]
+
+NAV, NAV_END = "<!--labnav-->", "<!--/labnav-->"
+NAV_CSS = """
+:root{--site-nav-h:44px}
+#labnav{box-sizing:border-box;height:var(--site-nav-h);margin:0;padding:0 16px;display:flex;flex-wrap:nowrap;align-items:center;gap:22px;overflow-x:auto;
+overflow-y:hidden;white-space:nowrap;scrollbar-width:none;background:#000;border-bottom:1px solid rgba(255,255,255,.1);position:relative;z-index:50;
+font:500 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;letter-spacing:0;text-transform:none;color-scheme:dark}
+#labnav::-webkit-scrollbar{display:none}
+#labnav a{color:#98989f;text-decoration:none;padding:15px 0 13px;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;margin:0;font-weight:500}
+#labnav a:hover{color:#f5f5f7;text-decoration:none}
+#labnav a[aria-current=page]{color:#f5f5f7;border-bottom-color:#a593d4}
+#labnav a:focus-visible{outline:2px solid #a593d4;outline-offset:2px;border-radius:2px}
+#labnav .ln-home{color:#f5f5f7;font-weight:650;font-size:14px}
+#labnav .ln-grp{display:flex;flex-direction:row;align-items:center;gap:16px;margin:0;padding:0}
+#labnav .ln-g{color:#6e6e75;font-size:12px;padding-left:16px;border-left:1px solid rgba(255,255,255,.1)}
+@media print{#labnav{display:none}}
+"""
+# On a narrow screen the bar scrolls sideways: start it scrolled to the current page.
+NAV_SCRIPT = ('<script>(()=>{const n=document.getElementById("labnav"),a=n&&n.querySelector("[aria-current]");'
+              'if(a&&a.offsetLeft+a.offsetWidth>n.clientWidth)n.scrollLeft=a.offsetLeft-16})()</script>')
 CSS = """
 :root{--bg:#f7f7f5;--panel:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#e3e2dd;--accent:#2f5fd0;--lo:#2e7d4f;--hi:#c0392b;--band:#f1f0ec}
 @media (prefers-color-scheme:dark){:root{--bg:#141413;--panel:#1d1d1b;--text:#ecebe6;--muted:#9c9b94;--line:#33322e;--accent:#7aa2ff;--lo:#6fcf97;--hi:#ff7b6b;--band:#252522}}
@@ -89,6 +123,10 @@ th,td{border-bottom-color:var(--line)!important}footer{border-top:1px solid var(
 nav a.on{background:rgba(70,40,120,.35)!important;color:var(--text)!important;border-radius:999px}
 .tag{border-color:var(--glass-line)!important}.banner.warn,.banner.danger{background:rgba(52,26,92,.4)!important}
 svg text{fill:var(--muted)!important}.chart .grid{stroke:var(--grid)}
+"""
+HUB_CSS = """
+section.group{margin:0 0 34px}section.group h2{font-size:20px;margin:0 0 2px;letter-spacing:-.01em}section.group .intro{margin:0 0 14px}
+.card .go{font-weight:600}.card .tag{text-transform:none;letter-spacing:-.01em;font-size:16px;font-weight:650;color:var(--text)}
 """
 MARK, MARK_END = "<!--portfolio-->", "<!--/portfolio-->"
 BANNER_CSS = """
@@ -212,47 +250,89 @@ def sleeve_card(t: dict, key: str, title: str, href: str, what: str, pos: str) -
             f'<a class="go" href="{href}">Open →</a></div>')
 
 
-def exp7_card(t: dict) -> str:
-    """Exp7 has its own 1000 CAD pot, kept outside the combined one."""
-    if not t.get("exp7") or "exp7" not in t["rows"][-1]:
-        return ""
-    return ('<h2 style="font-size:18px;margin:28px 0 10px">Separate pot</h2><div class="cards">'
-            + sleeve_card(t, "exp7", "Exp7 · VWAP + 9 EMA day trades", "exp7/index.html",
-                          "Day-trades SPY on a 3-minute chart: long when the 9 EMA is above the day's VWAP, short below, flat overnight.",
-                          e(t.get("exp7_position") or "")) + "</div>")
+def nav_bar(current: str, root: str, site: Path | None = None) -> str:
+    """The bar at the top of every page. current is the page's site folder ("" for the overview); root leads back to the site root.
+    With site given, experiments whose pages are not in it are left out."""
+    def link(d: str, label: str) -> str:
+        cur = ' aria-current="page"' if d == current else ""
+        return f'<a href="{root}{d}/index.html"{cur}>{e(label)}</a>'
+    groups = []
+    for g in (MARKETS, RESONANCE):
+        links = "".join(link(d, label) for d, grp, label, *_ in CATALOG
+                        if grp == g and (site is None or (site / d / "index.html").exists()))
+        if links:
+            groups.append(f'<span class="ln-grp"><span class="ln-g">{g}</span>{links}</span>')
+    home = ' aria-current="page"' if current == "" else ""
+    return (f'{NAV}<style>{NAV_CSS}</style><nav id="labnav" aria-label="Experiments">'
+            f'<a class="ln-home" href="{root}index.html"{home}>All experiments</a>{"".join(groups)}</nav>{NAV_SCRIPT}{NAV_END}')
+
+
+BODY = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
+
+
+def add_nav(site: Path) -> int:
+    """Put the navigation bar at the top of every page in the site (replacing any earlier copy). Redirect pages are left alone."""
+    n = 0
+    for f in site.rglob("*.html"):
+        s = f.read_text(encoding="utf-8")
+        if 'http-equiv="refresh"' in s:
+            continue
+        if NAV in s:
+            s = s[:s.index(NAV)] + s[s.index(NAV_END) + len(NAV_END):]
+        m = BODY.search(s)
+        if not m:
+            continue
+        rel = f.relative_to(site).parts
+        current = rel[0] if len(rel) > 1 else ""
+        f.write_text(s[:m.end()] + nav_bar(current, "../" * (len(rel) - 1), site) + s[m.end():], encoding="utf-8")
+        n += 1
+    return n
+
+
+def section(title: str, intro: str, body: str) -> str:
+    return f'<section class="group"><h2>{e(title)}</h2><p class="muted small intro">{intro}</p>{body}</section>'
+
+
+def plain_card(d: str, title: str, text: str, published: bool) -> str:
+    go = f'<a class="go" href="{d}/index.html">Open {e(title.split(" · ")[0])}</a>' if published else '<p class="muted small">Not published yet.</p>'
+    return f'<div class="card"><div class="tag">{e(title)}</div><p>{e(text)}</p>{go}</div>'
 
 
 def hub_page(site: Path, t: dict | None = None) -> str:
     built = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    have = lambda d: (site / d / "index.html").exists()  # noqa: E731
+    info = {d: (title, text) for d, _, _, title, text, _ in CATALOG}
     if t is None:
-        body = '<p class="muted">The portfolio appears after its first run.</p>'
+        money = '<p class="muted">The paper portfolio appears after its first nightly run.</p>'
+        cards = "".join(plain_card(d, *info[d], have(d)) for d in ("exp1", "exp2", "exp7"))
     else:
         rows = t["rows"]
         fx = "" if t.get("fx_known") else " USD/CAD rate unavailable: values exclude currency moves."
-        body = f"""{big_number(rows, "combined", "Combined paper portfolio: profit / loss", t.get("start"))}
+        money = f"""{big_number(rows, "combined", "Combined paper portfolio: profit / loss", t.get("start"))}
 <div class="panel">{value_chart(rows, [("combined", "var(--text)"), ("exp1", "var(--a)"), ("exp2", "var(--b)")])}
 <div class="small muted"><span style="color:var(--text)">━</span> combined <span style="color:var(--a)">━</span> Exp1
 <span style="color:var(--b)">━</span> Exp2 · dashed line: the starting 1,000 CAD</div></div>
-<p class="small muted">Half of the money follows each experiment. Trades every trading day; US positions, valued in CAD at the
-Bank of Canada rate. No costs or interest.{fx}</p>
-<div class="cards">{sleeve_card(t, "exp1", "Exp1 · pairs", "exp1/index.html", "Long the stock Exp1 favours in each pair, short the other.", exp1_positions(t))}
-{sleeve_card(t, "exp2", "Exp2 · volatility-timed", "exp2/index.html", "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", e(t.get("exp2_position") or ""))}</div>
-{exp7_card(t)}"""
-    shown = [x for x in STATIC if (site / x[0] / "index.html").exists()]
-    exp7_nav = '\n<a href="exp7/index.html">Experiment 7</a>' if (site / "exp7" / "index.html").exists() else ""
-    exp4_nav = "".join(f'\n<a href="{d}/index.html">Experiment {d[3:].replace("_", " ")}</a>' for d, *_ in shown)
-    exp4_card = ('<h2 style="font-size:18px;margin:28px 0 10px">Other experiments</h2><div class="cards">'
-                 + "".join(f'<div class="card"><div class="tag">{e(title)}</div><p>{e(text)}</p>'
-                           f'<a class="go" href="{d}/index.html">Open →</a></div>' for d, _, title, text in shown)
-                 + '</div>') if shown else ""
+<p class="small muted">Half of the money follows each of Exp1 and Exp2. Trades every trading day; US positions, valued in CAD at the
+Bank of Canada rate. No costs or interest.{fx}</p>"""
+        cards = (sleeve_card(t, "exp1", info["exp1"][0], "exp1/index.html", info["exp1"][1], exp1_positions(t))
+                 + sleeve_card(t, "exp2", info["exp2"][0], "exp2/index.html", info["exp2"][1], e(t.get("exp2_position") or "")))
+        if t.get("exp7") and "exp7" in rows[-1]:
+            cards += sleeve_card(t, "exp7", info["exp7"][0] + " (separate pot)", "exp7/index.html", info["exp7"][1],
+                                 e(t.get("exp7_position") or ""))
+        elif have("exp7"):
+            cards += plain_card("exp7", *info["exp7"], True)
+    research = [d for d, grp, *_ in CATALOG if grp == RESONANCE and have(d)]
+    markets = section("Markets", "Strategies traded every day with fake money: 1,000 CAD each, no orders placed anywhere.",
+                      money + f'<div class="cards">{cards}</div>')
+    resonance = section("Resonance research", "Joaquin Philco's resonance architecture: models and results you can run in the browser.",
+                        '<div class="cards">' + "".join(plain_card(d, *info[d], True) for d in research) + "</div>") if research else ""
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
-<title>Paper portfolio</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}</style></head><body>
-<header><div class="wrap"><a class="brand" href="index.html">Paper portfolio</a> <span class="nav"><a href="exp1/index.html">Experiment 1</a>
-<a href="exp2/index.html">Experiment 2</a>{exp7_nav}{exp4_nav}</span></div></header>
-<main class="wrap">{body}{exp4_card}</main>
-<footer><div class="wrap">Fake money: no orders are placed anywhere and nothing here is investment advice. Built {built}.
-<a href="{REPO_URL}">Source</a>.</div></footer></body></html>"""
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer"><title>All experiments</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}{HUB_CSS}</style></head><body>
+<main class="wrap"><h1>All experiments</h1>
+<p class="sub">Every project in one place. The bar at the top of each page leads to all the others.</p>
+{markets}{resonance}</main>
+<footer><div class="wrap">Fake money: no orders are placed anywhere and nothing here is investment advice. Built {built}.</div></footer></body></html>"""
 
 
 def redirect_page(target: str) -> str:
@@ -260,18 +340,6 @@ def redirect_page(target: str) -> str:
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex">'
             f'<meta http-equiv="refresh" content="0; url={t}"><link rel="canonical" href="{t}"><title>Moved</title></head>'
             f'<body><p>This page moved to <a href="{t}">{t}</a>.</p></body></html>')
-
-
-def link_exp1_to_hub(site: Path) -> int:
-    d, n = site / "exp1", 0
-    for f in d.rglob("*.html"):
-        depth = len(f.relative_to(d).parts)  # exp1/index.html -> 1, exp1/pairs/x.html -> 2
-        s = f.read_text()
-        if "data-hub" in s or "</nav></div></header>" not in s:
-            continue
-        f.write_text(s.replace("</nav></div></header>", "</nav>" + HUB_LINK.format(root="../" * depth) + "</div></header>", 1))
-        n += 1
-    return n
 
 
 def keep_old_addresses(site: Path) -> int:
@@ -295,11 +363,21 @@ def keep_old_addresses(site: Path) -> int:
     return n
 
 
+SHARED = re.compile(r'<script src="\.\./hub/([\w-]+\.js)"></script>')
+
+
+def inline_shared(page: str) -> str:
+    """Replace <script src="../hub/x.js"></script> with the script itself: the published site cannot serve script files."""
+    return SHARED.sub(lambda m: "<script>\n" + (HUB / m.group(1)).read_text(encoding="utf-8").replace("</script", "<\\/script") + "</script>", page)
+
+
 def add_static(site: Path, name: str, src: Path) -> bool:
     """Copy one static experiment page (folder with an index.html) into the site."""
     if not (src / "index.html").exists():
         return False
     shutil.copytree(src, site / name, dirs_exist_ok=True)
+    for f in (site / name).rglob("*.html"):
+        f.write_text(inline_shared(f.read_text(encoding="utf-8")), encoding="utf-8")
     return True
 
 
@@ -312,7 +390,6 @@ def build(site: Path, state: Path | None = None, update: bool = False) -> dict:
     site.mkdir(parents=True, exist_ok=True)
     for name, src, *_ in STATIC:
         add_static(site, name, src)
-    linked = link_exp1_to_hub(site) if (site / "exp1").is_dir() else 0
     moved = keep_old_addresses(site) if (site / "exp1").is_dir() else 0
     t, rep = None, {}
     if state is not None:
@@ -323,8 +400,10 @@ def build(site: Path, state: Path | None = None, update: bool = False) -> dict:
         inject(site / "exp7" / "index.html", portfolio_banner(t, "exp7", "../"))
     theme(site)
     (site / "index.html").write_text(hub_page(site, t))
+    navs = add_nav(site)
     (site / ".nojekyll").write_text("")
-    return {"exp1_pages_linked": linked, "old_addresses_kept": moved, "exp2": (site / "exp2" / "index.html").exists(), **rep}
+    (site / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
+    return {"pages_with_nav": navs, "old_addresses_kept": moved, "exp2": (site / "exp2" / "index.html").exists(), **rep}
 
 
 if __name__ == "__main__":

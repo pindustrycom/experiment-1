@@ -264,8 +264,7 @@ def page(S: dict, L: pd.DataFrame, scored: pd.DataFrame, first_live: str | None,
     attr = "".join(f"<li>{e(k)}: average miss {v:.3f} pp a day</li>" for k, v in S["error_by_sleeve_last_120"].items())
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex"><title>Experiment 2: volatility-timed portfolio</title><style>{CSS}</style></head><body>
-<header><div class="wrap"><a class="brand" href="../index.html">Market experiments</a><nav><a href="../exp1/index.html">Experiment 1</a>
-<a class="on" href="index.html">Experiment 2</a><a href="../index.html">Paper portfolio</a></nav></div></header>
+<header><div class="wrap"><a class="brand" href="index.html">Experiment 2 · volatility-timed portfolio</a></div></header>
 <main class="wrap"><h1>Experiment 2: volatility-timed portfolio</h1>
 <p class="sub">Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book. Predicts each morning, scores each evening.</p>
 {today}
