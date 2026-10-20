@@ -102,7 +102,7 @@ def test_overview_is_one_column_per_group(tmp_path):
     build_hub.build(tmp_path)
     hub = (tmp_path / "index.html").read_text()
     assert hub.count('class="half"') == len(build_hub.GROUPS)
-    for g, anchor, *_ in build_hub.GROUPS:
+    for _g, anchor, *_ in build_hub.GROUPS:
         assert f'id="{anchor}"' in hub and f'class="door" href="#{anchor}"' in hub
     assert 'class="ln-g" href="index.html#resonance">Resonance</a>' in hub
     assert 'href="../index.html#markets"' in (tmp_path / "exp1" / "index.html").read_text()
