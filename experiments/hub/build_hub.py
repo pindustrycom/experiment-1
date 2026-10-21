@@ -493,7 +493,7 @@ def markets_body(t: dict) -> tuple[str, str]:
     head = (best_pot(rows, pots) + total_number(rows, keys, "All paper pots: profit / loss", t.get("start")) + pots_table(rows, pots)
             + pots_chart(rows, pots)
             + f'<p class="small muted">Every pot started with a fake {CAPITAL:,.0f} CAD and trades every trading day from its own rule; US positions, '
-            f'valued in CAD at the Bank of Canada rate. A pot that joined later stays at {CAPITAL:,.0f} until its first trade.{fx}</p>')
+            f'valued in CAD at the Bank of Canada rate. All pots count from the same start as Exp1; a strategy added later is replayed from that day with the data known each day.{fx}</p>')
     halves = []
     for cat, anchor, color, bg, intro in HORIZONS:
         mine = [p for p in pots if p[2] == cat]

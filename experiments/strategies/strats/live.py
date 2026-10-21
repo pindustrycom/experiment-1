@@ -3,6 +3,7 @@
 After each US close: mark every pot's book to the close, then form the next book (rules.py). A pot's day return is its
 book's return from the previous close minus COST per unit of turnover when the book changes. The state (each pot's
 daily rows with the book held, and the event holdings with sessions left) is a JSON file the workflow keeps between runs.
+Every pot starts at the ORIGIN close; one added later is rebuilt from there with only the data known at each close.
 
 The earnings and insider pots need event histories that the free data does not reach back for, so they are tracked
 forward only. Trend and reversal are also replayed from 2019 with the same functions; the reversal replay uses today's
@@ -23,6 +24,9 @@ from . import copy, crypto, rules
 COST = 0.0001          # 1 bp of the traded amount, each side
 REPLAY_FROM = "2019-01-01"
 EVENT_FRESH_DAYS = 7   # an earnings beat older than this when first seen is not bought
+# Every pot forms its first book at this close, the last one before the paper portfolios' start (experiments/hub/portfolio.py
+# START, 2026-10-19, when Exp1 began), so all pots are compared over the same days. A pot added later is replayed from here.
+ORIGIN = "2026-10-16"
 
 
 def _last(rows: list[dict]) -> dict | None:
@@ -30,68 +34,99 @@ def _last(rows: list[dict]) -> dict | None:
 
 
 def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], earnings: pd.DataFrame, insiders: pd.DataFrame,
-         cp: dict | None = None, btc: pd.DataFrame | None = None) -> dict:
-    """Move every pot to the close of d. Safe to repeat: a pot already at d is left alone."""
+         cp: dict | None = None, btc: pd.DataFrame | None = None, origin: str = ORIGIN) -> dict:
+    """Move every pot to the close of d. Safe to repeat: a pot already at d is left alone. A pot that does not reach back to
+    the origin close (a new pot, or one added after the first) is first rebuilt from there, session by session, with only
+    what was known at each close; those rows are marked as replayed."""
     pots = state.setdefault("pots", {k: [] for k in rules.STRATEGIES})
-    events = state.setdefault("events", {"pead": {}, "insider": {}})
-    seen = state.setdefault("seen", {"pead": []})
+    state.setdefault("events", {"pead": {}, "insider": {}})
+    state.setdefault("seen", {"pead": []})
     ds = d.strftime("%Y-%m-%d")
-    state.setdefault("start", ds)
+    after = px.index[(px.index >= origin) & (px.index < d)]
+    o = after[0] if len(after) else None
     rep = {}
     for key in rules.STRATEGIES:
-        rows = pots.setdefault(key, [])
-        last = _last(rows)
-        if last and last["date"] >= ds:
-            rep[key] = f"already at {last['date']}"
-            continue
-        if key == crypto.KEY:
-            rep[key] = step_btc(rows, last, btc, d, ds)
-            if not rows:
-                pots.pop(key, None)
-            continue
-        old_w = last["w"] if last else {}
-        hold = book_return(old_w, px, pd.Timestamp(last["date"]), d) if last else 0.0
-        if key in copy.KEYS:
-            if not copy.has_data(cp):
-                if not last:
-                    pots.pop(key, None)
-                    rep[key] = "no filings data yet: starts once it is there"
-                    continue
-                new_w, reb = old_w, False
-            else:
-                new_w, reb = copy.WEIGHTS[key](cp, px, d), True
-        elif key in ("trend", "reversal"):
-            freq, due = ("M", rules.is_last_session_of_month) if key == "trend" else ("W", rules.is_last_session_of_week)
-            if due_now(rows, d, freq, due):
-                new_w = rules.trend_weights(px, d) if key == "trend" else rules.reversal_weights(px, d, members)
-                reb = True
-            else:
-                new_w, reb = old_w, False
-        else:
-            reb = True
-            h = {t: n - 1 for t, n in events[key].items() if n - 1 > 0} if last else dict(events[key])
-            if key == "pead":
-                beats = rules.earnings_beats(earnings)
-                if not beats.empty:
-                    bd = pd.to_datetime(beats["date"])
-                    fresh = beats[(bd < d) & (bd >= d - pd.Timedelta(days=EVENT_FRESH_DAYS))]
-                    for s, day in zip(fresh["symbol"], fresh["date"]):
-                        tag = f"{s}|{day}"
-                        if tag not in seen["pead"] and s in px.columns and pd.notna(px.at[d, s]):
-                            seen["pead"].append(tag)
-                            h.setdefault(s, rules.PEAD_HOLD)
-            else:
-                for s in rules.insider_clusters(insiders, d):
-                    if s in px.columns and pd.notna(px.at[d, s]):
-                        h.setdefault(s, rules.INSIDER_HOLD)
-            events[key] = h
-            new_w = rules.event_weights(h)
-        ret = hold - COST * rules.turnover(old_w, new_w) if last else -COST * rules.turnover({}, new_w)
-        idx = (last["index"] if last else 1.0) * (1 + ret)
-        rows.append({"date": ds, "ret": ret, "index": idx, "w": {k: round(v, 6) for k, v in new_w.items()}, "reb": reb})
-        rep[key] = f"{ds}: {ret:+.4%}, {len(new_w)} positions"
-    seen["pead"] = seen["pead"][-3000:]
+        rows = pots.get(key) or []
+        if o is not None and (not rows or rows[0]["date"] > o.strftime("%Y-%m-%d")):
+            if (done := catch_up(state, key, px, after, members, earnings, insiders, cp, btc)):
+                rep[f"{key}_replayed"] = done
+        rep[key] = step_pot(state, key, px, d, ds, members, earnings, insiders, cp, btc)
+    state["seen"]["pead"] = state["seen"]["pead"][-3000:]
+    firsts = [r[0]["date"] for r in pots.values() if r]
+    if firsts:
+        state["start"] = min(firsts)
     return rep
+
+
+def catch_up(state: dict, key: str, px: pd.DataFrame, sessions: pd.DatetimeIndex, members: list[str], earnings: pd.DataFrame,
+             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None) -> str:
+    """Rebuild one pot from the first of sessions, each step seeing prices only up to its own close."""
+    state["pots"][key] = []
+    if key in state["events"]:
+        state["events"][key] = {}
+    if key == "pead":
+        state["seen"]["pead"] = []
+    for s in sessions:
+        step_pot(state, key, px.loc[:s], s, s.strftime("%Y-%m-%d"), members, earnings, insiders, cp, btc)
+    rows = state["pots"].get(key) or []
+    for r in rows:
+        r["replayed"] = True
+    return f"replayed {len(rows)} sessions from {rows[0]['date']}" if rows else ""
+
+
+def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, members: list[str], earnings: pd.DataFrame,
+             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None) -> str:
+    """Move one pot to the close of d."""
+    pots, events, seen = state["pots"], state["events"], state["seen"]
+    rows = pots.setdefault(key, [])
+    last = _last(rows)
+    if last and last["date"] >= ds:
+        return f"already at {last['date']}"
+    if key == crypto.KEY:
+        out = step_btc(rows, last, btc, d, ds)
+        if not rows:
+            pots.pop(key, None)
+        return out
+    old_w = last["w"] if last else {}
+    hold = book_return(old_w, px, pd.Timestamp(last["date"]), d) if last else 0.0
+    if key in copy.KEYS:
+        if not copy.has_data(cp):
+            if not last:
+                pots.pop(key, None)
+                return "no filings data yet: starts once it is there"
+            new_w, reb = old_w, False
+        else:
+            new_w, reb = copy.WEIGHTS[key](cp, px, d), True
+    elif key in ("trend", "reversal"):
+        freq, due = ("M", rules.is_last_session_of_month) if key == "trend" else ("W", rules.is_last_session_of_week)
+        if due_now(rows, d, freq, due):
+            new_w = rules.trend_weights(px, d) if key == "trend" else rules.reversal_weights(px, d, members)
+            reb = True
+        else:
+            new_w, reb = old_w, False
+    else:
+        reb = True
+        h = {t: n - 1 for t, n in events[key].items() if n - 1 > 0} if last else dict(events[key])
+        if key == "pead":
+            beats = rules.earnings_beats(earnings)
+            if not beats.empty:
+                bd = pd.to_datetime(beats["date"])
+                fresh = beats[(bd < d) & (bd >= d - pd.Timedelta(days=EVENT_FRESH_DAYS))]
+                for s, day in zip(fresh["symbol"], fresh["date"]):
+                    tag = f"{s}|{day}"
+                    if tag not in seen["pead"] and s in px.columns and pd.notna(px.at[d, s]):
+                        seen["pead"].append(tag)
+                        h.setdefault(s, rules.PEAD_HOLD)
+        else:
+            for s in rules.insider_clusters(insiders, d):
+                if s in px.columns and pd.notna(px.at[d, s]):
+                    h.setdefault(s, rules.INSIDER_HOLD)
+        events[key] = h
+        new_w = rules.event_weights(h)
+    ret = hold - COST * rules.turnover(old_w, new_w) if last else -COST * rules.turnover({}, new_w)
+    idx = (last["index"] if last else 1.0) * (1 + ret)
+    rows.append({"date": ds, "ret": ret, "index": idx, "w": {k: round(v, 6) for k, v in new_w.items()}, "reb": reb})
+    return f"{ds}: {ret:+.4%}, {len(new_w)} positions"
 
 
 def step_btc(rows: list[dict], last: dict | None, btc: pd.DataFrame | None, d: pd.Timestamp, ds: str) -> str:

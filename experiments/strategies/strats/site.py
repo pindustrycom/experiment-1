@@ -107,12 +107,16 @@ def page(summary: dict, pots: dict) -> str:
                 continue
             rows = pots.get(k) or []
             live = (rows[-1]["index"] - 1) if rows else None
+            rp_rows = [r for r in rows if r.get("replayed")]
+            since = (f' (replayed with the same rule up to the {e(rp_rows[-1]["date"])} close, using only what was known each day; '
+                     f'traded live after that)') if rp_rows else ""
             parts.append(f'<section class="panel" id="{k}"><h3>{e(s["name"])}</h3><p class="muted">{e(s["what"])}</p>'
-                         f'<p class="small">Paper pot since {e(rows[0]["date"]) if rows else "the next close"}: {pct(live)} in USD (the Markets page shows it in CAD)</p>'
+                         f'<p class="small">Paper pot since {e(rows[0]["date"]) if rows else "the next close"}{since}: {pct(live)} in USD (the Markets page shows it in CAD)</p>'
                          f'<p class="small">{e(s["position"])}</p>{_replay_block(k, rp)}</section>')
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Strategy pots</title><style>{CSS}</style></head><body>
 <main class="wrap"><h1>Strategy pots</h1><p class="muted">{len(summary["strategies"])} rules, each traded every day on paper with its own
-1,000 CAD from its first close. Long-term pots hold positions for weeks or months; short-term ones for days. Last close: {e(summary.get("last") or "none yet")}.</p>
+1,000 CAD from the same first close as the other pots; a pot added later is replayed from there.
+Long-term pots hold positions for weeks or months; short-term ones for days. Last close: {e(summary.get("last") or "none yet")}.</p>
 {"".join(parts)}<p class="muted small">Fake money: no orders are placed anywhere. Prices from Yahoo, earnings and insider filings from Finnhub,
 13Fs from SEC EDGAR, Pelosi's trades from the House Clerk.</p></main></body></html>"""

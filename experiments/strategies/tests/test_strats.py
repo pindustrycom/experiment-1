@@ -233,3 +233,29 @@ def test_btc_pot_steps_with_the_rule_equity():
     st2 = {}
     live.step(st2, px, days[0], [], pd.DataFrame(), pd.DataFrame(), None, None)
     assert "btc_donchian" not in st2["pots"]                 # no bars: the pot waits
+
+
+def test_pots_added_later_are_replayed_from_the_origin():
+    px = prices()
+    members = [c for c in px.columns if c.startswith("S")]
+    o, d = px.index[-6], px.index[-1]
+    earn = pd.DataFrame({"symbol": ["S01"], "date": [str((px.index[-4] - pd.Timedelta(days=1)).date())], "epsActual": [2.0], "epsEstimate": [1.0]})
+    # stepped by hand, close by close, from the origin
+    ref = {}
+    for s in px.index[-6:]:
+        live.step(ref, px.loc[:s], s, members, earn, pd.DataFrame(), origin=str(s.date()))
+    # a state whose pots only started at the last session but one is rebuilt from the origin on the next run
+    st = {}
+    live.step(st, px.loc[:px.index[-2]], px.index[-2], members, earn, pd.DataFrame(), origin=str(px.index[-2].date()))
+    rep = live.step(st, px, d, members, earn, pd.DataFrame(), origin=str(o.date()))
+    assert rep["trend_replayed"] == f"replayed 5 sessions from {o.date()}" and st["start"] == str(o.date())
+    for k in ("trend", "pead", "insider", "reversal"):
+        rows = st["pots"][k]
+        assert [r["date"] for r in rows] == [r["date"] for r in ref["pots"][k]]
+        assert rows[-1]["index"] == pytest.approx(ref["pots"][k][-1]["index"])
+        assert all(r.get("replayed") for r in rows[:-1]) and not rows[-1].get("replayed")
+    assert st["events"]["pead"] == ref["events"]["pead"]
+    # once a pot reaches back to the origin it is not rebuilt again
+    assert not any(k.endswith("_replayed") for k in live.step(st, px, d, members, earn, pd.DataFrame(), origin=str(o.date())))
+    out = site.page({"strategies": {"trend": {"name": "Trend following", "category": rules.LONG_TERM, "what": "", "position": ""}}}, st["pots"])
+    assert f"replayed with the same rule up to the {px.index[-2].date()} close" in out
