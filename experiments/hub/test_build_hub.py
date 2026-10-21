@@ -45,11 +45,11 @@ def test_every_page_gets_one_nav_with_the_right_depth(tmp_path):
     assert hub.count('id="labnav"') == 1 and 'class="ln-home" href="index.html" aria-current="page"' in hub
     six = (tmp_path / "exp6" / "index.html").read_text()
     assert six.index('id="labnav"') < six.index("<h1>")
-    for d in ("exp1", "exp4", "exp5", "exp6", "exp6_live"):
+    for d in ("exp1", "exp4", "exp5", "exp6", "exp6_live", "trader_skill"):
         assert f'href="../{d}/index.html"' in six
     # redirect pages stay plain
     assert "labnav" not in (tmp_path / "about.html").read_text()
-    assert r["pages_with_nav"] == 3 + 5 + 1
+    assert r["pages_with_nav"] == 3 + 6 + 1
 
 
 def test_nav_links_exp2_and_exp7_once_published(tmp_path):

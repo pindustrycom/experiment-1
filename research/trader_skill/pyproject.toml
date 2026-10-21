@@ -1,0 +1,10 @@
+[tool.ruff]
+line-length = 210
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "I"]
+ignore = ["B905"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
