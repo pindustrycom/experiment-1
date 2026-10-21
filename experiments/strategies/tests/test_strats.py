@@ -2,8 +2,9 @@ import json
 
 import numpy as np
 import pandas as pd
+import pytest
 
-from strats import cli, copy, live, rules, site
+from strats import cli, copy, crypto, live, rules, site
 
 
 def prices(n=600, seed=0, tickers=None):
@@ -96,7 +97,7 @@ def test_replay_and_site(tmp_path):
     out = site.write(tmp_path, st, rp, {})
     assert out["sessions"] == 1
     head = (tmp_path / "data" / "daily.csv").read_text().splitlines()[0]
-    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal"
+    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,btc_donchian"
     s = json.loads((tmp_path / "data" / "summary.json").read_text())
     assert s["strategies"]["pead"]["category"] == rules.LONG_TERM and "cash" in s["strategies"]["pead"]["position"]
     page = (tmp_path / "index.html").read_text()
@@ -186,3 +187,49 @@ def test_live_quote_of_an_open_session_is_dropped():
     ny = lambda h: (today + pd.Timedelta(hours=h)).tz_localize("America/New_York")  # noqa: E731
     assert cli.closed(px, ny(11)).index[-1] == px.index[-2]
     assert cli.closed(px, ny(17)).index[-1] == today
+
+
+def btc_bars(n=400, seed=3, start="2026-08-01"):
+    rng = np.random.default_rng(seed)
+    c = 60000 * np.exp(np.cumsum(rng.normal(0.002, 0.01, n)))
+    o = np.r_[c[0], c[:-1]]
+    idx = pd.date_range(start, periods=n, freq="4h")
+    return pd.DataFrame({"open": o, "high": np.maximum(o, c) * 1.001, "low": np.minimum(o, c) * 0.999, "close": c}, index=idx)
+
+
+def test_btc_rule_trades_breakouts_at_the_next_open():
+    d = btc_bars()
+    eq = crypto.run_rule(d, cost=0.0)
+    hi = d.high.rolling(crypto.CHANNEL).max().shift()
+    sma = d.close.rolling(crypto.TREND).mean()
+    first = d.index[((d.close > hi) & (d.close > sma)).to_numpy()][0]
+    j = d.index.get_loc(first)
+    assert not eq["held"].iloc[j] and eq["after"].iloc[j] and eq["held"].iloc[j + 1]
+    assert eq["equity"].iloc[j + 1] == pytest.approx(d.close.iloc[j + 1] / d.open.iloc[j + 1])
+    assert (eq["equity"].iloc[: j + 1] == 1.0).all()
+    assert crypto.run_rule(d)["equity"].iloc[-1] < eq["equity"].iloc[-1]       # costs bite
+
+
+def test_btc_mark_bar_is_the_last_bar_closed_by_the_us_close():
+    eq = crypto.run_rule(btc_bars())
+    # 2026-09-10 16:00 New York = 20:00 UTC: the bar opening 16:00 UTC is the last one closed
+    assert crypto.mark_bar(eq, pd.Timestamp("2026-09-10")) == pd.Timestamp("2026-09-10 16:00")
+    assert crypto.mark_bar(eq, pd.Timestamp("2026-01-05")) is None
+
+
+def test_btc_pot_steps_with_the_rule_equity():
+    d = btc_bars()
+    px = prices()
+    st = {}
+    days = [pd.Timestamp("2026-09-08"), pd.Timestamp("2026-09-09"), pd.Timestamp("2026-09-10")]
+    for day in days:
+        live.step(st, px, day, [], pd.DataFrame(), pd.DataFrame(), None, d)
+    rows = st["pots"]["btc_donchian"]
+    eq = crypto.run_rule(d)["equity"]
+    assert [r["date"] for r in rows] == ["2026-09-08", "2026-09-09", "2026-09-10"] and rows[0]["ret"] == 0.0
+    b0, b2 = pd.Timestamp(rows[0]["bar"]), pd.Timestamp(rows[2]["bar"])
+    assert rows[2]["index"] == pytest.approx(eq[b2] / eq[b0])
+    assert "BTC" in site.position_text("btc_donchian", rows[-1], {}) or "cash" in site.position_text("btc_donchian", rows[-1], {})
+    st2 = {}
+    live.step(st2, px, days[0], [], pd.DataFrame(), pd.DataFrame(), None, None)
+    assert "btc_donchian" not in st2["pots"]                 # no bars: the pot waits

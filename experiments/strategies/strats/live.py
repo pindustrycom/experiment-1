@@ -18,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import copy, rules
+from . import copy, crypto, rules
 
 COST = 0.0001          # 1 bp of the traded amount, each side
 REPLAY_FROM = "2019-01-01"
@@ -30,7 +30,7 @@ def _last(rows: list[dict]) -> dict | None:
 
 
 def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], earnings: pd.DataFrame, insiders: pd.DataFrame,
-         cp: dict | None = None) -> dict:
+         cp: dict | None = None, btc: pd.DataFrame | None = None) -> dict:
     """Move every pot to the close of d. Safe to repeat: a pot already at d is left alone."""
     pots = state.setdefault("pots", {k: [] for k in rules.STRATEGIES})
     events = state.setdefault("events", {"pead": {}, "insider": {}})
@@ -43,6 +43,11 @@ def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], ear
         last = _last(rows)
         if last and last["date"] >= ds:
             rep[key] = f"already at {last['date']}"
+            continue
+        if key == crypto.KEY:
+            rep[key] = step_btc(rows, last, btc, d, ds)
+            if not rows:
+                pots.pop(key, None)
             continue
         old_w = last["w"] if last else {}
         hold = book_return(old_w, px, pd.Timestamp(last["date"]), d) if last else 0.0
@@ -87,6 +92,23 @@ def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], ear
         rep[key] = f"{ds}: {ret:+.4%}, {len(new_w)} positions"
     seen["pead"] = seen["pead"][-3000:]
     return rep
+
+
+def step_btc(rows: list[dict], last: dict | None, btc: pd.DataFrame | None, d: pd.Timestamp, ds: str) -> str:
+    """The BTC pot earns the 4-hour rule's equity change between the bars marked at the last and this US close."""
+    eq = crypto.run_rule(btc) if btc is not None and len(btc) > crypto.TREND else None
+    b = crypto.mark_bar(eq, d) if eq is not None else None
+    if b is None:
+        if not last:
+            return "no BTC bars yet: starts once they are there"
+        ret, w, bar = 0.0, last["w"], last.get("bar")
+    else:
+        prev = pd.Timestamp(last["bar"]) if last and last.get("bar") else None
+        ret = float(eq.at[b, "equity"] / eq.at[prev, "equity"] - 1) if prev is not None and prev in eq.index else 0.0
+        w, bar = ({"BTC": 1.0} if eq.at[b, "after"] else {}), str(b)
+    idx = (last["index"] if last else 1.0) * (1 + ret)
+    rows.append({"date": ds, "ret": ret, "index": idx, "w": w, "reb": False, "bar": bar})
+    return f"{ds}: {ret:+.4%}, {'BTC' if w else 'cash'} after the bar opening {bar} UTC"
 
 
 def due_now(rows: list[dict], d: pd.Timestamp, freq: str, due) -> bool:

@@ -46,7 +46,7 @@ CATALOG = [
      "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", None),
     ("exp7", MARKETS, "Exp7 VWAP", "Exp7 · VWAP + 9 EMA day trades",
      "Day-trades SPY on a 3-minute chart: long when the 9 EMA is above the day's VWAP, short below, flat overnight.", None),
-    ("strategies", MARKETS, "Strategy pots", "Strategy pots · trend, earnings, insiders, reversal",
+    ("strategies", MARKETS, "Strategy pots", "Strategy pots · trend, earnings, insiders, reversal, BTC",
      "Four rules with their own pots: trend following across ETFs, buying after earnings beats, buying after insiders "
      "buy, and buying the week's biggest losers.", None),
     ("trader_skill", MARKETS, "Copy-trading test", "trader-skill test · copying funds and Congress",
@@ -86,7 +86,8 @@ POTS = [("exp2", "Exp2 volatility", LONG, "exp2/index.html"), ("trend", "Trend f
         ("conviction", "Fund conviction", LONG, "strategies/index.html#conviction"),
         ("pelosi", "Pelosi copy", LONG, "strategies/index.html#pelosi"),
         ("exp1", "Exp1 pairs", SHORT, "exp1/index.html"), ("exp7", "Exp7 VWAP", SHORT, "exp7/index.html"),
-        ("reversal", "Weekly reversal", SHORT, "strategies/index.html#reversal")]
+        ("reversal", "Weekly reversal", SHORT, "strategies/index.html#reversal"),
+        ("btc_donchian", "BTC breakout", SHORT, "strategies/index.html#btc_donchian")]
 # (category, anchor, colour, moving background, description)
 HORIZONS = [(LONG, "long", "#8fc1ad", "price", "Positions kept for weeks or months: monthly books, year-long trends, copied fund and Pelosi filings, and events held for a season."),
             (SHORT, "short", "#d9a15b", "candles", "Positions kept for a day or a week: daily pair bets, intraday SPY trades and weekly bounces.")]

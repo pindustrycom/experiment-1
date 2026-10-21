@@ -11,6 +11,7 @@ Long-term (positions held for weeks or months):
            filed open-market purchases within 30 days, hold it 120 sessions. Sized like pead.
   best_ideas, conviction, pelosi  Copying public filings (13Fs, Pelosi's PTRs): see copy.py.
 Short-term (positions held for days):
+  btc_donchian  Bitcoin 4-hour breakout: see crypto.py.
   reversal Weekly reversal: at each week's last close, buy the 20 S&P 500 stocks that fell the most over the past 5
            sessions, 5% each, and hold them for the week.
 """
@@ -43,6 +44,9 @@ STRATEGIES = {
                "after the filing is public; sells when she discloses a sale or after a year."),
     "reversal": ("Weekly reversal", SHORT_TERM, "Each Friday buys the 20 S&P 500 stocks that fell the most that week and holds "
                  "them until the next Friday."),
+    "btc_donchian": ("BTC breakout", SHORT_TERM, "Bitcoin on 4-hour bars (Jesse's Donchian example): buys a close above the past "
+                     "20 bars' high while above the 200-bar average, sells a close below the past 20 bars' low; trades last "
+                     "about 10 days. See crypto.py."),
 }
 
 
