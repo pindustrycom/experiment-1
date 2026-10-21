@@ -1,0 +1,64 @@
+name: GitHub bot strategies backtest
+
+# Research only, paper only (research/github_bots): rules from open-source trading bots on GitHub (freqtrade
+# strategies, Jesse examples, quant-trading's Dual Thrust, classic allocation rules), ported to one backtester and run
+# from 2019 with costs against buy-and-hold. Crypto bars: Binance's public monthly files (data.binance.vision, no key).
+# Stocks: Yahoo daily, plus SPY/QQQ 1-minute bars from the exp7-data release. Nothing from those repos is installed or
+# run, no exchange keys are used, nothing is deployed. Results: the log, the job summary and the run's artifact.
+
+on:
+  pull_request:
+    paths: ["research/github_bots/**", ".github/workflows/github-bots.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-bots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: research/github_bots
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/github_bots/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Tests
+        run: ruff check . && python -m pytest -q
+
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/klines
+          key: binance-klines-${{ hashFiles('research/github_bots/data.py') }}-${{ github.run_id }}
+          restore-keys: binance-klines-
+
+      - name: SPY/QQQ minute bars (exp7-data release)
+        run: |
+          mkdir -p /tmp/exp7
+          gh release download exp7-data --repo "$GITHUB_REPOSITORY" --pattern exp7-data.tar.gz --dir /tmp/prev
+          tar xzf /tmp/prev/exp7-data.tar.gz -C /tmp/exp7
+          ls /tmp/exp7
+
+      - name: Backtest
+        run: |
+          set -o pipefail
+          python run.py /tmp/klines /tmp/exp7 out | tee /tmp/log.txt
+          cat out/table.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: github-bots-results
+          path: research/github_bots/out
