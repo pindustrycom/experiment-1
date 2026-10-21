@@ -189,9 +189,10 @@ color:var(--text);background:linear-gradient(0deg,rgba(0,0,0,.8),rgba(0,0,0,0) 6
 .split.sub{min-height:440px;margin:26px 0 8px;border:1px solid var(--glass-line);border-radius:20px;overflow:hidden}
 .split.sub:has(>.half:target){min-height:0;margin:0;border:0;border-radius:0;overflow:visible}
 .sub .door h2{font-size:clamp(36px,5vw,64px)}.open .open .wrap{padding:0}
-.mk-pots td,.mk-pots th{padding:7px 8px;text-align:right;white-space:nowrap}.mk-pots td:first-child,.mk-pots th:first-child,.mk-pots td:nth-child(2),.mk-pots th:nth-child(2){text-align:left}
+.mk-pots td,.mk-pots th{padding:7px 8px;text-align:right;white-space:nowrap}.mk-pots td:first-child,.mk-pots th:first-child,.mk-pots td:nth-child(2),.mk-pots th:nth-child(2),.mk-pots td:nth-child(3),.mk-pots th:nth-child(3){text-align:left}
 .mk-pots{width:100%;border-collapse:collapse;font-size:14px}.mk-pots th{font-size:12px;color:var(--muted);font-weight:500}
-.mk-pots tr+tr td{border-top:1px solid var(--line)}.mk-pots .cat{font-size:12px;color:var(--muted)}.tw{overflow-x:auto}
+.mk-pots tr+tr td{border-top:1px solid var(--line)}.mk-pots tr.lead td{font-weight:650}.mk-pots td:first-child{color:var(--muted)}
+.big.best .v{font-size:clamp(30px,5vw,44px)}.big.best .v a{color:var(--text)}.big.best .d+.d{margin-top:4px}.door .lead{font-size:14px;color:var(--text)}.mk-pots .cat{font-size:12px;color:var(--muted)}.tw{overflow-x:auto}
 @keyframes open{from{opacity:0;transform:translateY(16px)}}
 @media (max-width:640px){.split{flex-direction:column}.split>.half{border-right:0;border-bottom:1px solid var(--glass-line);min-height:300px}
 .split.sub>.half{min-height:400px}.mk-pots .cat{display:none}}
@@ -435,12 +436,50 @@ def pots_chart(rows: list[dict], pots: list[tuple]) -> str:
             f'{CAPITAL:,.0f} CAD</div></div>')
 
 
+def ranked(rows: list[dict], pots: list[tuple]) -> list[tuple]:
+    """The pots from the best % return on their 1,000 CAD to the worst (every pot starts with the same amount)."""
+    return sorted(pots, key=lambda p: -rows[-1][p[0]])
+
+
+def pot_since(rows: list[dict], k: str) -> tuple[str | None, int]:
+    """(the close a pot started from, trading days it has moved since), or (None, 0) before its first trade."""
+    for i, r in enumerate(rows):
+        if abs(r[k] - CAPITAL) > 1e-9:
+            return rows[i - 1]["date"], len(rows) - i
+    return None, 0
+
+
+def best_pot(rows: list[dict], pots: list[tuple]) -> str:
+    """The highlight at the top of the Markets page: the pot with the best % return so far, and the runner-up."""
+    order = ranked(rows, pots)
+    if not order:
+        return ""
+    k, label, cat, href, *_ = order[0]
+    pl = rows[-1][k] - CAPITAL
+    if pl_class(pl) != "pos":
+        return ('<div class="big best"><div class="k">Best pot so far</div><div class="v">None ahead yet</div>'
+                f'<div class="d">No pot is above its {CAPITAL:,.0f} CAD start at the {e(rows[-1]["date"])} close.</div></div>')
+    since, days = pot_since(rows, k)
+    nxt = ""
+    if len(order) > 1:
+        k2, label2, _, href2, *_ = order[1]
+        pl2 = rows[-1][k2] - CAPITAL
+        nxt = f' · runner-up <a href="{href2}">{e(label2)}</a> <span class="{pl_class(pl2)}">{100 * pl2 / CAPITAL:+.2f}%</span>'
+    luck = (f'<div class="d small">Only {days} trading day{"s" * (days != 1)} so far: a lead this young is mostly luck.</div>'
+            if days < 60 else "")
+    return (f'<div class="big best"><div class="k">Best pot so far · {e(cat)}</div><div class="v"><a href="{href}">{e(label)}</a> '
+            f'<span class="pos">{100 * pl / CAPITAL:+.2f}%</span></div><div class="d">Worth <b>{cad(rows[-1][k])}</b> '
+            f'({cad(pl, True)}) from {CAPITAL:,.0f} CAD on {e(since)}{nxt}</div>{luck}</div>')
+
+
 def pots_table(rows: list[dict], pots: list[tuple]) -> str:
-    out = ['<div class="panel"><div class="tw"><table class="mk-pots"><tr><th>Pot</th><th class="cat">Holds for</th><th>Worth</th><th>Profit / loss</th><th>Today</th></tr>']
-    for k, label, cat, href, *_ in pots:
+    out = ['<div class="panel"><div class="tw"><table class="mk-pots"><tr><th>#</th><th>Pot</th><th class="cat">Holds for</th><th>Worth</th>'
+           '<th>Profit / loss</th><th>Today</th></tr>']
+    for n, (k, label, cat, href, *_) in enumerate(ranked(rows, pots), 1):
         v = rows[-1][k]
         pl, day = v - CAPITAL, v - rows[-2][k] if len(rows) > 1 else 0.0
-        out.append(f'<tr><td><a href="{href}">{e(label)}</a></td><td class="cat">{e(cat)}</td><td class="mono">{cad(v)}</td>'
+        out.append(f'<tr{" class=lead" * (n == 1 and pl_class(pl) == "pos")}><td class="mono">{n}</td><td><a href="{href}">{e(label)}</a></td>'
+                   f'<td class="cat">{e(cat)}</td><td class="mono">{cad(v)}</td>'
                    f'<td class="mono {pl_class(pl)}">{cad(pl, True)} ({100 * pl / CAPITAL:+.2f}%)</td>'
                    f'<td class="mono {pl_class(day)}">{cad(day, True)}</td></tr>')
     return "".join(out) + "</table></div></div>"
@@ -451,7 +490,8 @@ def markets_body(t: dict) -> tuple[str, str]:
     rows, pots = t["rows"], pots_in(t)
     keys = [p[0] for p in pots]
     fx = "" if t.get("fx_known") else " USD/CAD rate unavailable: values exclude currency moves."
-    head = (total_number(rows, keys, "All paper pots: profit / loss", t.get("start")) + pots_table(rows, pots) + pots_chart(rows, pots)
+    head = (best_pot(rows, pots) + total_number(rows, keys, "All paper pots: profit / loss", t.get("start")) + pots_table(rows, pots)
+            + pots_chart(rows, pots)
             + f'<p class="small muted">Every pot started with a fake {CAPITAL:,.0f} CAD and trades every trading day from its own rule; US positions, '
             f'valued in CAD at the Bank of Canada rate. A pot that joined later stays at {CAPITAL:,.0f} until its first trade.{fx}</p>')
     halves = []
@@ -466,8 +506,11 @@ def markets_body(t: dict) -> tuple[str, str]:
                 + '<div class="cards">' + "".join(sleeve_card(t, k, label, href, what, pos) for k, label, _, href, what, pos in mine) + "</div>")
         halves.append(half(cat, anchor, color, bg, intro, [p[1] for p in mine], stat, body, unit="pot", back=("#markets", "Markets")))
     total = sum(rows[-1][k] for k in keys) - CAPITAL * len(keys)
+    top = ranked(rows, pots)[:1]
+    lead = "".join(f'<span class="lead">Best pot: <b>{e(p[1])}</b> <span class="mono pos">{100 * (rows[-1][p[0]] - CAPITAL) / CAPITAL:+.2f}%</span></span>'
+                   for p in top if pl_class(rows[-1][p[0]] - CAPITAL) == "pos")
     return (head + f'<div class="split sub">{"".join(halves)}</div>',
-            f'<span class="v mono {pl_class(total)}">{cad(total, True)}</span>')
+            f'<span class="v mono {pl_class(total)}">{cad(total, True)}</span>{lead}')
 
 
 def plain_card(d: str, title: str, text: str, published: bool) -> str:
