@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import copy, copy_data, data, live, rules, site
+from . import copy, copy_data, crypto, data, live, rules, site
 
 
 def closed(px: pd.DataFrame, now: pd.Timestamp | None = None) -> pd.DataFrame:
@@ -55,8 +55,10 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
         earnings["symbol"] = earnings["symbol"].astype(str).str.replace(".", "-")
     if not insiders.empty:
         insiders["symbol"] = insiders["symbol"].astype(str).str.replace(".", "-")
+    if fetch:
+        rep["btc"] = crypto.update(data_dir)
     state = live.load_state(state_f)
-    rep["step"] = live.step(state, px, d, members, earnings, insiders, cp)
+    rep["step"] = live.step(state, px, d, members, earnings, insiders, cp, crypto.load(data_dir))
     live.save_state(state_f, state)
     rp = None
     try:

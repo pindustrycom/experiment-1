@@ -2,7 +2,7 @@ name: Strategy pots
 
 # Paper strategies, each with its own 1000 CAD pot (experiments/strategies; no orders placed anywhere):
 #   long-term: trend following (ETFs), earnings drift, insider cluster buying, and three copy pots (funds' best ideas,
-#   fund conviction, Pelosi); short-term: weekly reversal.
+#   fund conviction, Pelosi); short-term: weekly reversal, and BTC breakout (4-hour bars from Kraken's public API).
 # Weekdays after the close: fetch prices (Yahoo), the S&P 500 list, earnings results and insider filings (Finnhub), new
 # 13Fs (SEC EDGAR) and Pelosi's PTRs (House Clerk), move every pot to the close and form the next books, replay the pots
 # that have a history from 2019, and build the pages. The copy pots' filing history is seeded once from the
