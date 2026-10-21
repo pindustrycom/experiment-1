@@ -49,6 +49,9 @@ CATALOG = [
     ("strategies", MARKETS, "Strategy pots", "Strategy pots · trend, earnings, insiders, reversal",
      "Four rules with their own pots: trend following across ETFs, buying after earnings beats, buying after insiders "
      "buy, and buying the week's biggest losers.", None),
+    ("trader_skill", MARKETS, "Copy-trading test", "trader-skill test · copying funds and Congress",
+     "A backtest of the trader-skill Claude skills: copying 23 famous funds' 13F filings and every stock buy the House "
+     "discloses, against SPY. Research only, no pot.", EXPERIMENTS / "trader_skill"),
     ("exp4", RESONANCE, "Exp4 playground", "Exp4 · resonance playground",
      "A 3D model of the resonance architecture by Joaquin Philco: retina and V1, time-based somas with resonators on the axon, "
      "concept structures and the rules that ask, allocate and sleep. Show it a digit in a colour, blur it, or open one cell.", EXP4),
