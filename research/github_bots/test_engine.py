@@ -61,7 +61,7 @@ def test_short_and_flat_at():
 
 def test_every_strategy_runs():
     for name, (build, _, _, mk) in strategies.CATALOG.items():
-        d = bars(3000, freq="5min" if any("5m" in v for v in mk.values()) else "1h")
+        d = bars(12000, freq="5min" if any("5m" in v for v in mk.values()) else "1h")
         r, t = simulate(d, build(d), 60, 2.0)
         s = stats(daily(r), daily(d.close.pct_change().fillna(0)), 365, t, d.index, 60)
         assert np.isfinite(s["sharpe"]), name
