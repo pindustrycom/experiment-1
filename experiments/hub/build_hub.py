@@ -79,12 +79,15 @@ GROUPS = [
 LONG, SHORT = "Long-term", "Short-term"
 POTS = [("exp2", "Exp2 volatility", LONG, "exp2/index.html"), ("trend", "Trend following", LONG, "strategies/index.html#trend"),
         ("pead", "Earnings drift", LONG, "strategies/index.html#pead"), ("insider", "Insider buying", LONG, "strategies/index.html#insider"),
+        ("best_ideas", "Best ideas", LONG, "strategies/index.html#best_ideas"),
+        ("conviction", "Fund conviction", LONG, "strategies/index.html#conviction"),
+        ("pelosi", "Pelosi copy", LONG, "strategies/index.html#pelosi"),
         ("exp1", "Exp1 pairs", SHORT, "exp1/index.html"), ("exp7", "Exp7 VWAP", SHORT, "exp7/index.html"),
         ("reversal", "Weekly reversal", SHORT, "strategies/index.html#reversal")]
 # (category, anchor, colour, moving background, description)
-HORIZONS = [(LONG, "long", "#8fc1ad", "price", "Positions kept for weeks or months: monthly books, year-long trends and events held for a season."),
+HORIZONS = [(LONG, "long", "#8fc1ad", "price", "Positions kept for weeks or months: monthly books, year-long trends, copied fund and Pelosi filings, and events held for a season."),
             (SHORT, "short", "#d9a15b", "candles", "Positions kept for a day or a week: daily pair bets, intraday SPY trades and weekly bounces.")]
-POT_COLORS = ["#f5f5f7", "#a593d4", "#8fc1ad", "#d9a15b", "#7aa2ff", "#ff9f8a", "#c7c7cc"]
+POT_COLORS = ["#f5f5f7", "#a593d4", "#8fc1ad", "#d9a15b", "#7aa2ff", "#ff9f8a", "#c7c7cc", "#e6c86e", "#6fc7d9", "#d98fb8"]
 # Static experiment pages: (site folder, source folder, card title, card text). No money involved in any of them.
 STATIC = [(d, src, title, text) for d, _, _, title, text, src in CATALOG if src is not None]
 

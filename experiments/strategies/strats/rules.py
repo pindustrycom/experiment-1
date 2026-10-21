@@ -9,6 +9,7 @@ Long-term (positions held for weeks or months):
            more, hold it 60 sessions. 5% of the pot per stock (equal shares once more than 20 are held), the rest in cash.
   insider  Insider cluster buying: buy an S&P 500 stock at the first close after three or more different insiders have
            filed open-market purchases within 30 days, hold it 120 sessions. Sized like pead.
+  best_ideas, conviction, pelosi  Copying public filings (13Fs, Pelosi's PTRs): see copy.py.
 Short-term (positions held for days):
   reversal Weekly reversal: at each week's last close, buy the 20 S&P 500 stocks that fell the most over the past 5
            sessions, 5% each, and hold them for the week.
@@ -34,6 +35,12 @@ STRATEGIES = {
              "and holds them for about three months."),
     "insider": ("Insider buying", LONG_TERM, "Buys S&P 500 stocks after three or more of their own insiders bought shares on "
                 "the open market within 30 days; holds them for about six months."),
+    "best_ideas": ("Best ideas", LONG_TERM, "Holds each of 23 famous funds' biggest stock from its latest 13F filing (Berkshire, "
+                   "Scion, Pershing Square...), bought after the filing is public; one equal slice per fund."),
+    "conviction": ("Fund conviction", LONG_TERM, "Holds the stocks that long-term funds put 7.5% or more of their book in, "
+                   "most-shared first, up to 50; rebuilt 47 days after each quarter from the 13Fs filed by then."),
+    "pelosi": ("Pelosi copy", LONG_TERM, "Buys every stock Nancy Pelosi discloses buying (shares or calls, copied with shares) "
+               "after the filing is public; sells when she discloses a sale or after a year."),
     "reversal": ("Weekly reversal", SHORT_TERM, "Each Friday buys the 20 S&P 500 stocks that fell the most that week and holds "
                  "them until the next Friday."),
 }

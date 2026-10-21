@@ -3,7 +3,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from strats import cli, live, rules, site
+from strats import cli, copy, live, rules, site
 
 
 def prices(n=600, seed=0, tickers=None):
@@ -96,7 +96,7 @@ def test_replay_and_site(tmp_path):
     out = site.write(tmp_path, st, rp, {})
     assert out["sessions"] == 1
     head = (tmp_path / "data" / "daily.csv").read_text().splitlines()[0]
-    assert head == "date,trend,pead,insider,reversal"
+    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal"
     s = json.loads((tmp_path / "data" / "summary.json").read_text())
     assert s["strategies"]["pead"]["category"] == rules.LONG_TERM and "cash" in s["strategies"]["pead"]["position"]
     page = (tmp_path / "index.html").read_text()
@@ -112,3 +112,69 @@ def test_cli_offline(tmp_path):
     rep = cli.run(tmp_path / "data", tmp_path / "state" / "state.json", tmp_path / "site", fetch=False)
     assert rep["last_close"] == str(px.index[-1].date()) and (tmp_path / "site" / "index.html").exists()
     assert json.loads((tmp_path / "state" / "state.json").read_text())["pots"]["reversal"]
+
+
+def copy_data(px):
+    d = px.index
+    q = lambda per, filed, tops, acc: {"period": per, "filed": filed, "accession": acc, "total": 100.0, "stock_total": 100.0,  # noqa: E731
+                                       "top": [{"cusip": c, "issuer": c, "title": "COM", "value": v} for c, v in tops]}
+    f1 = {"cik": "1", "name": "A", "quarters": [q("2019-12-31", str(d[30].date()), [("cS01", 40), ("cS02", 30), ("cS03", 8)], "a1"),
+                                                q("2020-03-31", str(d[90].date()), [("cS04", 50), ("cS01", 10)], "a2")]}
+    f2 = {"cik": "2", "name": "B", "quarters": [q("2019-12-31", str(d[31].date()), [("cSPY", 60), ("cS02", 20)], "b1")]}
+    cusips = {f"c{t}": t for t in px.columns}
+    pel = copy.pelosi_frame([{"ticker": "S05", "type": "P", "date": str(d[5].date()), "filed": str(d[20].date())},
+                             {"ticker": "S05", "type": "P", "date": str(d[5].date()), "filed": str(d[20].date())},
+                             {"ticker": "S05", "type": "S (partial)", "date": str(d[50].date()), "filed": str(d[70].date())},
+                             {"ticker": "S06", "type": "P", "date": str(d[60].date()), "filed": str(d[61].date())}])
+    return {"filers": [f1, f2], "cusips": cusips, "pelosi": pel}
+
+
+def test_copy_pots():
+    px = prices()
+    d = px.index
+    cp = copy_data(px)
+    assert copy.best_ideas_weights(cp, px, d[30]) == {}                     # filed that day: not public before the close
+    assert copy.best_ideas_weights(cp, px, d[31]) == {"S01": 1.0}
+    assert copy.best_ideas_weights(cp, px, d[40]) == {"S01": 0.5, "S02": 0.5}   # B's top is SPY, an index fund: next one
+    assert copy.best_ideas_weights(cp, px, d[91])["S04"] == 0.5
+    # conviction: 7.5%+ names of the 2019-12-31 books, from the first session on or after 2020-02-16
+    reb = d[d.searchsorted(pd.Timestamp("2019-12-31") + pd.Timedelta(days=copy.CONV_LAG_DAYS))]
+    w = copy.conviction_weights(cp, px, reb)
+    assert list(w) == ["S02", "S01", "S03"] and abs(sum(w.values()) - 1) < 1e-12   # S02 is in both books, so first
+    assert copy.conviction_weights(cp, px, reb - pd.Timedelta(days=1)) == {}
+    # pelosi: shares + calls on one day are one buy; held from the close after the filing until the sale is disclosed
+    assert copy.pelosi_weights(cp, px, d[20]) == {}
+    assert copy.pelosi_weights(cp, px, d[21]) == {"S05": 1.0}
+    assert copy.pelosi_weights(cp, px, d[62]) == {"S05": 0.5, "S06": 0.5}
+    assert copy.pelosi_weights(cp, px, d[71]) == {"S06": 1.0}
+    assert copy.pelosi_weights(cp, px, d[62 + copy.PELOSI_HOLD]) == {}
+    assert {"S01", "S02", "S03", "S04", "S05", "S06"} <= copy.tickers(cp, since="2000-01-01") and "SPY" not in copy.tickers(cp, "2000")
+
+
+def test_copy_pots_step_and_replay():
+    px = prices()
+    cp = copy_data(px)
+    st = {}
+    live.step(st, px.loc[:px.index[100]], px.index[100], [], pd.DataFrame(), pd.DataFrame(), cp)
+    assert st["pots"]["pelosi"][-1]["w"] == {"S06": 1.0} and st["pots"]["best_ideas"][-1]["w"]
+    st2 = {}
+    rep = live.step(st2, px, px.index[-1], [], pd.DataFrame(), pd.DataFrame())
+    assert "pelosi" not in st2["pots"]                                     # no data: the pot waits
+    assert rep["pelosi"].startswith("no filings")
+    rp = live.replay(px, [], start="2019-03-01", cp=cp)
+    assert {"best_ideas", "conviction", "pelosi"} <= set(rp.columns)
+    s = live.replay_summary(rp)
+    assert "pelosi" in s["corr_spy"]
+
+
+def test_copy_load(tmp_path):
+    d = tmp_path / "copy"
+    (d / "13f").mkdir(parents=True)
+    (d / "ptr").mkdir()
+    (d / "13f" / "1.json").write_text(json.dumps({"cik": "1", "name": "A", "quarters": []}))
+    (d / "cusips.json").write_text("{}")
+    (d / "ptr" / "2024.json").write_text(json.dumps({"year": 2024, "docs": {
+        "1": {"last": "Pelosi", "filed": "2024-01-05", "rows": [{"ticker": "nvda", "type": "P", "date": "2024-01-02"}]},
+        "2": {"last": "Smith", "filed": "2024-01-05", "rows": [{"ticker": "X", "type": "P", "date": "2024-01-02"}]}}}))
+    cp = copy.load(tmp_path)
+    assert list(cp["pelosi"]["ticker"]) == ["NVDA"] and copy.has_data(cp)
