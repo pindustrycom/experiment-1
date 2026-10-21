@@ -55,7 +55,7 @@ def parse_master(text: str) -> pd.DataFrame:
         parts = line.split("|")
         if len(parts) == 5 and parts[2].strip() in FORMS:
             recs.append({"cik": int(parts[0]), "name": parts[1].strip().upper(), "form": parts[2].strip(),
-                         "filed": parts[3], "file": parts[4].strip()})
+                         "filed": parts[3], "file": parts[4].strip().rsplit("/", 1)[-1]})   # the accession, shared by all rows
     return pd.DataFrame(recs, columns=["cik", "name", "form", "filed", "file"])
 
 
@@ -79,7 +79,7 @@ def filings(cache: Path, start: int) -> pd.DataFrame:
 
 def pair_up(rows: pd.DataFrame, tickers: dict[int, str]) -> pd.DataFrame:
     """One event per filing: the subject is the listed company in it that is not the filer.
-    A filing lists the subject and every reporting person under the same file name."""
+    A filing is listed once under the subject and once under each reporting person, with the same accession."""
     out = []
     for file, g in rows.groupby("file"):
         acts = [m for m in (ACT_RE.search(n) for n in g["name"]) if m]
@@ -204,6 +204,8 @@ def main(cache: Path, out: Path, start: int = 2019) -> None:
     print(f"13D originals: {rows['file'].nunique()} filings, {len(ev)} events on listed companies, "
           f"{ev['activist'].notna().sum()} by the {len(ACTIVISTS)} activists")
     ev.to_csv(out / "events_13d.csv", index=False)
+    if ev.empty:
+        raise SystemExit("no 13D could be matched to a listed subject: the index format may have changed")
     act = ev[ev["activist"].notna()]
     px = prices(cache, set(ev["ticker"]), f"{start - 1}-06-01")
     spy = px["SPY"].pct_change()
@@ -212,6 +214,8 @@ def main(cache: Path, out: Path, start: int = 2019) -> None:
         es = event_study(sub, px)
         es.to_csv(out / f"study_{name}.csv", index=False)
         res[name] = {"events": summarize(es)}
+        if es.empty:
+            raise SystemExit(f"{name}: no event has a Yahoo price")
         for hold in (126, 252):
             r = portfolio(es, px, hold)
             res[name][f"hold{hold}"] = stats(r, spy)
