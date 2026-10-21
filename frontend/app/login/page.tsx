@@ -29,7 +29,8 @@ function LoginForm() {
         throw new Error(body?.error?.message || "Sign-in failed");
       }
       const next = params.get("next");
-      router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
+      // "//host" and "/\host" both leave the site
+      router.replace(next && /^\/(?![/\\])/.test(next) ? next : "/");
     } catch (err) {
       setError((err as Error).message);
     } finally {
