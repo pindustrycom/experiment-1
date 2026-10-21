@@ -46,6 +46,9 @@ CATALOG = [
      "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", None),
     ("exp7", MARKETS, "Exp7 VWAP", "Exp7 · VWAP + 9 EMA day trades",
      "Day-trades SPY on a 3-minute chart: long when the 9 EMA is above the day's VWAP, short below, flat overnight.", None),
+    ("strategies", MARKETS, "Strategy pots", "Strategy pots · trend, earnings, insiders, reversal",
+     "Four rules with their own pots: trend following across ETFs, buying after earnings beats, buying after insiders "
+     "buy, and buying the week's biggest losers.", None),
     ("exp4", RESONANCE, "Exp4 playground", "Exp4 · resonance playground",
      "A 3D model of the resonance architecture by Joaquin Philco: retina and V1, time-based somas with resonators on the axon, "
      "concept structures and the rules that ask, allocate and sleep. Show it a digit in a colour, blur it, or open one cell.", EXP4),
@@ -71,6 +74,17 @@ GROUPS = [
     (MARKETS, "markets", "#e3ac5b", "price", "Strategies traded every day with fake money: 1,000 CAD each, no orders placed anywhere."),
     (RESONANCE, "resonance", "#a593d4", "rings", "Joaquin Philco's resonance architecture: models and results you can run in the browser."),
 ]
+# Every paper pot on the Markets dashboard, split by how long it holds positions: (key in the portfolio table, label,
+# category, page). The strategy pots take their names and descriptions from strategies/data/summary.json.
+LONG, SHORT = "Long-term", "Short-term"
+POTS = [("exp2", "Exp2 volatility", LONG, "exp2/index.html"), ("trend", "Trend following", LONG, "strategies/index.html#trend"),
+        ("pead", "Earnings drift", LONG, "strategies/index.html#pead"), ("insider", "Insider buying", LONG, "strategies/index.html#insider"),
+        ("exp1", "Exp1 pairs", SHORT, "exp1/index.html"), ("exp7", "Exp7 VWAP", SHORT, "exp7/index.html"),
+        ("reversal", "Weekly reversal", SHORT, "strategies/index.html#reversal")]
+# (category, anchor, colour, moving background, description)
+HORIZONS = [(LONG, "long", "#8fc1ad", "price", "Positions kept for weeks or months: monthly books, year-long trends and events held for a season."),
+            (SHORT, "short", "#d9a15b", "candles", "Positions kept for a day or a week: daily pair bets, intraday SPY trades and weekly bounces.")]
+POT_COLORS = ["#f5f5f7", "#a593d4", "#8fc1ad", "#d9a15b", "#7aa2ff", "#ff9f8a", "#c7c7cc"]
 # Static experiment pages: (site folder, source folder, card title, card text). No money involved in any of them.
 STATIC = [(d, src, title, text) for d, _, _, title, text, src in CATALOG if src is not None]
 
@@ -144,9 +158,9 @@ section.group{margin:0 0 34px}section.group h2{font-size:20px;margin:0 0 2px;let
 SPLIT_CSS = """
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .split{display:flex;min-height:calc(100vh - var(--site-nav-h));min-height:calc(100svh - var(--site-nav-h))}
-.half{flex:1 1 0;min-width:0;position:relative;overflow:hidden;border-right:1px solid var(--glass-line);scroll-margin-top:100vh;
+.split>.half{flex:1 1 0;min-width:0;position:relative;overflow:hidden;border-right:1px solid var(--glass-line);scroll-margin-top:100vh;
 transition:flex-grow .6s cubic-bezier(.2,.8,.2,1)}
-.half:last-child{border-right:0}.split:not(:has(.half:target)) .half:hover{flex-grow:1.35}
+.split>.half:last-child{border-right:0}.split:not(:has(.half:target))>.half:hover{flex-grow:1.35}
 .half>canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
 .door{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:32px clamp(20px,4vw,52px) 40px;
 color:var(--text);background:linear-gradient(0deg,rgba(0,0,0,.8),rgba(0,0,0,0) 65%)}
@@ -157,14 +171,24 @@ color:var(--text);background:linear-gradient(0deg,rgba(0,0,0,.8),rgba(0,0,0,0) 6
 .door p{margin:0;max-width:40ch;color:var(--muted)}.door .v{font-size:26px;font-weight:500}
 .door .exps{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--text)}.door .cta{font-weight:600;color:var(--c)}
 .open{display:none}
-.half:target{flex:1 0 100%;overflow:visible;border:0}.split:has(.half:target) .half:not(:target){display:none}
-.half:target>canvas{position:fixed;opacity:.3}.half:target .door{display:none}
-.half:target .open{display:block;position:relative;padding:22px 0 40px;animation:open .5s cubic-bezier(.2,.8,.2,1) both}
+.split>.half:is(:target,:has(.half:target)){flex:1 0 100%;overflow:visible;border:0}
+.split:has(>.half:is(:target,:has(.half:target)))>.half:not(:target):not(:has(.half:target)){display:none}
+.half:is(:target,:has(.half:target))>canvas{position:fixed;opacity:.3}.half:has(.half:target)>canvas{display:none}
+.half:is(:target,:has(.half:target))>.door{display:none}
+.half:is(:target,:has(.half:target))>.open{display:block;position:relative;padding:22px 0 40px;animation:open .5s cubic-bezier(.2,.8,.2,1) both}
+.half:has(.half:target)>.open>.wrap>:not(.split){display:none}.half:has(.half:target)>.open{padding:0}
 .open .back{display:inline-block;font-size:13px;color:var(--muted);margin:0 0 14px}.open .back:hover{color:var(--text);text-decoration:none}
 .open h2{font-size:clamp(34px,5vw,52px);letter-spacing:-.04em;font-weight:800;margin:0 0 4px;color:var(--c)}
+.split.sub{min-height:440px;margin:26px 0 8px;border:1px solid var(--glass-line);border-radius:20px;overflow:hidden}
+.split.sub:has(>.half:target){min-height:0;margin:0;border:0;border-radius:0;overflow:visible}
+.sub .door h2{font-size:clamp(36px,5vw,64px)}.open .open .wrap{padding:0}
+.mk-pots td,.mk-pots th{padding:7px 8px;text-align:right;white-space:nowrap}.mk-pots td:first-child,.mk-pots th:first-child,.mk-pots td:nth-child(2),.mk-pots th:nth-child(2){text-align:left}
+.mk-pots{width:100%;border-collapse:collapse;font-size:14px}.mk-pots th{font-size:12px;color:var(--muted);font-weight:500}
+.mk-pots tr+tr td{border-top:1px solid var(--line)}.mk-pots .cat{font-size:12px;color:var(--muted)}.tw{overflow-x:auto}
 @keyframes open{from{opacity:0;transform:translateY(16px)}}
-@media (max-width:640px){.split{flex-direction:column}.half{border-right:0;border-bottom:1px solid var(--glass-line);min-height:300px}}
-@media (prefers-reduced-motion:reduce){.half{transition:none}.half:target .open{animation:none}}
+@media (max-width:640px){.split{flex-direction:column}.split>.half{border-right:0;border-bottom:1px solid var(--glass-line);min-height:300px}
+.split.sub>.half{min-height:400px}.mk-pots .cat{display:none}}
+@media (prefers-reduced-motion:reduce){.split>.half{transition:none}.half .open{animation:none!important}}
 """
 # Draws each column's moving background: only while the column is on screen and the tab is visible; one still frame when
 # the reader asks for reduced motion.
@@ -181,10 +205,15 @@ function rings(x,W,H,d,c,t){const cx=W*.6,cy=H*.38,ph=t/1400,R=Math.hypot(W,H)*.
 for(let k=0;k<16;k++){x.globalAlpha=.5*(1-(k+ph%1)/16);x.beginPath();x.arc(cx,cy,(k+ph%1)/16*R,0,7);x.stroke()}
 x.globalAlpha=.9;x.fillStyle=c;for(let k=0;k<5;k++){const a=k*1.3+ph*.4;x.beginPath();x.arc(cx+Math.cos(a)*W*.25,cy+Math.sin(a)*H*.2,3*d,0,7);x.fill()}
 x.globalAlpha=1}
+function candles(x,W,H,d,c,t){const n=42,cw=W/n,off=Math.floor(t/140),fr=(t%140)/140;x.lineWidth=d;let o=0;
+for(let i=0;i<n+1;i++){const k=i+off,h=Math.sin(k*12.9898)*43758.5453,u=h-Math.floor(h),h2=Math.sin(k*78.233)*12345.678,u2=h2-Math.floor(h2),
+up=u>.47,body=(.02+.06*u2)*H,cx=(i-fr)*cw,cy=H*.32+Math.sin(k*.21)*H*.08+(u-.5)*H*.05;
+x.globalAlpha=.75;x.strokeStyle=x.fillStyle=up?c:"rgba(255,255,255,.35)";x.beginPath();x.moveTo(cx+cw/2,cy-body*.9);x.lineTo(cx+cw/2,cy+body*1.9);x.stroke();
+x.fillRect(cx+cw*.2,cy,cw*.6,body)}x.globalAlpha=1}
 let pending=0;const go=()=>{if(!pending)pending=requestAnimationFrame(t=>{pending=0;frame(t)})};
 function frame(t){for(const c of cs){if(!still&&!seen.has(c))continue;const r=c.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2),
 W=Math.round(r.width*d),H=Math.round(r.height*d);if(!W||!H)continue;if(c.width!==W||c.height!==H){c.width=W;c.height=H}
-const x=c.getContext("2d");x.clearRect(0,0,W,H);(c.dataset.bg==="price"?price:rings)(x,W,H,d,c.dataset.color,still?0:t)}if(!still)go()}
+const x=c.getContext("2d");x.clearRect(0,0,W,H);({price,rings,candles}[c.dataset.bg]||price)(x,W,H,d,c.dataset.color,still?0:t)}if(!still)go()}
 const io=new IntersectionObserver(es=>{es.forEach(x=>x.isIntersecting?seen.add(x.target):seen.delete(x.target));go()});cs.forEach(c=>io.observe(c));
 addEventListener("visibilitychange",go);addEventListener("resize",go);addEventListener("hashchange",go);go()})()</script>"""
 MARK, MARK_END = "<!--portfolio-->", "<!--/portfolio-->"
@@ -288,7 +317,7 @@ def inject(f: Path, block: str) -> bool:
 def theme(site: Path) -> int:
     """Lay the glass theme over every experiment page (replacing any earlier copy)."""
     n = 0
-    for d in ("exp1", "exp2", "exp7"):
+    for d in ("exp1", "exp2", "exp7", "strategies"):
         for f in (site / d).rglob("*.html") if (site / d).is_dir() else []:
             s = f.read_text()
             if GLASS in s:
@@ -348,14 +377,90 @@ def add_nav(site: Path) -> int:
     return n
 
 
-def half(group: str, anchor: str, color: str, bg: str, intro: str, labels: list[str], stat: str, body: str) -> str:
-    """One group's column on the overview page, and the full page it opens into."""
-    count = f'{len(labels)} experiment{"s" * (len(labels) != 1)}'
+def half(group: str, anchor: str, color: str, bg: str, intro: str, labels: list[str], stat: str, body: str,
+         unit: str = "experiment", back: tuple[str, str] = ("#", "All groups")) -> str:
+    """One group's column on the overview page, and the full page it opens into. The Markets page holds two more of these
+    (long-term and short-term pots), which open over the whole page the same way."""
+    count = f'{len(labels)} {unit}{"s" * (len(labels) != 1)}'
     return (f'<section class="half" id="{anchor}" style="--c:{color}"><canvas data-bg="{bg}" data-color="{color}" aria-hidden="true"></canvas>'
             f'<a class="door" href="#{anchor}"><span class="k mono">{count}</span><h2>{e(group)}</h2><p>{e(intro)}</p>{stat}'
             f'<span class="exps">{"".join(f"<span>{e(x)}</span>" for x in labels)}</span><span class="cta">Open {e(group)} →</span></a>'
-            f'<div class="open"><div class="wrap"><a class="back" href="#">← All groups</a><h2>{e(group)}</h2>'
+            f'<div class="open"><div class="wrap"><a class="back" href="{back[0]}">← {e(back[1])}</a><h2>{e(group)}</h2>'
             f'<p class="muted small intro">{e(intro)}</p>{body}</div></div></section>')
+
+
+def pots_in(t: dict) -> list[tuple[str, str, str, str, str, str]]:
+    """The pots the table has, as (key, label, category, page, what, position)."""
+    info = {d: text for d, _, _, _, text, _ in CATALOG}
+    strat = t.get("strategies") or {}
+    last = t["rows"][-1]
+    out = []
+    for k, label, cat, href in POTS:
+        if k not in last or (k == "exp7" and not t.get("exp7")):
+            continue
+        if k in strat:
+            what, pos = e(strat[k].get("what", "")), e(strat[k].get("position", ""))
+        elif k == "exp1":
+            what, pos = e(info["exp1"]), exp1_positions(t)
+        elif k in info:
+            what, pos = e(info[k]), e(t.get(f"{k}_position") or "")
+        else:
+            continue
+        out.append((k, label, cat, href, what, pos))
+    return out
+
+
+def total_number(rows: list[dict], keys: list[str], label: str, since: str | None) -> str:
+    """The big P/L number for a set of pots, each started with CAPITAL."""
+    cap = CAPITAL * len(keys)
+    v = sum(rows[-1][k] for k in keys)
+    day = v - sum(rows[-2][k] for k in keys) if len(rows) > 1 else 0.0
+    pl = v - cap
+    return (f'<div class="big"><div class="k">{e(label)}</div><div class="v {pl_class(pl)}">{cad(pl, True)}</div>'
+            f'<div class="d">Worth <b>{cad(v)}</b> of {len(keys)} × {CAPITAL:,.0f} CAD ({100 * pl / cap:+.2f}%) · today '
+            f'<span class="{pl_class(day)}">{cad(day, True)}</span> · since {e(since or rows[0]["date"])} · last update {e(rows[-1]["date"])}</div></div>')
+
+
+def pots_chart(rows: list[dict], pots: list[tuple]) -> str:
+    keys = [(k, POT_COLORS[i % len(POT_COLORS)]) for i, (k, *_) in enumerate(pots)]
+    legend = " ".join(f'<span style="color:{c}">━</span> {e(p[1])}' for (k, c), p in zip(keys, pots))
+    return (f'<div class="panel">{value_chart(rows, keys)}<div class="small muted">{legend} · dashed line: the starting '
+            f'{CAPITAL:,.0f} CAD</div></div>')
+
+
+def pots_table(rows: list[dict], pots: list[tuple]) -> str:
+    out = ['<div class="panel"><div class="tw"><table class="mk-pots"><tr><th>Pot</th><th class="cat">Holds for</th><th>Worth</th><th>Profit / loss</th><th>Today</th></tr>']
+    for k, label, cat, href, *_ in pots:
+        v = rows[-1][k]
+        pl, day = v - CAPITAL, v - rows[-2][k] if len(rows) > 1 else 0.0
+        out.append(f'<tr><td><a href="{href}">{e(label)}</a></td><td class="cat">{e(cat)}</td><td class="mono">{cad(v)}</td>'
+                   f'<td class="mono {pl_class(pl)}">{cad(pl, True)} ({100 * pl / CAPITAL:+.2f}%)</td>'
+                   f'<td class="mono {pl_class(day)}">{cad(day, True)}</td></tr>')
+    return "".join(out) + "</table></div></div>"
+
+
+def markets_body(t: dict) -> tuple[str, str]:
+    """The Markets page: every pot with its own 1,000 CAD, then the long-term and short-term columns. Returns (body, door stat)."""
+    rows, pots = t["rows"], pots_in(t)
+    keys = [p[0] for p in pots]
+    fx = "" if t.get("fx_known") else " USD/CAD rate unavailable: values exclude currency moves."
+    head = (total_number(rows, keys, "All paper pots: profit / loss", t.get("start")) + pots_table(rows, pots) + pots_chart(rows, pots)
+            + f'<p class="small muted">Every pot started with a fake {CAPITAL:,.0f} CAD and trades every trading day from its own rule; US positions, '
+            f'valued in CAD at the Bank of Canada rate. A pot that joined later stays at {CAPITAL:,.0f} until its first trade.{fx}</p>')
+    halves = []
+    for cat, anchor, color, bg, intro in HORIZONS:
+        mine = [p for p in pots if p[2] == cat]
+        if not mine:
+            continue
+        ks = [p[0] for p in mine]
+        pl = sum(rows[-1][k] for k in ks) - CAPITAL * len(ks)
+        stat = f'<span class="v mono {pl_class(pl)}">{cad(pl, True)}</span>'
+        body = (total_number(rows, ks, f"{cat} pots: profit / loss", t.get("start")) + pots_chart(rows, mine)
+                + '<div class="cards">' + "".join(sleeve_card(t, k, label, href, what, pos) for k, label, _, href, what, pos in mine) + "</div>")
+        halves.append(half(cat, anchor, color, bg, intro, [p[1] for p in mine], stat, body, unit="pot", back=("#markets", "Markets")))
+    total = sum(rows[-1][k] for k in keys) - CAPITAL * len(keys)
+    return (head + f'<div class="split sub">{"".join(halves)}</div>',
+            f'<span class="v mono {pl_class(total)}">{cad(total, True)}</span>')
 
 
 def plain_card(d: str, title: str, text: str, published: bool) -> str:
@@ -370,25 +475,10 @@ def hub_page(site: Path, t: dict | None = None) -> str:
     if t is None:
         money = '<p class="muted">The paper portfolio appears after its first nightly run.</p>'
         cards = "".join(plain_card(d, *info[d], have(d)) for d in ("exp1", "exp2", "exp7"))
+        body, stat = {MARKETS: money + f'<div class="cards">{cards}</div>'}, {MARKETS: ""}
     else:
-        rows = t["rows"]
-        fx = "" if t.get("fx_known") else " USD/CAD rate unavailable: values exclude currency moves."
-        money = f"""{big_number(rows, "combined", "Combined paper portfolio: profit / loss", t.get("start"))}
-<div class="panel">{value_chart(rows, [("combined", "var(--text)"), ("exp1", "var(--a)"), ("exp2", "var(--b)")])}
-<div class="small muted"><span style="color:var(--text)">━</span> combined <span style="color:var(--a)">━</span> Exp1
-<span style="color:var(--b)">━</span> Exp2 · dashed line: the starting 1,000 CAD</div></div>
-<p class="small muted">Half of the money follows each of Exp1 and Exp2. Trades every trading day; US positions, valued in CAD at the
-Bank of Canada rate. No costs or interest.{fx}</p>"""
-        cards = (sleeve_card(t, "exp1", info["exp1"][0], "exp1/index.html", info["exp1"][1], exp1_positions(t))
-                 + sleeve_card(t, "exp2", info["exp2"][0], "exp2/index.html", info["exp2"][1], e(t.get("exp2_position") or "")))
-        if t.get("exp7") and "exp7" in rows[-1]:
-            cards += sleeve_card(t, "exp7", info["exp7"][0] + " (separate pot)", "exp7/index.html", info["exp7"][1],
-                                 e(t.get("exp7_position") or ""))
-        elif have("exp7"):
-            cards += plain_card("exp7", *info["exp7"], True)
-    body = {MARKETS: money + f'<div class="cards">{cards}</div>'}
-    stat = {MARKETS: "" if t is None else (f'<span class="v mono {pl_class(t["rows"][-1]["combined"] - CAPITAL)}">'
-                                           f'{cad(t["rows"][-1]["combined"] - CAPITAL, True)}</span>')}
+        mb, ms = markets_body(t)
+        body, stat = {MARKETS: mb}, {MARKETS: ms}
     halves = []
     for g, anchor, color, bg, intro in GROUPS:
         shown = [(d, label) for d, grp, label, *_ in CATALOG if grp == g and have(d)]
