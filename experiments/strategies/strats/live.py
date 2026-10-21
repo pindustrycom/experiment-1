@@ -1,4 +1,4 @@
-"""Daily paper trading of the four rules, and a replay of the two that can be replayed from prices alone.
+"""Daily paper trading of the strategy pots, and a replay of those whose history we have (all but pead and insider).
 
 After each US close: mark every pot's book to the close, then form the next book (rules.py). A pot's day return is its
 book's return from the previous close minus COST per unit of turnover when the book changes. The state (each pot's
@@ -6,7 +6,8 @@ daily rows with the book held, and the event holdings with sessions left) is a J
 
 The earnings and insider pots need event histories that the free data does not reach back for, so they are tracked
 forward only. Trend and reversal are also replayed from 2019 with the same functions; the reversal replay uses today's
-S&P 500 members, which flatters it (stocks that fell out of the index are missing).
+S&P 500 members, which flatters it (stocks that fell out of the index are missing). The copy pots are replayed from the
+13F and PTR history in data/copy.
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import rules
+from . import copy, rules
 
 COST = 0.0001          # 1 bp of the traded amount, each side
 REPLAY_FROM = "2019-01-01"
@@ -28,7 +29,8 @@ def _last(rows: list[dict]) -> dict | None:
     return rows[-1] if rows else None
 
 
-def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], earnings: pd.DataFrame, insiders: pd.DataFrame) -> dict:
+def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], earnings: pd.DataFrame, insiders: pd.DataFrame,
+         cp: dict | None = None) -> dict:
     """Move every pot to the close of d. Safe to repeat: a pot already at d is left alone."""
     pots = state.setdefault("pots", {k: [] for k in rules.STRATEGIES})
     events = state.setdefault("events", {"pead": {}, "insider": {}})
@@ -44,7 +46,16 @@ def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], ear
             continue
         old_w = last["w"] if last else {}
         hold = book_return(old_w, px, pd.Timestamp(last["date"]), d) if last else 0.0
-        if key in ("trend", "reversal"):
+        if key in copy.KEYS:
+            if not copy.has_data(cp):
+                if not last:
+                    pots.pop(key, None)
+                    rep[key] = "no filings data yet: starts once it is there"
+                    continue
+                new_w, reb = old_w, False
+            else:
+                new_w, reb = copy.WEIGHTS[key](cp, px, d), True
+        elif key in ("trend", "reversal"):
             freq, due = ("M", rules.is_last_session_of_month) if key == "trend" else ("W", rules.is_last_session_of_week)
             if due_now(rows, d, freq, due):
                 new_w = rules.trend_weights(px, d) if key == "trend" else rules.reversal_weights(px, d, members)
@@ -94,8 +105,8 @@ def book_return(w: dict, px: pd.DataFrame, d0: pd.Timestamp, d1: pd.Timestamp) -
 
 # ---------------------------------------------------------------- replay
 
-def replay(px: pd.DataFrame, members: list[str], start: str = REPLAY_FROM) -> pd.DataFrame:
-    """Daily returns of trend and reversal (after costs) and SPY, from start to the last close."""
+def replay(px: pd.DataFrame, members: list[str], start: str = REPLAY_FROM, cp: dict | None = None) -> pd.DataFrame:
+    """Daily returns of trend, reversal and (with their data) the copy pots, after costs, and SPY, from start to the last close."""
     dates = px.index[px.index >= start]
     me, we = rules.month_end(px.index), rules.week_end(px.index)
     wt, wr = rules.trend_weights(px, dates[0]), rules.reversal_weights(px, dates[0], members)
@@ -111,7 +122,10 @@ def replay(px: pd.DataFrame, members: list[str], start: str = REPLAY_FROM) -> pd
             rr -= COST * rules.turnover(wr, nw)
             wr = nw
         out.append({"date": d1, "trend": rt, "reversal": rr, "SPY": px.at[d1, "SPY"] / px.at[d0, "SPY"] - 1})
-    return pd.DataFrame(out).set_index("date")
+    rep = pd.DataFrame(out).set_index("date")
+    if copy.has_data(cp):
+        rep = rep.join(copy.replay(cp, px, start))
+    return rep
 
 
 def stats(r: pd.Series) -> dict:
@@ -127,11 +141,12 @@ def stats(r: pd.Series) -> dict:
 
 
 def replay_summary(rep: pd.DataFrame) -> dict:
-    out = {k: stats(rep[k]) for k in ("trend", "reversal", "SPY")}
+    keys = [k for k in rep.columns if k != "SPY"]
+    out = {k: stats(rep[k]) for k in rep.columns}
     out["from"], out["to"] = str(rep.index[0].date()), str(rep.index[-1].date())
     # how the two move with SPY: correlation of monthly returns
     m = (1 + rep).groupby(rep.index.to_period("M")).prod() - 1
-    out["corr_spy"] = {k: float(np.corrcoef(m[k], m["SPY"])[0, 1]) for k in ("trend", "reversal")}
+    out["corr_spy"] = {k: float(np.corrcoef(m[k], m["SPY"])[0, 1]) for k in keys}
     out["monthly"] = {str(p): {k: round(float(m.at[p, k]), 5) for k in m.columns} for p in m.index}
     return out
 

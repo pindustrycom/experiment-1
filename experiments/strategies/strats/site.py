@@ -78,7 +78,11 @@ def _replay_block(key: str, rp: dict | None) -> str:
     yt = ("<div class=\"scroll\"><table><tr><th>Year</th>" + "".join(f"<th>{y}</th>" for y in years) + "</tr>"
           f"<tr><td>{e(rules.STRATEGIES[key][0])}</td>" + "".join(f"<td>{pct(s['years'][y])}</td>" for y in years) + "</tr>"
           "<tr><td>SPY</td>" + "".join(f"<td>{pct(spy.get('years', {}).get(y))}</td>" for y in years) + "</tr></table></div>")
-    note = " Uses today's S&P 500 members, so it looks better than it really was." if key == "reversal" else ""
+    note = {"reversal": " Uses today's S&P 500 members, so it looks better than it really was.",
+            "best_ideas": " The 23 funds were picked because they are famous today, which flatters it; most of the gain is Scion's GameStop in 2020-21.",
+            "conviction": " The funds were picked because they are famous today, which flatters it.",
+            "pelosi": " Pelosi was picked because her record is famous today; about 60 buys, mostly big tech, and she trades calls, we copy with shares.",
+            }.get(key, "")
     return (f'<p class="small muted">Replay {e(rp["from"])} to {e(rp["to"])}, same rule, 1 bp per side.{note}</p><div class="stats">'
             f'<div class="stat"><div class="k">Per year</div><div class="v">{pct(s["cagr"])}</div></div>'
             f'<div class="stat"><div class="k">SPY per year</div><div class="v">{pct(spy.get("cagr"))}</div></div>'
@@ -102,6 +106,7 @@ def page(summary: dict, pots: dict) -> str:
                          f'<p class="small">{e(s["position"])}</p>{_replay_block(k, rp)}</section>')
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Strategy pots</title><style>{CSS}</style></head><body>
-<main class="wrap"><h1>Strategy pots</h1><p class="muted">Four rules added on {e(summary.get("start") or "")}, each traded every day on paper with its own
-1,000 CAD. Long-term pots hold positions for weeks or months; short-term ones for days. Last close: {e(summary.get("last") or "none yet")}.</p>
-{"".join(parts)}<p class="muted small">Fake money: no orders are placed anywhere. Prices from Yahoo, earnings and insider filings from Finnhub.</p></main></body></html>"""
+<main class="wrap"><h1>Strategy pots</h1><p class="muted">{len(summary["strategies"])} rules, each traded every day on paper with its own
+1,000 CAD from its first close. Long-term pots hold positions for weeks or months; short-term ones for days. Last close: {e(summary.get("last") or "none yet")}.</p>
+{"".join(parts)}<p class="muted small">Fake money: no orders are placed anywhere. Prices from Yahoo, earnings and insider filings from Finnhub,
+13Fs from SEC EDGAR, Pelosi's trades from the House Clerk.</p></main></body></html>"""

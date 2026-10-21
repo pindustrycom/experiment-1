@@ -1,7 +1,7 @@
 """python -m strats live --data data --state state/state.json --out site
 
-Fetches prices, the S&P 500 list, earnings and insider filings, moves every pot to the latest close, replays trend and
-reversal, and writes the pages. Prints a JSON report."""
+Fetches prices, the S&P 500 list, earnings and insider filings, new 13Fs and Pelosi PTRs, moves every pot to the latest
+close, replays the pots that have a history, and writes the pages. Prints a JSON report."""
 from __future__ import annotations
 
 import argparse
@@ -12,14 +12,17 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import data, live, rules, site
+from . import copy, copy_data, data, live, rules, site
 
 
 def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     rep: dict = {}
     members = data.sp500_members(data_dir) if fetch else (sorted(pd.read_csv(data_dir / "sp500.csv")["ticker"]) if (data_dir / "sp500.csv").exists() else [])
-    tickers = sorted(set(rules.TREND_ETFS) | {m.replace(".", "-") for m in members})
     key = os.environ.get("FINNHUB_API_KEY", "")
+    if fetch and (data_dir / "copy").exists():
+        rep["copy_data"] = copy_data.update(data_dir, pd.Timestamp.today().normalize())
+    cp = copy.load(data_dir) if (data_dir / "copy").exists() else None
+    tickers = sorted(set(rules.TREND_ETFS) | {m.replace(".", "-") for m in members} | (copy.tickers(cp) if copy.has_data(cp) else set()))
     if fetch:
         rep["prices"] = data.update_prices(data_dir, tickers)
         rep["prices"]["failed"] = rep["prices"]["failed"][:30]
@@ -45,12 +48,12 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     if not insiders.empty:
         insiders["symbol"] = insiders["symbol"].astype(str).str.replace(".", "-")
     state = live.load_state(state_f)
-    rep["step"] = live.step(state, px, d, members, earnings, insiders)
+    rep["step"] = live.step(state, px, d, members, earnings, insiders, cp)
     live.save_state(state_f, state)
     rp = None
     try:
-        rp = live.replay_summary(live.replay(px, members))
-        rep["replay"] = {k: {m: round(v, 4) for m, v in rp[k].items() if m != "years"} for k in ("trend", "reversal", "SPY")}
+        rp = live.replay_summary(live.replay(px, members, cp=cp))
+        rep["replay"] = {k: {m: round(v, 4) for m, v in rp[k].items() if m != "years"} for k in rp if k in rules.STRATEGIES or k == "SPY"}
     except Exception as ex:  # noqa: BLE001 - the pages still build
         rep["replay"] = f"failed: {type(ex).__name__}: {str(ex)[:200]}"
     rep["site"] = site.write(out, state, rp, {"members": len(members), "priced": int(px.loc[d].notna().sum())})
