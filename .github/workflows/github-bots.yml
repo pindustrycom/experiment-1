@@ -57,6 +57,11 @@ jobs:
           python run.py /tmp/klines /tmp/exp7 out | tee /tmp/log.txt
           cat out/table.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Robustness of the crypto Donchian rule
+        run: |
+          set -o pipefail
+          python robust.py /tmp/klines | tee out/robust.txt
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
