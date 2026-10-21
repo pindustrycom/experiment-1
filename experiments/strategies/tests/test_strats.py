@@ -178,3 +178,11 @@ def test_copy_load(tmp_path):
         "2": {"last": "Smith", "filed": "2024-01-05", "rows": [{"ticker": "X", "type": "P", "date": "2024-01-02"}]}}}))
     cp = copy.load(tmp_path)
     assert list(cp["pelosi"]["ticker"]) == ["NVDA"] and copy.has_data(cp)
+
+
+def test_live_quote_of_an_open_session_is_dropped():
+    px = prices(10)
+    today = px.index[-1]
+    ny = lambda h: (today + pd.Timedelta(hours=h)).tz_localize("America/New_York")  # noqa: E731
+    assert cli.closed(px, ny(11)).index[-1] == px.index[-2]
+    assert cli.closed(px, ny(17)).index[-1] == today
