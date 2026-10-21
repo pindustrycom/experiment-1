@@ -59,6 +59,10 @@ CATALOG = [
     ("exp6_live", RESONANCE, "Exp6 live", "Exp6 live · the model in your browser",
      "The trained exp6 model runs in the page: type a word in any font, draw a character or pick a colour, and see which "
      "letter, word and naming structures resonate, with a 3D view driven by the computed values.", EXPERIMENTS / "exp6_live"),
+    ("exp8", RESONANCE, "Exp8 neuron", "Exp8 · resonant neuron and volume",
+     "Joaquin Philco's neuron: a sigmoid soma, one axon per connection with myelin resonators, and oligodendrocytes that set "
+     "each weight. One neuron wired to two others runs live in 3D, then a 16 x 16 x 16 volume trained by his resonance-index sleep.",
+     EXPERIMENTS / "exp8_neuron"),
 ]
 # The overview page is one column per group, side by side; clicking a column opens that group over the whole page. A new
 # project adds its group here and its experiments to CATALOG: (group, page anchor, colour, moving background drawn behind
