@@ -53,6 +53,7 @@ def update_13f(d: Path, today: pd.Timestamp) -> dict:
         f = json.loads(path.read_text())
         done = {q["accession"] for q in f["quarters"]}
         periods = {q["period"] for q in f["quarters"]}
+        newest = max(periods, default="2013-06-30")      # older 13Fs are plain text, and the history is already here
         try:
             filings = e.list_filings(fetcher.get_json(e.SUBMISSIONS % e.cik10(f["cik"])))
         except Exception as ex:  # noqa: BLE001
@@ -60,7 +61,7 @@ def update_13f(d: Path, today: pd.Timestamp) -> dict:
             continue
         for x in sorted(filings, key=lambda x: (x["filed"], x["accession"])):
             # originals only, and the first one filed for a period (a refiling is not news to a copier)
-            if x["form"] != "13F-HR" or x["accession"] in done or x["period"] in periods:
+            if x["form"] != "13F-HR" or x["accession"] in done or x["period"] in periods or x["period"] <= newest:
                 continue
             try:
                 base = e.archive_url(f["cik"], x["accession"])
