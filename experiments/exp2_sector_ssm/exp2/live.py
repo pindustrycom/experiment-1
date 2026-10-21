@@ -63,6 +63,11 @@ def spy_frame(data: Path) -> pd.DataFrame:
     return df.dropna(subset=["vix"])
 
 
+def closed_sessions(df: pd.DataFrame, today: pd.Timestamp) -> pd.DataFrame:
+    """Drop a bar dated today: before the close, Yahoo's latest row is a live quote, not a close."""
+    return df[df.index < today]
+
+
 def har_inputs(df: pd.DataFrame) -> pd.DataFrame:
     r2 = df["r"] ** 2
     return pd.DataFrame({"one": 1.0, "d": r2, "w": r2.rolling(5).mean(), "m": r2.rolling(22).mean(), "vix": (df["vix"] / 100) ** 2 / 252})
@@ -257,6 +262,8 @@ def run(state: Path, site: Path, mode: str, now: datetime | None = None, fetch: 
     if fetch:
         rep["fetch"] = refresh(data, today, everything=mode == "evening" or str(today.to_period("M")) not in plans)
     df = spy_frame(data)
+    if mode == "morning":
+        df = closed_sessions(df, today)
     b = fit_har(df)
     sig = sigma_next(df, b)
     p_hi = regime(df)

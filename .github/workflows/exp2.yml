@@ -14,7 +14,8 @@ on:
   pull_request:   # tests, plus a trial run on real data that saves nothing
     paths: ["experiments/exp2_sector_ssm/**", "experiments/hub/**", ".github/workflows/exp2.yml"]
   schedule:
-    - cron: "0 13 * * 1-5"    # morning: 9:00 New York in summer, 8:00 in winter
+    - cron: "30 11 * * 1-5"   # morning: 7:30 New York in summer, 6:30 in winter (scheduled runs can start late)
+    - cron: "30 12 * * 1-5"   # morning retry, in case GitHub skips the first; "already predicted" makes it a no-op
     - cron: "0 22 * * 1-5"    # evening: 18:00 New York in summer, 17:00 in winter
   workflow_dispatch:
     inputs:
@@ -46,7 +47,7 @@ jobs:
       STATE_KEY: ${{ secrets.STATE_KEY || secrets.PASSWORD }}
       CRYPT: ${{ github.workspace }}/experiments/hub/state_crypt.sh
       TRIAL: ${{ github.event_name == 'pull_request' }}
-      MODE: ${{ inputs.mode || (github.event.schedule == '0 13 * * 1-5' && 'morning') || 'evening' }}
+      MODE: ${{ inputs.mode || ((github.event.schedule == '30 11 * * 1-5' || github.event.schedule == '30 12 * * 1-5') && 'morning') || 'evening' }}
     defaults:
       run:
         working-directory: experiments/exp2_sector_ssm
