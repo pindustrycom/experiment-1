@@ -10,6 +10,9 @@ Three pots, each starting with a fake 1000 CAD on START:
   Combined (the main dashboard): 500 CAD in each of the two.
   Exp7 portfolio (its own pot, not in the combined one): the VWAP + 9 EMA day-trading rule on SPY; each session earns the
       day's result of the rule's trades after 0.3 bp per side (exp7/data/daily.csv, built by experiments/exp7_vwap).
+  Strategy pots (each its own 1000 CAD, not in the combined one): trend following, earnings drift, insider buying and
+      weekly reversal; each session earns the pot's return after 1 bp per side (strategies/data/daily.csv, built by
+      experiments/strategies).
 The pots are invested in US markets, so each day's value is converted to CAD at the Bank of Canada USD/CAD rate.
 No costs, borrow fees or interest are included.
 
@@ -171,6 +174,34 @@ def exp7_position(site: Path) -> str:
     return (_json(site / "exp7" / "data" / "summary.json", {}) or {}).get("position", "")
 
 
+# ---------------------------------------------------------------- Strategy pots (experiments/strategies)
+
+STRATS = ["trend", "pead", "insider", "best_ideas", "conviction", "pelosi", "reversal"]
+
+
+def strategy_returns(site: Path) -> dict[str, list[tuple[str, float]]]:
+    """Each strategy pot's sessions from START on, as (date, return as a fraction, after costs); strategies/data/daily.csv."""
+    try:
+        with (site / "strategies" / "data" / "daily.csv").open() as fh:
+            rows = list(csv.DictReader(fh))
+    except OSError:
+        return {}
+    out = {k: [] for k in STRATS}
+    for r in rows:
+        for k in STRATS:
+            try:
+                if r["date"] >= START and r.get(k):
+                    out[k].append((r["date"], float(r[k])))
+            except (KeyError, ValueError):
+                continue
+    return {k: sorted(v) for k, v in out.items() if v}
+
+
+def strategy_info(site: Path) -> dict:
+    """name, category, what and position of each strategy pot, from strategies/data/summary.json."""
+    return (_json(site / "strategies" / "data" / "summary.json", {}) or {}).get("strategies", {})
+
+
 # ---------------------------------------------------------------- FX and the daily table
 
 def fetch_fx(start: str) -> dict[str, float]:
@@ -197,25 +228,37 @@ def table(state: dict, site: Path) -> dict:
     for d, r in exp7_returns(site):
         idx7 *= 1 + r
         e7[d] = idx7
-    dates = sorted({d for d, _ in e1} | set(e2) | set(e7))
+    es = {}
+    for k, rs in strategy_returns(site).items():
+        idx, es[k] = 1.0, {}
+        for d, r in rs:
+            idx *= 1 + r
+            es[k][d] = idx
+    dates = sorted({d for d, _ in e1} | set(e2) | set(e7) | {d for v in es.values() for d in v})
     base_day = (date.fromisoformat(START) - timedelta(days=1)).isoformat()
     fx0 = _asof(fx, base_day) or (fx[min(fx)] if fx else None)
     e1d = dict(e1)
     pre = [r["index"] for r in state.get("exp1", []) if r["date"] < START]
     i1 = pre[-1] if pre else 1.0
     base1 = i1
-    rows = [{"date": base_day, "exp1": CAPITAL, "exp2": CAPITAL, "combined": CAPITAL, "exp7": CAPITAL, "fx": fx0}]
+    rows = [{"date": base_day, "exp1": CAPITAL, "exp2": CAPITAL, "combined": CAPITAL, "exp7": CAPITAL, **{s: CAPITAL for s in es}, "fx": fx0}]
     i2 = i7 = 1.0
+    ix = {s: 1.0 for s in es}
+    # a strategy pot that joined later is converted to CAD from its own first close, not from START's rate
+    fxs = {s: _asof(fx, min(es[s])) or fx0 for s in es}
     for d in dates:
         i1, i2, i7 = e1d.get(d, i1), e2.get(d, i2), e7.get(d, i7)
+        ix = {s: es[s].get(d, ix[s]) for s in es}
         f = _asof(fx, d) or fx0
         k = f / fx0 if f and fx0 else 1.0
         v1, v2 = CAPITAL * i1 / base1 * k, CAPITAL * i2 * k
-        rows.append({"date": d, "exp1": v1, "exp2": v2, "combined": (v1 + v2) / 2, "exp7": CAPITAL * i7 * k, "fx": f})
+        rows.append({"date": d, "exp1": v1, "exp2": v2, "combined": (v1 + v2) / 2, "exp7": CAPITAL * i7 * k,
+                     **{s: CAPITAL * ix[s] * (f / fxs[s] if f and fxs[s] and d >= min(es[s]) else 1.0) for s in es}, "fx": f})
     last = state["exp1"][-1] if state.get("exp1") else None
     return {"start": START, "rows": rows, "fx_known": fx0 is not None,
             "exp1_book": last["book"] if last else [], "exp1_book_date": last["date"] if last else None,
-            "exp2_position": exp2_position(site), "exp7": bool(e7) or (site / "exp7" / "index.html").exists(), "exp7_position": exp7_position(site)}
+            "exp2_position": exp2_position(site), "exp7": bool(e7) or (site / "exp7" / "index.html").exists(), "exp7_position": exp7_position(site),
+            "strategies": {k: v for k, v in strategy_info(site).items() if k in es}}
 
 
 def run(site: Path, state_file: Path, update: bool) -> dict:

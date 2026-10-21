@@ -126,7 +126,7 @@ def test_exp7_pot_is_separate_from_the_combined_one(tmp_path, fx):
     last = json.loads((site / "data" / "portfolio.json").read_text())["rows"][-1]
     assert last["exp7"] == pytest.approx(1020.0) and last["combined"] == pytest.approx(1000.0)
     hub = (site / "index.html").read_text()
-    assert "Exp7 · VWAP + 9 EMA" in hub and 'href="exp7/index.html">Experiment 7' in hub
+    assert "Exp7 VWAP" in hub and "Short-term" in hub and 'href="exp7/index.html">Exp7 VWAP</a>' in hub
     page = (site / "exp7" / "index.html").read_text()
     assert "Exp7 paper portfolio" in page and "3 trades" in page and "backdrop-filter" in page
 
@@ -136,3 +136,28 @@ def test_no_exp7_card_without_exp7(tmp_path):
     make_site(site, [("2026-10-16", 100, 100), ("2026-10-19", 100, 100)])
     build_hub.build(site, tmp_path / "p.json", update=True)
     assert "Exp7" not in (site / "index.html").read_text()
+
+
+def test_strategy_pots_split_long_and_short(tmp_path, fx):
+    site, state = tmp_path / "site", tmp_path / "p.json"
+    make_site(site, [("2026-10-16", 100, 100), ("2026-10-19", 100, 100), ("2026-10-20", 100, 100)], direction="neutral", z=None)
+    write_exp2(site, ["2026-10-19,live,scored,0.0,True,True,18", "2026-10-20,live,scored,0.0,True,True,18"])
+    d = site / "strategies" / "data"
+    d.mkdir(parents=True)
+    (site / "strategies" / "index.html").write_text("<html><head></head><body><main class=\"wrap\">pots</main></body></html>")
+    # trend joins on 10-19 (the first close only forms the book) and makes 1% on 10-20; reversal joins on 10-20
+    (d / "daily.csv").write_text("date,trend,pead,insider,reversal\n2026-10-19,0.0,,,\n2026-10-20,0.01,,,0.0\n")
+    (d / "summary.json").write_text(json.dumps({"strategies": {
+        "trend": {"name": "Trend following", "category": "Long-term", "what": "ETFs by trend", "position": "long SPY 9%"},
+        "reversal": {"name": "Weekly reversal", "category": "Short-term", "what": "losers", "position": "20 stocks"},
+        "pead": {"name": "Earnings drift", "category": "Long-term", "what": "beats", "position": "cash"}}}))
+    build_hub.build(site, state, update=True)
+    last = json.loads((site / "data" / "portfolio.json").read_text())["rows"][-1]
+    assert last["trend"] == pytest.approx(1000 * 1.01 * 1.414 / 1.40) and last["reversal"] == pytest.approx(1000.0)   # joined on 10-20, after the currency move
+    assert "pead" not in last and last["combined"] == pytest.approx(last["exp1"] / 2 + last["exp2"] / 2)
+    hub = (site / "index.html").read_text()
+    assert 'id="long"' in hub and 'id="short"' in hub and 'href="#markets">← Markets' in hub
+    lo, sh = hub.index('id="long"'), hub.index('id="short"')
+    assert "Trend following" in hub[lo:sh] and "Weekly reversal" not in hub[lo:sh] and "Weekly reversal" in hub[sh:]
+    assert "4 × 1,000 CAD" in hub and "long SPY 9%" in hub and 'href="strategies/index.html#trend"' in hub
+    assert "backdrop-filter" in (site / "strategies" / "index.html").read_text()

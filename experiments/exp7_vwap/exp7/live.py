@@ -72,7 +72,7 @@ header a{{margin-right:14px;color:var(--muted)}}.brand{{font-weight:650;color:va
 .muted{{color:var(--muted)}}.panel{{padding:14px 16px;margin:14px 0}}table{{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}}
 th,td{{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}}.scroll{{overflow-x:auto}}.pos{{color:var(--lo)}}.neg{{color:var(--hi)}}
 details summary{{cursor:pointer}}footer{{color:var(--muted);font-size:13px;padding:16px 0 30px}}</style></head><body>
-<header><div class="wrap"><a class="brand" href="../index.html">Paper portfolio</a><a href="../exp1/index.html">Experiment 1</a><a href="../exp2/index.html">Experiment 2</a></div></header>
+<header><div class="wrap"><a class="brand" href="index.html">Experiment 7 · VWAP + 9 EMA day trades</a></div></header>
 <main class="wrap"><h1>Experiment 7 · VWAP + 9 EMA cross</h1>
 <p class="muted">From an Instagram reel: on a 3-minute SPY chart, go long when the 9-period EMA crosses above the day's VWAP and short when it crosses
 below, and be flat at the close. Each evening the day's 1-minute bars are replayed and the trades the rule would have made are recorded, at

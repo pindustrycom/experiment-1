@@ -1,0 +1,111 @@
+name: Strategy pots
+
+# Paper strategies, each with its own 1000 CAD pot (experiments/strategies; no orders placed anywhere):
+#   long-term: trend following (ETFs), earnings drift, insider cluster buying, and three copy pots (funds' best ideas,
+#   fund conviction, Pelosi); short-term: weekly reversal.
+# Weekdays after the close: fetch prices (Yahoo), the S&P 500 list, earnings results and insider filings (Finnhub), new
+# 13Fs (SEC EDGAR) and Pelosi's PTRs (House Clerk), move every pot to the close and form the next books, replay the pots
+# that have a history from 2019, and build the pages. The copy pots' filing history is seeded once from the
+# trader-skill-data release and read with the trader-skill pack at the commit research/trader_skill reviewed.
+# The state and the price cache are saved to the "strategies-state" release (encrypted with state_crypt.sh, as the other
+# experiments), and the pages as strategies-site.tar.gz, which pages.yml puts under /strategies/ and into the Markets dashboard.
+
+on:
+  pull_request:   # tests, plus a trial run on real data that saves nothing
+    paths: ["experiments/strategies/**", ".github/workflows/strategies.yml"]
+  schedule:
+    - cron: "40 21 * * 1-5"   # 17:40 New York in summer, 16:40 in winter: after the close, before pages.yml (23:15)
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the state release
+
+concurrency:
+  group: strategies-${{ github.event_name == 'pull_request' && github.ref || 'live' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  STATE_TAG: strategies-state
+  SKILL_REPO: https://github.com/Jakeschincariol/trader-skill.git
+  SKILL_COMMIT: 5189e79b9a480755a3733ac9713f5353981dbe18
+  TRIAL: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+      SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+      GH_TOKEN: ${{ github.token }}
+      STATE_KEY: ${{ secrets.STATE_KEY || secrets.PASSWORD }}
+      CRYPT: ${{ github.workspace }}/experiments/hub/state_crypt.sh
+    defaults:
+      run:
+        working-directory: experiments/strategies
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: experiments/strategies/requirements.txt
+      - run: pip install -r requirements.txt && sudo apt-get install -y -q poppler-utils
+      - name: Tests
+        run: ruff check strats tests && python -m pytest -q
+
+      - name: Restore the state
+        run: |
+          mkdir -p state
+          if [ "$TRIAL" != "true" ] && gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx strategies-state.tar.gz; then
+            # State exists: failing to restore it must stop the run, or a fresh state would restart every pot.
+            gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --pattern strategies-state.tar.gz --dir /tmp/prev
+            "$CRYPT" open /tmp/prev/strategies-state.tar.gz
+            tar xzf /tmp/prev/strategies-state.tar.gz -C state
+            echo "Restored state from the previous run." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No previous state: every pot starts at this close." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Seed the copy pots' filings and check out trader-skill
+        run: |
+          if [ ! -d state/data/copy/13f ]; then
+            gh release download trader-skill-data --repo "$GITHUB_REPOSITORY" --pattern cache.tar.gz --dir /tmp/ts
+            mkdir -p state/data/copy
+            tar xzf /tmp/ts/cache.tar.gz -C state/data/copy ./13f ./ptr ./cusips.json
+            echo "Seeded the copy pots' filings from trader-skill-data." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          git init -q /tmp/trader-skill
+          git -C /tmp/trader-skill fetch -q --depth 1 "$SKILL_REPO" "$SKILL_COMMIT"
+          git -C /tmp/trader-skill checkout -q FETCH_HEAD
+          test "$(git -C /tmp/trader-skill rev-parse HEAD)" = "$SKILL_COMMIT"
+          echo "TRADER_SKILL=/tmp/trader-skill" >> "$GITHUB_ENV"
+
+      - name: Trade the close
+        run: |
+          set -o pipefail
+          mkdir -p state/data
+          python -m strats live --data state/data --state state/state.json --out site | tee /tmp/run.json
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          s = json.load(open("/tmp/run.json"))
+          print(f"\n**Close {s['last_close']}**\n")
+          for k, v in s["step"].items():
+              print(f"- {k}: {v}")
+          print(f"\nReplay: {json.dumps(s.get('replay'))[:600]}")
+          print(f"\nPrices: {json.dumps(s.get('prices'))[:300]}; earnings: {s.get('earnings')}; insiders: {s.get('insiders')}")
+          print(f"\nFilings for the copy pots: {s.get('copy_data')}")
+          PY
+
+      - name: Save the state and the pages
+        if: env.TRIAL != 'true'
+        run: |
+          [ -f site/index.html ] || { echo "No pages were built."; exit 1; }
+          mkdir -p /tmp/out
+          tar czf /tmp/out/strategies-state.tar.gz -C state .
+          tar czf /tmp/out/strategies-site.tar.gz -C site .
+          "$CRYPT" seal /tmp/out/*.tar.gz
+          gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --title "Strategy pots state" --latest=false \
+              --notes "State (books, events, price cache, filings) and pages of the strategy pots. Not a software release."
+          gh release upload "$STATE_TAG" /tmp/out/*.tar.gz --repo "$GITHUB_REPOSITORY" --clobber

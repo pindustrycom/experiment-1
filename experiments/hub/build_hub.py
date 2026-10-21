@@ -1,14 +1,19 @@
-"""Assemble the GitHub Pages site: the paper portfolio at the root, one folder per experiment.
+"""Assemble the GitHub Pages site: an overview of every experiment at the root, one folder per experiment.
 
     python experiments/hub/build_hub.py --site _site --state state/portfolio.json [--update]
 
-The root page is the combined 1000 CAD paper portfolio (portfolio.py); each experiment's page gets its own
-1000 CAD portfolio box at the top.
+The root page is one column per group of experiments (GROUPS below): the market experiments (traded on paper, with the
+combined 1000 CAD paper portfolio from portfolio.py) and the resonance research pages. Clicking a column opens that group
+over the whole page (root/index.html#markets, ...). Each market experiment's page gets
+its own 1000 CAD portfolio box at the top.
 
-Expects each experiment's pages already in place (_site/exp1/, _site/exp2/); a missing one is shown
-as "not published yet" rather than failing the build. Experiments 4 to 6 are static pages kept in this repository
-(experiments/exp4_resonance/, exp5_vision/, exp6_alphabet/) and are copied to _site/exp4/ to _site/exp6/. It also:
-  - adds "Experiment 2" and "Paper portfolio" links to Exp1's page headers,
+Expects each market experiment's pages already in place (_site/exp1/, _site/exp2/, _site/exp7/); a missing one is
+shown as "not published yet" rather than failing the build. The resonance experiments are static pages kept in this
+repository (experiments/exp4_resonance/, ...) and are copied in. It also:
+  - puts the same navigation bar at the top of every page, so each page links to all the others (CATALOG below is
+    the one list it is built from),
+  - inlines the shared scripts the static pages load from ../hub/ (the published site encrypts every file that
+    is not a page, so a page cannot load a script file),
   - keeps Exp1's old addresses working: every Exp1 page that used to live at the site root gets a
     redirect page there, and its data files are copied back to /data/ (files can't redirect).
 Standard library only, so it runs in any job.
@@ -18,6 +23,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
@@ -29,24 +35,81 @@ e = html.escape
 REPO_URL = "https://github.com/pindustrycom/experiment-1"
 EXPERIMENTS = Path(__file__).resolve().parent.parent
 EXP4 = EXPERIMENTS / "exp4_resonance"
-# Static experiment pages: (site folder, source folder, card title, card text). No money involved in any of them.
-STATIC = [
-    ("exp4", EXP4, "Exp4 · resonance playground",
-     "A 3D model of the resonance architecture by Joaquin Philco: retina and V1, time-based somas with resonators on the axon, "
-     "concept structures and the rules that ask, allocate and sleep. Show it a digit in a colour, blur it, or open one cell."),
-    ("exp5", EXPERIMENTS / "exp5_vision", "Exp5 · vision stack",
-     "Can better vision make Joaquin Philco's resonance agent see natural images? Eleven methods on CIFAR and Imagenette: Gabor and "
-     "learned V1, somas with an axon resonance machine, a deeper somatic stack, feedback from memory and super labels."),
-    ("exp6", EXPERIMENTS / "exp6_alphabet", "Exp6 · alphabet and words",
-     "The same resonance machinery learns letters, numbers and words from images, then words name colour patches with no "
-     "stored labels. Includes a 3D view: watch the eye read a word, or a patch evoke its word."),
-    ("exp6_live", EXPERIMENTS / "exp6_live", "Exp6 live · the model in your browser",
-     "The trained exp6 model runs in the page: type a word in any font, draw a character or pick a colour, and see which "
-     "letter, word and naming structures resonate, with a 3D view driven by the computed values."),
-]
-HUB_LINK = ('<a href="{root}exp2/index.html" style="color:var(--muted)">Experiment 2</a> '
-            '<a href="{root}index.html" style="color:var(--muted)" data-hub>Paper portfolio</a>')
+HUB = Path(__file__).resolve().parent
 
+MARKETS, RESONANCE = "Markets", "Resonance"
+# Every experiment on the site, in menu order: (site folder, group, menu label, card title, card text, source folder of a
+# static page, or None when another workflow builds the pages). The navigation bar and the overview page both come from it.
+CATALOG = [
+    ("exp1", MARKETS, "Exp1 pairs", "Exp1 · pairs", "Long the stock Exp1 favours in each pair, short the other.", None),
+    ("exp2", MARKETS, "Exp2 volatility", "Exp2 · volatility-timed",
+     "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", None),
+    ("exp7", MARKETS, "Exp7 VWAP", "Exp7 · VWAP + 9 EMA day trades",
+     "Day-trades SPY on a 3-minute chart: long when the 9 EMA is above the day's VWAP, short below, flat overnight.", None),
+    ("strategies", MARKETS, "Strategy pots", "Strategy pots · trend, earnings, insiders, reversal",
+     "Four rules with their own pots: trend following across ETFs, buying after earnings beats, buying after insiders "
+     "buy, and buying the week's biggest losers.", None),
+    ("exp4", RESONANCE, "Exp4 playground", "Exp4 · resonance playground",
+     "A 3D model of the resonance architecture by Joaquin Philco: retina and V1, time-based somas with resonators on the axon, "
+     "concept structures and the rules that ask, allocate and sleep. Show it a digit in a colour, blur it, or open one cell.", EXP4),
+    ("exp5", RESONANCE, "Exp5 vision", "Exp5 · vision stack",
+     "Can better vision make Joaquin Philco's resonance agent see natural images? Eleven methods on CIFAR and Imagenette: Gabor and "
+     "learned V1, somas with an axon resonance machine, a deeper somatic stack, feedback from memory and super labels.",
+     EXPERIMENTS / "exp5_vision"),
+    ("exp6", RESONANCE, "Exp6 alphabet", "Exp6 · alphabet and words",
+     "The same resonance machinery learns letters, numbers and words from images, then words name colour patches with no "
+     "stored labels. Includes a 3D view: watch the eye read a word, or a patch evoke its word.", EXPERIMENTS / "exp6_alphabet"),
+    ("exp6_live", RESONANCE, "Exp6 live", "Exp6 live · the model in your browser",
+     "The trained exp6 model runs in the page: type a word in any font, draw a character or pick a colour, and see which "
+     "letter, word and naming structures resonate, with a 3D view driven by the computed values.", EXPERIMENTS / "exp6_live"),
+    ("exp8", RESONANCE, "Exp8 neuron", "Exp8 · resonant neuron and volume",
+     "Joaquin Philco's neuron: a sigmoid soma, one axon per connection with myelin resonators, and oligodendrocytes that set "
+     "each weight. One neuron wired to two others runs live in 3D, then a 16 x 16 x 16 volume trained by his resonance-index sleep.",
+     EXPERIMENTS / "exp8_neuron"),
+]
+# The overview page is one column per group, side by side; clicking a column opens that group over the whole page. A new
+# project adds its group here and its experiments to CATALOG: (group, page anchor, colour, moving background drawn behind
+# the column: "price" or "rings", one-line description).
+GROUPS = [
+    (MARKETS, "markets", "#e3ac5b", "price", "Strategies traded every day with fake money: 1,000 CAD each, no orders placed anywhere."),
+    (RESONANCE, "resonance", "#a593d4", "rings", "Joaquin Philco's resonance architecture: models and results you can run in the browser."),
+]
+# Every paper pot on the Markets dashboard, split by how long it holds positions: (key in the portfolio table, label,
+# category, page). The strategy pots take their names and descriptions from strategies/data/summary.json.
+LONG, SHORT = "Long-term", "Short-term"
+POTS = [("exp2", "Exp2 volatility", LONG, "exp2/index.html"), ("trend", "Trend following", LONG, "strategies/index.html#trend"),
+        ("pead", "Earnings drift", LONG, "strategies/index.html#pead"), ("insider", "Insider buying", LONG, "strategies/index.html#insider"),
+        ("best_ideas", "Best ideas", LONG, "strategies/index.html#best_ideas"),
+        ("conviction", "Fund conviction", LONG, "strategies/index.html#conviction"),
+        ("pelosi", "Pelosi copy", LONG, "strategies/index.html#pelosi"),
+        ("exp1", "Exp1 pairs", SHORT, "exp1/index.html"), ("exp7", "Exp7 VWAP", SHORT, "exp7/index.html"),
+        ("reversal", "Weekly reversal", SHORT, "strategies/index.html#reversal")]
+# (category, anchor, colour, moving background, description)
+HORIZONS = [(LONG, "long", "#8fc1ad", "price", "Positions kept for weeks or months: monthly books, year-long trends, copied fund and Pelosi filings, and events held for a season."),
+            (SHORT, "short", "#d9a15b", "candles", "Positions kept for a day or a week: daily pair bets, intraday SPY trades and weekly bounces.")]
+POT_COLORS = ["#f5f5f7", "#a593d4", "#8fc1ad", "#d9a15b", "#7aa2ff", "#ff9f8a", "#c7c7cc", "#e6c86e", "#6fc7d9", "#d98fb8"]
+# Static experiment pages: (site folder, source folder, card title, card text). No money involved in any of them.
+STATIC = [(d, src, title, text) for d, _, _, title, text, src in CATALOG if src is not None]
+
+NAV, NAV_END = "<!--labnav-->", "<!--/labnav-->"
+NAV_CSS = """
+:root{--site-nav-h:44px}
+#labnav{box-sizing:border-box;height:var(--site-nav-h);margin:0;padding:0 16px;display:flex;flex-wrap:nowrap;align-items:center;gap:22px;overflow-x:auto;
+overflow-y:hidden;white-space:nowrap;scrollbar-width:none;background:#000;border-bottom:1px solid rgba(255,255,255,.1);position:relative;z-index:50;
+font:500 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;letter-spacing:0;text-transform:none;color-scheme:dark}
+#labnav::-webkit-scrollbar{display:none}
+#labnav a{color:#98989f;text-decoration:none;padding:15px 0 13px;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;margin:0;font-weight:500}
+#labnav a:hover{color:#f5f5f7;text-decoration:none}
+#labnav a[aria-current=page]{color:#f5f5f7;border-bottom-color:#a593d4}
+#labnav a:focus-visible{outline:2px solid #a593d4;outline-offset:2px;border-radius:2px}
+#labnav .ln-home{color:#f5f5f7;font-weight:650;font-size:14px}
+#labnav .ln-grp{display:flex;flex-direction:row;align-items:center;gap:16px;margin:0;padding:0}
+#labnav .ln-g{color:#6e6e75;font-size:12px;padding-left:16px;border-left:1px solid rgba(255,255,255,.1)}
+@media print{#labnav{display:none}}
+"""
+# On a narrow screen the bar scrolls sideways: start it scrolled to the current page.
+NAV_SCRIPT = ('<script>(()=>{const n=document.getElementById("labnav"),a=n&&n.querySelector("[aria-current]");'
+              'if(a&&a.offsetLeft+a.offsetWidth>n.clientWidth)n.scrollLeft=a.offsetLeft-16})()</script>')
 CSS = """
 :root{--bg:#f7f7f5;--panel:#fff;--text:#1d1d1b;--muted:#6b6b66;--line:#e3e2dd;--accent:#2f5fd0;--lo:#2e7d4f;--hi:#c0392b;--band:#f1f0ec}
 @media (prefers-color-scheme:dark){:root{--bg:#141413;--panel:#1d1d1b;--text:#ecebe6;--muted:#9c9b94;--line:#33322e;--accent:#7aa2ff;--lo:#6fcf97;--hi:#ff7b6b;--band:#252522}}
@@ -90,6 +153,72 @@ nav a.on{background:rgba(70,40,120,.35)!important;color:var(--text)!important;bo
 .tag{border-color:var(--glass-line)!important}.banner.warn,.banner.danger{background:rgba(52,26,92,.4)!important}
 svg text{fill:var(--muted)!important}.chart .grid{stroke:var(--grid)}
 """
+HUB_CSS = """
+section.group{margin:0 0 34px}section.group h2{font-size:20px;margin:0 0 2px;letter-spacing:-.01em}section.group .intro{margin:0 0 14px}
+.card .go{font-weight:600}.card .tag{text-transform:none;letter-spacing:-.01em;font-size:16px;font-weight:650;color:var(--text)}
+"""
+# The overview page: the group columns, and a group opened over the whole page (the column whose anchor is in the address).
+SPLIT_CSS = """
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.split{display:flex;min-height:calc(100vh - var(--site-nav-h));min-height:calc(100svh - var(--site-nav-h))}
+.split>.half{flex:1 1 0;min-width:0;position:relative;overflow:hidden;border-right:1px solid var(--glass-line);scroll-margin-top:100vh;
+transition:flex-grow .6s cubic-bezier(.2,.8,.2,1)}
+.split>.half:last-child{border-right:0}.split:not(:has(.half:target))>.half:hover{flex-grow:1.35}
+.half>canvas{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+.door{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:32px clamp(20px,4vw,52px) 40px;
+color:var(--text);background:linear-gradient(0deg,rgba(0,0,0,.8),rgba(0,0,0,0) 65%)}
+.door:hover{text-decoration:none}.door:focus-visible{outline:2px solid var(--c);outline-offset:-6px}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+.door .k{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.door h2{font-size:clamp(44px,6.5vw,84px);line-height:.95;letter-spacing:-.045em;font-weight:800;margin:0;color:var(--c);text-wrap:balance}
+.door p{margin:0;max-width:40ch;color:var(--muted)}.door .v{font-size:26px;font-weight:500}
+.door .exps{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--text)}.door .cta{font-weight:600;color:var(--c)}
+.open{display:none}
+.split>.half:is(:target,:has(.half:target)){flex:1 0 100%;overflow:visible;border:0}
+.split:has(>.half:is(:target,:has(.half:target)))>.half:not(:target):not(:has(.half:target)){display:none}
+.half:is(:target,:has(.half:target))>canvas{position:fixed;opacity:.3}.half:has(.half:target)>canvas{display:none}
+.half:is(:target,:has(.half:target))>.door{display:none}
+.half:is(:target,:has(.half:target))>.open{display:block;position:relative;padding:22px 0 40px;animation:open .5s cubic-bezier(.2,.8,.2,1) both}
+.half:has(.half:target)>.open>.wrap>:not(.split){display:none}.half:has(.half:target)>.open{padding:0}
+.open .back{display:inline-block;font-size:13px;color:var(--muted);margin:0 0 14px}.open .back:hover{color:var(--text);text-decoration:none}
+.open h2{font-size:clamp(34px,5vw,52px);letter-spacing:-.04em;font-weight:800;margin:0 0 4px;color:var(--c)}
+.split.sub{min-height:440px;margin:26px 0 8px;border:1px solid var(--glass-line);border-radius:20px;overflow:hidden}
+.split.sub:has(>.half:target){min-height:0;margin:0;border:0;border-radius:0;overflow:visible}
+.sub .door h2{font-size:clamp(36px,5vw,64px)}.open .open .wrap{padding:0}
+.mk-pots td,.mk-pots th{padding:7px 8px;text-align:right;white-space:nowrap}.mk-pots td:first-child,.mk-pots th:first-child,.mk-pots td:nth-child(2),.mk-pots th:nth-child(2){text-align:left}
+.mk-pots{width:100%;border-collapse:collapse;font-size:14px}.mk-pots th{font-size:12px;color:var(--muted);font-weight:500}
+.mk-pots tr+tr td{border-top:1px solid var(--line)}.mk-pots .cat{font-size:12px;color:var(--muted)}.tw{overflow-x:auto}
+@keyframes open{from{opacity:0;transform:translateY(16px)}}
+@media (max-width:640px){.split{flex-direction:column}.split>.half{border-right:0;border-bottom:1px solid var(--glass-line);min-height:300px}
+.split.sub>.half{min-height:400px}.mk-pots .cat{display:none}}
+@media (prefers-reduced-motion:reduce){.split>.half{transition:none}.half .open{animation:none!important}}
+"""
+# Draws each column's moving background: only while the column is on screen and the tab is visible; one still frame when
+# the reader asks for reduced motion.
+SPLIT_SCRIPT = """<script>(()=>{
+const still=matchMedia("(prefers-reduced-motion: reduce)").matches,cs=[...document.querySelectorAll("canvas[data-bg]")],seen=new Set();
+let s=7,v=0;const walk=Array.from({length:700},()=>(v+=(s=(s*9301+49297)%233280)/233280-.485));
+function price(x,W,H,d,c,t){const off=Math.floor(t/90)%500,vals=walk.slice(off,off+180),lo=Math.min(...vals),hi=Math.max(...vals);
+x.strokeStyle="rgba(255,255,255,.06)";x.lineWidth=d;for(let i=1;i<8;i++){x.beginPath();x.moveTo(0,H*i/8);x.lineTo(W,H*i/8);x.stroke()}
+const pt=i=>[i/(vals.length-1)*W,H*.08+(1-(vals[i]-lo)/(hi-lo||1))*H*.34];x.beginPath();vals.forEach((_,i)=>x.lineTo(...pt(i)));
+x.strokeStyle=c;x.lineWidth=2*d;x.stroke();const end=pt(vals.length-1);x.lineTo(W,H);x.lineTo(0,H);x.closePath();
+const g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,c+"55");g.addColorStop(1,c+"00");x.fillStyle=g;x.fill();
+x.beginPath();x.arc(end[0]-4*d,end[1],4*d,0,7);x.fillStyle=c;x.fill()}
+function rings(x,W,H,d,c,t){const cx=W*.6,cy=H*.38,ph=t/1400,R=Math.hypot(W,H)*.75;x.strokeStyle=c;x.lineWidth=1.2*d;
+for(let k=0;k<16;k++){x.globalAlpha=.5*(1-(k+ph%1)/16);x.beginPath();x.arc(cx,cy,(k+ph%1)/16*R,0,7);x.stroke()}
+x.globalAlpha=.9;x.fillStyle=c;for(let k=0;k<5;k++){const a=k*1.3+ph*.4;x.beginPath();x.arc(cx+Math.cos(a)*W*.25,cy+Math.sin(a)*H*.2,3*d,0,7);x.fill()}
+x.globalAlpha=1}
+function candles(x,W,H,d,c,t){const n=42,cw=W/n,off=Math.floor(t/140),fr=(t%140)/140;x.lineWidth=d;let o=0;
+for(let i=0;i<n+1;i++){const k=i+off,h=Math.sin(k*12.9898)*43758.5453,u=h-Math.floor(h),h2=Math.sin(k*78.233)*12345.678,u2=h2-Math.floor(h2),
+up=u>.47,body=(.02+.06*u2)*H,cx=(i-fr)*cw,cy=H*.32+Math.sin(k*.21)*H*.08+(u-.5)*H*.05;
+x.globalAlpha=.75;x.strokeStyle=x.fillStyle=up?c:"rgba(255,255,255,.35)";x.beginPath();x.moveTo(cx+cw/2,cy-body*.9);x.lineTo(cx+cw/2,cy+body*1.9);x.stroke();
+x.fillRect(cx+cw*.2,cy,cw*.6,body)}x.globalAlpha=1}
+let pending=0;const go=()=>{if(!pending)pending=requestAnimationFrame(t=>{pending=0;frame(t)})};
+function frame(t){for(const c of cs){if(!still&&!seen.has(c))continue;const r=c.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2),
+W=Math.round(r.width*d),H=Math.round(r.height*d);if(!W||!H)continue;if(c.width!==W||c.height!==H){c.width=W;c.height=H}
+const x=c.getContext("2d");x.clearRect(0,0,W,H);({price,rings,candles}[c.dataset.bg]||price)(x,W,H,d,c.dataset.color,still?0:t)}if(!still)go()}
+const io=new IntersectionObserver(es=>{es.forEach(x=>x.isIntersecting?seen.add(x.target):seen.delete(x.target));go()});cs.forEach(c=>io.observe(c));
+addEventListener("visibilitychange",go);addEventListener("resize",go);addEventListener("hashchange",go);go()})()</script>"""
 MARK, MARK_END = "<!--portfolio-->", "<!--/portfolio-->"
 BANNER_CSS = """
 .big,.pf{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin:0 0 16px}
@@ -191,7 +320,7 @@ def inject(f: Path, block: str) -> bool:
 def theme(site: Path) -> int:
     """Lay the glass theme over every experiment page (replacing any earlier copy)."""
     n = 0
-    for d in ("exp1", "exp2", "exp7"):
+    for d in ("exp1", "exp2", "exp7", "strategies"):
         for f in (site / d).rglob("*.html") if (site / d).is_dir() else []:
             s = f.read_text()
             if GLASS in s:
@@ -212,47 +341,161 @@ def sleeve_card(t: dict, key: str, title: str, href: str, what: str, pos: str) -
             f'<a class="go" href="{href}">Open →</a></div>')
 
 
-def exp7_card(t: dict) -> str:
-    """Exp7 has its own 1000 CAD pot, kept outside the combined one."""
-    if not t.get("exp7") or "exp7" not in t["rows"][-1]:
-        return ""
-    return ('<h2 style="font-size:18px;margin:28px 0 10px">Separate pot</h2><div class="cards">'
-            + sleeve_card(t, "exp7", "Exp7 · VWAP + 9 EMA day trades", "exp7/index.html",
-                          "Day-trades SPY on a 3-minute chart: long when the 9 EMA is above the day's VWAP, short below, flat overnight.",
-                          e(t.get("exp7_position") or "")) + "</div>")
+def nav_bar(current: str, root: str, site: Path | None = None) -> str:
+    """The bar at the top of every page. current is the page's site folder ("" for the overview); root leads back to the site root.
+    With site given, experiments whose pages are not in it are left out."""
+    def link(d: str, label: str) -> str:
+        cur = ' aria-current="page"' if d == current else ""
+        return f'<a href="{root}{d}/index.html"{cur}>{e(label)}</a>'
+    groups = []
+    for g, anchor, *_ in GROUPS:
+        links = "".join(link(d, label) for d, grp, label, *_ in CATALOG
+                        if grp == g and (site is None or (site / d / "index.html").exists()))
+        if links:
+            groups.append(f'<span class="ln-grp"><a class="ln-g" href="{root}index.html#{anchor}">{g}</a>{links}</span>')
+    home = ' aria-current="page"' if current == "" else ""
+    return (f'{NAV}<style>{NAV_CSS}</style><nav id="labnav" aria-label="Experiments">'
+            f'<a class="ln-home" href="{root}index.html"{home}>All experiments</a>{"".join(groups)}</nav>{NAV_SCRIPT}{NAV_END}')
+
+
+BODY = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
+
+
+def add_nav(site: Path) -> int:
+    """Put the navigation bar at the top of every page in the site (replacing any earlier copy). Redirect pages are left alone."""
+    n = 0
+    for f in site.rglob("*.html"):
+        s = f.read_text(encoding="utf-8")
+        if 'http-equiv="refresh"' in s:
+            continue
+        if NAV in s:
+            s = s[:s.index(NAV)] + s[s.index(NAV_END) + len(NAV_END):]
+        m = BODY.search(s)
+        if not m:
+            continue
+        rel = f.relative_to(site).parts
+        current = rel[0] if len(rel) > 1 else ""
+        f.write_text(s[:m.end()] + nav_bar(current, "../" * (len(rel) - 1), site) + s[m.end():], encoding="utf-8")
+        n += 1
+    return n
+
+
+def half(group: str, anchor: str, color: str, bg: str, intro: str, labels: list[str], stat: str, body: str,
+         unit: str = "experiment", back: tuple[str, str] = ("#", "All groups")) -> str:
+    """One group's column on the overview page, and the full page it opens into. The Markets page holds two more of these
+    (long-term and short-term pots), which open over the whole page the same way."""
+    count = f'{len(labels)} {unit}{"s" * (len(labels) != 1)}'
+    return (f'<section class="half" id="{anchor}" style="--c:{color}"><canvas data-bg="{bg}" data-color="{color}" aria-hidden="true"></canvas>'
+            f'<a class="door" href="#{anchor}"><span class="k mono">{count}</span><h2>{e(group)}</h2><p>{e(intro)}</p>{stat}'
+            f'<span class="exps">{"".join(f"<span>{e(x)}</span>" for x in labels)}</span><span class="cta">Open {e(group)} →</span></a>'
+            f'<div class="open"><div class="wrap"><a class="back" href="{back[0]}">← {e(back[1])}</a><h2>{e(group)}</h2>'
+            f'<p class="muted small intro">{e(intro)}</p>{body}</div></div></section>')
+
+
+def pots_in(t: dict) -> list[tuple[str, str, str, str, str, str]]:
+    """The pots the table has, as (key, label, category, page, what, position)."""
+    info = {d: text for d, _, _, _, text, _ in CATALOG}
+    strat = t.get("strategies") or {}
+    last = t["rows"][-1]
+    out = []
+    for k, label, cat, href in POTS:
+        if k not in last or (k == "exp7" and not t.get("exp7")):
+            continue
+        if k in strat:
+            what, pos = e(strat[k].get("what", "")), e(strat[k].get("position", ""))
+        elif k == "exp1":
+            what, pos = e(info["exp1"]), exp1_positions(t)
+        elif k in info:
+            what, pos = e(info[k]), e(t.get(f"{k}_position") or "")
+        else:
+            continue
+        out.append((k, label, cat, href, what, pos))
+    return out
+
+
+def total_number(rows: list[dict], keys: list[str], label: str, since: str | None) -> str:
+    """The big P/L number for a set of pots, each started with CAPITAL."""
+    cap = CAPITAL * len(keys)
+    v = sum(rows[-1][k] for k in keys)
+    day = v - sum(rows[-2][k] for k in keys) if len(rows) > 1 else 0.0
+    pl = v - cap
+    return (f'<div class="big"><div class="k">{e(label)}</div><div class="v {pl_class(pl)}">{cad(pl, True)}</div>'
+            f'<div class="d">Worth <b>{cad(v)}</b> of {len(keys)} × {CAPITAL:,.0f} CAD ({100 * pl / cap:+.2f}%) · today '
+            f'<span class="{pl_class(day)}">{cad(day, True)}</span> · since {e(since or rows[0]["date"])} · last update {e(rows[-1]["date"])}</div></div>')
+
+
+def pots_chart(rows: list[dict], pots: list[tuple]) -> str:
+    keys = [(k, POT_COLORS[i % len(POT_COLORS)]) for i, (k, *_) in enumerate(pots)]
+    legend = " ".join(f'<span style="color:{c}">━</span> {e(p[1])}' for (k, c), p in zip(keys, pots))
+    return (f'<div class="panel">{value_chart(rows, keys)}<div class="small muted">{legend} · dashed line: the starting '
+            f'{CAPITAL:,.0f} CAD</div></div>')
+
+
+def pots_table(rows: list[dict], pots: list[tuple]) -> str:
+    out = ['<div class="panel"><div class="tw"><table class="mk-pots"><tr><th>Pot</th><th class="cat">Holds for</th><th>Worth</th><th>Profit / loss</th><th>Today</th></tr>']
+    for k, label, cat, href, *_ in pots:
+        v = rows[-1][k]
+        pl, day = v - CAPITAL, v - rows[-2][k] if len(rows) > 1 else 0.0
+        out.append(f'<tr><td><a href="{href}">{e(label)}</a></td><td class="cat">{e(cat)}</td><td class="mono">{cad(v)}</td>'
+                   f'<td class="mono {pl_class(pl)}">{cad(pl, True)} ({100 * pl / CAPITAL:+.2f}%)</td>'
+                   f'<td class="mono {pl_class(day)}">{cad(day, True)}</td></tr>')
+    return "".join(out) + "</table></div></div>"
+
+
+def markets_body(t: dict) -> tuple[str, str]:
+    """The Markets page: every pot with its own 1,000 CAD, then the long-term and short-term columns. Returns (body, door stat)."""
+    rows, pots = t["rows"], pots_in(t)
+    keys = [p[0] for p in pots]
+    fx = "" if t.get("fx_known") else " USD/CAD rate unavailable: values exclude currency moves."
+    head = (total_number(rows, keys, "All paper pots: profit / loss", t.get("start")) + pots_table(rows, pots) + pots_chart(rows, pots)
+            + f'<p class="small muted">Every pot started with a fake {CAPITAL:,.0f} CAD and trades every trading day from its own rule; US positions, '
+            f'valued in CAD at the Bank of Canada rate. A pot that joined later stays at {CAPITAL:,.0f} until its first trade.{fx}</p>')
+    halves = []
+    for cat, anchor, color, bg, intro in HORIZONS:
+        mine = [p for p in pots if p[2] == cat]
+        if not mine:
+            continue
+        ks = [p[0] for p in mine]
+        pl = sum(rows[-1][k] for k in ks) - CAPITAL * len(ks)
+        stat = f'<span class="v mono {pl_class(pl)}">{cad(pl, True)}</span>'
+        body = (total_number(rows, ks, f"{cat} pots: profit / loss", t.get("start")) + pots_chart(rows, mine)
+                + '<div class="cards">' + "".join(sleeve_card(t, k, label, href, what, pos) for k, label, _, href, what, pos in mine) + "</div>")
+        halves.append(half(cat, anchor, color, bg, intro, [p[1] for p in mine], stat, body, unit="pot", back=("#markets", "Markets")))
+    total = sum(rows[-1][k] for k in keys) - CAPITAL * len(keys)
+    return (head + f'<div class="split sub">{"".join(halves)}</div>',
+            f'<span class="v mono {pl_class(total)}">{cad(total, True)}</span>')
+
+
+def plain_card(d: str, title: str, text: str, published: bool) -> str:
+    go = f'<a class="go" href="{d}/index.html">Open {e(title.split(" · ")[0])}</a>' if published else '<p class="muted small">Not published yet.</p>'
+    return f'<div class="card"><div class="tag">{e(title)}</div><p>{e(text)}</p>{go}</div>'
 
 
 def hub_page(site: Path, t: dict | None = None) -> str:
     built = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+    have = lambda d: (site / d / "index.html").exists()  # noqa: E731
+    info = {d: (title, text) for d, _, _, title, text, _ in CATALOG}
     if t is None:
-        body = '<p class="muted">The portfolio appears after its first run.</p>'
+        money = '<p class="muted">The paper portfolio appears after its first nightly run.</p>'
+        cards = "".join(plain_card(d, *info[d], have(d)) for d in ("exp1", "exp2", "exp7"))
+        body, stat = {MARKETS: money + f'<div class="cards">{cards}</div>'}, {MARKETS: ""}
     else:
-        rows = t["rows"]
-        fx = "" if t.get("fx_known") else " USD/CAD rate unavailable: values exclude currency moves."
-        body = f"""{big_number(rows, "combined", "Combined paper portfolio: profit / loss", t.get("start"))}
-<div class="panel">{value_chart(rows, [("combined", "var(--text)"), ("exp1", "var(--a)"), ("exp2", "var(--b)")])}
-<div class="small muted"><span style="color:var(--text)">━</span> combined <span style="color:var(--a)">━</span> Exp1
-<span style="color:var(--b)">━</span> Exp2 · dashed line: the starting 1,000 CAD</div></div>
-<p class="small muted">Half of the money follows each experiment. Trades every trading day; US positions, valued in CAD at the
-Bank of Canada rate. No costs or interest.{fx}</p>
-<div class="cards">{sleeve_card(t, "exp1", "Exp1 · pairs", "exp1/index.html", "Long the stock Exp1 favours in each pair, short the other.", exp1_positions(t))}
-{sleeve_card(t, "exp2", "Exp2 · volatility-timed", "exp2/index.html", "Sells SPY volatility when it is overpriced, holds SPY in calm markets, plus a stock book.", e(t.get("exp2_position") or ""))}</div>
-{exp7_card(t)}"""
-    shown = [x for x in STATIC if (site / x[0] / "index.html").exists()]
-    exp7_nav = '\n<a href="exp7/index.html">Experiment 7</a>' if (site / "exp7" / "index.html").exists() else ""
-    exp4_nav = "".join(f'\n<a href="{d}/index.html">Experiment {d[3:].replace("_", " ")}</a>' for d, *_ in shown)
-    exp4_card = ('<h2 style="font-size:18px;margin:28px 0 10px">Other experiments</h2><div class="cards">'
-                 + "".join(f'<div class="card"><div class="tag">{e(title)}</div><p>{e(text)}</p>'
-                           f'<a class="go" href="{d}/index.html">Open →</a></div>' for d, _, title, text in shown)
-                 + '</div>') if shown else ""
+        mb, ms = markets_body(t)
+        body, stat = {MARKETS: mb}, {MARKETS: ms}
+    halves = []
+    for g, anchor, color, bg, intro in GROUPS:
+        shown = [(d, label) for d, grp, label, *_ in CATALOG if grp == g and have(d)]
+        if g not in body:
+            if not shown:
+                continue
+            body[g] = '<div class="cards">' + "".join(plain_card(d, *info[d], True) for d, _ in shown) + "</div>"
+        halves.append(half(g, anchor, color, bg, intro, [label for _, label in shown], stat.get(g, ""), body[g]))
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
-<title>Paper portfolio</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}</style></head><body>
-<header><div class="wrap"><a class="brand" href="index.html">Paper portfolio</a> <span class="nav"><a href="exp1/index.html">Experiment 1</a>
-<a href="exp2/index.html">Experiment 2</a>{exp7_nav}{exp4_nav}</span></div></header>
-<main class="wrap">{body}{exp4_card}</main>
-<footer><div class="wrap">Fake money: no orders are placed anywhere and nothing here is investment advice. Built {built}.
-<a href="{REPO_URL}">Source</a>.</div></footer></body></html>"""
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer"><title>All experiments</title><style>{CSS}{BANNER_CSS}{GLASS_CSS}{HUB_CSS}{SPLIT_CSS}</style></head><body>
+<main><h1 class="sr">All experiments</h1><div class="split">{"".join(halves)}</div></main>
+<footer><div class="wrap">Fake money: no orders are placed anywhere and nothing here is investment advice. Built {built}.</div></footer>
+{SPLIT_SCRIPT}</body></html>"""
 
 
 def redirect_page(target: str) -> str:
@@ -260,18 +503,6 @@ def redirect_page(target: str) -> str:
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex">'
             f'<meta http-equiv="refresh" content="0; url={t}"><link rel="canonical" href="{t}"><title>Moved</title></head>'
             f'<body><p>This page moved to <a href="{t}">{t}</a>.</p></body></html>')
-
-
-def link_exp1_to_hub(site: Path) -> int:
-    d, n = site / "exp1", 0
-    for f in d.rglob("*.html"):
-        depth = len(f.relative_to(d).parts)  # exp1/index.html -> 1, exp1/pairs/x.html -> 2
-        s = f.read_text()
-        if "data-hub" in s or "</nav></div></header>" not in s:
-            continue
-        f.write_text(s.replace("</nav></div></header>", "</nav>" + HUB_LINK.format(root="../" * depth) + "</div></header>", 1))
-        n += 1
-    return n
 
 
 def keep_old_addresses(site: Path) -> int:
@@ -295,11 +526,21 @@ def keep_old_addresses(site: Path) -> int:
     return n
 
 
+SHARED = re.compile(r'<script src="\.\./hub/([\w-]+\.js)"></script>')
+
+
+def inline_shared(page: str) -> str:
+    """Replace <script src="../hub/x.js"></script> with the script itself: the published site cannot serve script files."""
+    return SHARED.sub(lambda m: "<script>\n" + (HUB / m.group(1)).read_text(encoding="utf-8").replace("</script", "<\\/script") + "</script>", page)
+
+
 def add_static(site: Path, name: str, src: Path) -> bool:
     """Copy one static experiment page (folder with an index.html) into the site."""
     if not (src / "index.html").exists():
         return False
     shutil.copytree(src, site / name, dirs_exist_ok=True)
+    for f in (site / name).rglob("*.html"):
+        f.write_text(inline_shared(f.read_text(encoding="utf-8")), encoding="utf-8")
     return True
 
 
@@ -312,7 +553,6 @@ def build(site: Path, state: Path | None = None, update: bool = False) -> dict:
     site.mkdir(parents=True, exist_ok=True)
     for name, src, *_ in STATIC:
         add_static(site, name, src)
-    linked = link_exp1_to_hub(site) if (site / "exp1").is_dir() else 0
     moved = keep_old_addresses(site) if (site / "exp1").is_dir() else 0
     t, rep = None, {}
     if state is not None:
@@ -323,8 +563,10 @@ def build(site: Path, state: Path | None = None, update: bool = False) -> dict:
         inject(site / "exp7" / "index.html", portfolio_banner(t, "exp7", "../"))
     theme(site)
     (site / "index.html").write_text(hub_page(site, t))
+    navs = add_nav(site)
     (site / ".nojekyll").write_text("")
-    return {"exp1_pages_linked": linked, "old_addresses_kept": moved, "exp2": (site / "exp2" / "index.html").exists(), **rep}
+    (site / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
+    return {"pages_with_nav": navs, "old_addresses_kept": moved, "exp2": (site / "exp2" / "index.html").exists(), **rep}
 
 
 if __name__ == "__main__":

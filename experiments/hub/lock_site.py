@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 ITERATIONS = 600_000
 LOCKED = "<!--locked-->"
-SKIP = {".nojekyll"}
+SKIP = {".nojekyll", "robots.txt"}  # served as they are: neither says anything about the site
 
 # Added to each page before it is encrypted: once the page is unlocked, links to the site's own data files
 # (which are stored encrypted) are fetched, decrypted with the session key and saved.
@@ -47,7 +47,7 @@ document.body.appendChild(d);d.click();d.remove();setTimeout(()=>URL.revokeObjec
 # The login page: pure black, a spinning point-cloud torus behind one password field. A wrong password turns
 # the field and the torus red until the visitor types again.
 LOGIN = """<!doctype html><html lang="en"><head><meta charset="utf-8">""" + LOCKED + """
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
 <title>Private dashboard</title><style>
 :root{color-scheme:dark;--text:#f5f5f7;--line:rgba(255,255,255,.14);--hi:#ff453a}
 *{box-sizing:border-box}html,body{margin:0;height:100%;background:#000;overflow:hidden}

@@ -38,8 +38,34 @@ SI-v2 needs at least 60% of its weight available, including the market component
 fundamentals and structure together are 55%, so SI-v2 shows as unavailable until news analysis
 (`ANTHROPIC_API_KEY` plus at least one news source) is on. SI-v1 needs only prices, so with just `TIINGO_API_KEY` set the dashboard shows SI-v1 scores and records predictions.
 
+## How the site is organised
+
+The site root lists every experiment, in two groups: the market experiments (Exp1, Exp2 and Exp7, traded with
+paper money) and the resonance research pages (Exp4 to Exp6). Every page starts with the same navigation bar, so
+each experiment links to all the others. `experiments/hub/build_hub.py` adds the bar when the site is assembled,
+from one list (`CATALOG`): to add an experiment, add its row there.
+
+The 3D pages (Exp4, Exp6 and Exp6 live) share `experiments/hub/gl_runtime.js`. It renders only while the tab is
+visible and the 3D view is on screen, caps the pixel ratio, and releases the graphics context whenever a page is
+left. Chrome turns WebGL off for a whole site after its pages lose the context a few times, which is why a crash
+used to need a browser restart. New 3D pages should use `LabGL.start(canvas)` and `gl.loop(frame)` instead of
+creating a `THREE.WebGLRenderer` and calling `requestAnimationFrame` themselves.
+
 ## Privacy
 
-GitHub Pages sites are public, even from a private repository, and the dashboard has no login. It
-contains only scores, predictions, public prices and links to public news. API keys stay in
-GitHub's encrypted secrets and never appear on the site or in the database dump.
+The whole site is behind a password (the `PASSWORD` secret): `experiments/hub/lock_site.py` encrypts every page
+and data file, and the browser decrypts them once the password is typed. The site sends `noindex` and a
+`robots.txt` that asks search engines to stay out.
+
+The repository is public, and so are its releases. Every file the workflows keep in a release (database dumps,
+site builds, experiment state, the paper portfolio) is encrypted with `experiments/hub/state_crypt.sh` under the
+`STATE_KEY` secret, or under `PASSWORD` when `STATE_KEY` is not set. Set `STATE_KEY` to its own random value before
+you ever change the site password: files sealed under one key can't be opened with another. Files saved before
+this change are read as they are and replaced with encrypted copies on the next run.
+
+What stays public whatever the password: the code, the research notes and the market-data caches in this
+repository and its releases, and the prediction log on the `exp2-ledger` branch. Making the repository private
+(Settings → General → Danger zone) hides all of that; GitHub Pages can still publish from a private repository on
+a paid plan.
+
+API keys stay in GitHub's encrypted secrets and never appear on the site or in the database dump.

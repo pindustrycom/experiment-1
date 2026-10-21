@@ -68,6 +68,18 @@ def test_morning_then_evening_then_catch_up():
     assert list(L["source"].tail(2)) == ["catch-up", "catch-up"] and L["date"].is_unique
 
 
+def test_morning_ignores_todays_live_quote():
+    df = spy()
+    today = df.index[-1]
+    seen = live.closed_sessions(df, today)
+    assert seen.index[-1] < today and len(seen) == len(df) - 1
+    sig = pd.Series(0.01, index=df.index)
+    p_hi = pd.Series(0.1, index=df.index)
+    plans = {str(today.to_period("M")): PLAN}
+    m = live.morning(pd.DataFrame(columns=live.LOG_COLS), seen, sig, p_hi, plans, today, datetime(2020, 1, 1, tzinfo=UTC))
+    assert m["row"]["last_close"] == str(seen.index[-1].date())
+
+
 def test_market_closed_day():
     df = spy()
     L = pd.DataFrame([{**{c: None for c in live.LOG_COLS}, "date": "2019-07-04", "source": "live", "status": "pending"}])
@@ -84,7 +96,7 @@ def test_site_builds(tmp_path):
     rep = live_site.build(tmp_path, L, plans, df)
     assert rep["scored"] == len(L)
     page = (tmp_path / "index.html").read_text()
-    assert "../exp1/index.html" in page and "Prediction log" in page
+    assert "Experiment 2 · volatility-timed portfolio" in page and "Prediction log" in page
     assert (tmp_path / "data" / "summary.json").exists()
 
 

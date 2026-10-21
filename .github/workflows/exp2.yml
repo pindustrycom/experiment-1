@@ -7,13 +7,15 @@ name: Experiment 2
 # asks the dashboard workflow (pages.yml) to republish the site, so the morning prediction is on the site before the open.
 # The prediction log is also committed to the "exp2-ledger" branch (live/predictions.csv), so each prediction's
 # timestamp is on record in git before its outcome is known.
+# The release files are encrypted with experiments/hub/state_crypt.sh (STATE_KEY, or the site PASSWORD), as in pages.yml.
 # The earlier tech-sector model (python -m exp2 run) is kept in the code but no longer scheduled.
 
 on:
   pull_request:   # tests, plus a trial run on real data that saves nothing
     paths: ["experiments/exp2_sector_ssm/**", "experiments/hub/**", ".github/workflows/exp2.yml"]
   schedule:
-    - cron: "0 13 * * 1-5"    # morning: 9:00 New York in summer, 8:00 in winter
+    - cron: "30 11 * * 1-5"   # morning: 7:30 New York in summer, 6:30 in winter (scheduled runs can start late)
+    - cron: "30 12 * * 1-5"   # morning retry, in case GitHub skips the first; "already predicted" makes it a no-op
     - cron: "0 22 * * 1-5"    # evening: 18:00 New York in summer, 17:00 in winter
   workflow_dispatch:
     inputs:
@@ -42,8 +44,10 @@ jobs:
     env:
       TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
       GH_TOKEN: ${{ github.token }}
+      STATE_KEY: ${{ secrets.STATE_KEY || secrets.PASSWORD }}
+      CRYPT: ${{ github.workspace }}/experiments/hub/state_crypt.sh
       TRIAL: ${{ github.event_name == 'pull_request' }}
-      MODE: ${{ inputs.mode || (github.event.schedule == '0 13 * * 1-5' && 'morning') || 'evening' }}
+      MODE: ${{ inputs.mode || ((github.event.schedule == '30 11 * * 1-5' || github.event.schedule == '30 12 * * 1-5') && 'morning') || 'evening' }}
     defaults:
       run:
         working-directory: experiments/exp2_sector_ssm
@@ -90,6 +94,7 @@ jobs:
           if [ "$TRIAL" != "true" ] && gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx "$STATE_FILE"; then
             # State exists: failing to restore it must stop the run, or a fresh state would overwrite the log.
             gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --pattern "$STATE_FILE" --dir /tmp/prev
+            "$CRYPT" open "/tmp/prev/$STATE_FILE"
             tar xzf "/tmp/prev/$STATE_FILE" -C state
             echo "Restored state from the previous run." >> "$GITHUB_STEP_SUMMARY"
           else
@@ -139,6 +144,7 @@ jobs:
           tar czf "/tmp/out/$STATE_FILE" -C state .
           tar czf /tmp/out/exp2-site.tar.gz -C site .
           tar czf "/tmp/out/exp2-live-log-$(date -u +%Y%m%d).tar.gz" -C state log
+          "$CRYPT" seal /tmp/out/*.tar.gz
           gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --title "Experiment 2 state" --latest=false \
               --notes "Experiment 2's data, monthly books, prediction log and pages. $STATE_FILE is restored at the start of each run; dated copies of the log are kept for 30 days."
