@@ -15,6 +15,14 @@ import pandas as pd
 from . import copy, copy_data, data, live, rules, site
 
 
+def closed(px: pd.DataFrame, now: pd.Timestamp | None = None) -> pd.DataFrame:
+    """Drop today's row while the US session is still open: Yahoo's latest bar is a live quote until the close settles."""
+    now = now or pd.Timestamp.now(tz="America/New_York")
+    if now.hour * 60 + now.minute < 16 * 60 + 30:
+        return px[px.index < now.tz_localize(None).normalize()]
+    return px
+
+
 def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     rep: dict = {}
     members = data.sp500_members(data_dir) if fetch else (sorted(pd.read_csv(data_dir / "sp500.csv")["ticker"]) if (data_dir / "sp500.csv").exists() else [])
@@ -26,7 +34,7 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     if fetch:
         rep["prices"] = data.update_prices(data_dir, tickers)
         rep["prices"]["failed"] = rep["prices"]["failed"][:30]
-    px = data.load_prices(data_dir, tickers)
+    px = closed(data.load_prices(data_dir, tickers))
     spy = px["SPY"].dropna()
     d = spy.index[-1]
     px = px.loc[px.index.isin(spy.index)]
