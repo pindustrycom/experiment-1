@@ -69,6 +69,10 @@ CATALOG = [
      "Joaquin Philco's neuron: a sigmoid soma, one axon per connection with myelin resonators, and oligodendrocytes that set "
      "each weight. One neuron wired to two others runs live in 3D, then a 16 x 16 x 16 volume trained by his resonance-index sleep.",
      EXPERIMENTS / "exp8_neuron"),
+    ("exp9", RESONANCE, "Exp9 reading", "Exp9 · reading from vision",
+     "Joaquin Philco's memory cells taught like a child: letters by Montessori lessons and negative bonds, words read by "
+     "eye movements, words bonded to colours and digits, then two-word phrases with a learned word order. Step through it in 3D.",
+     EXPERIMENTS / "exp9_reading"),
 ]
 # The overview page is one column per group, side by side; clicking a column opens that group over the whole page. A new
 # project adds its group here and its experiments to CATALOG: (group, page anchor, colour, moving background drawn behind
