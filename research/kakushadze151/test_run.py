@@ -81,4 +81,25 @@ def test_build_without_rates():
     d = fake(end="2017-06-30")
     d["rates"] = pd.DataFrame()
     _, ret, _, rd = run.build(d)
+    assert list(rd.columns) == ["USD", *run.CURRENCY_ETF] and ret["EUR"].notna().sum() > 100   # currency-fund fallback
+    del d["ohlc"]["FXE"]
+    _, ret, _, rd = run.build(d)
     assert rd.empty and ret["EUR"].notna().sum() > 100
+
+
+def test_to_calendar_fills_fx_holidays():
+    cal = pd.bdate_range("2024-01-01", periods=10)
+    fx = pd.DataFrame({"open": 1.0, "high": 1.1, "low": 0.9, "close": np.arange(10.0) + 1}, index=cal).drop(cal[[3, 4]])
+    out = run.to_calendar(fx, cal)
+    assert out.close.notna().all() and out.close.iloc[4] == 3.0 and out.high.iloc[4] == 3.0
+
+
+def test_implied_rates_from_currency_funds():
+    cal = pd.bdate_range("2020-01-01", periods=300)
+    spot = pd.Series(np.linspace(1.0, 1.1, 300), index=cal)
+    close = pd.DataFrame({c: spot for c in run.CURRENCY_ETF})
+    for e in run.CURRENCY_ETF.values():
+        close[e] = spot * np.exp(0.03 * np.arange(300) / 252)        # 3% deposit
+    close["BIL"] = np.exp(0.05 * np.arange(300) / 252)
+    r = run.implied_rates(close).iloc[-1]
+    assert abs(r["EUR"] - (np.exp(0.03) - 1 + 0.004)) < 1e-9 and abs(r["USD"] - (np.exp(0.05) - 1)) < 1e-9

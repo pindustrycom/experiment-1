@@ -33,7 +33,8 @@ SECTORS = ["XLB", "XLE", "XLF", "XLI", "XLK", "XLP", "XLU", "XLV", "XLY", "XLRE"
 MULTI = ["SPY", "EFA", "EEM", "TLT", "IEF", "GLD", "DBC", "VNQ"]
 COMMOD = ["GLD", "SLV", "USO", "UNG", "DBA", "CPER", "PPLT", "PALL", "CORN", "WEAT", "SOYB", "DBB"]
 FUT = ["SPY", "EFA", "EEM", "TLT", "IEF", "GLD", "SLV", "USO", "UNG", "DBA", "CPER", "FXE", "FXY", "FXB", "FXA"]
-OTHER = ["QQQ", "IWM", "BIL", "TQQQ", "SQQQ", "VIXY", "VIXM", "^VIX", "^VIX3M", "BTC-USD"]
+CURRENCY_ETF = {"EUR": "FXE", "GBP": "FXB", "AUD": "FXA", "JPY": "FXY", "CAD": "FXC", "CHF": "FXF"}
+OTHER = ["FXC", "FXF", "QQQ", "IWM", "BIL", "TQQQ", "SQQQ", "VIXY", "VIXM", "^VIX", "^VIX3M", "BTC-USD"]
 # Yahoo FX ticker -> (currency, invert so the series is the USD price of the foreign currency)
 FX = {"EURUSD=X": ("EUR", False), "GBPUSD=X": ("GBP", False), "AUDUSD=X": ("AUD", False),
       "JPY=X": ("JPY", True), "CAD=X": ("CAD", True), "CHF=X": ("CHF", True)}
@@ -56,7 +57,12 @@ def to_calendar(d: pd.DataFrame, cal: pd.DatetimeIndex) -> pd.DataFrame:
     d = d[(d.index >= cal[0]) & (d.index <= cal[-1])]
     pos = cal.searchsorted(d.index)
     g = d.groupby(cal[pos])
-    return pd.DataFrame({"open": g.open.first(), "high": g.high.max(), "low": g.low.min(), "close": g.close.last()}).reindex(cal)
+    out = pd.DataFrame({"open": g.open.first(), "high": g.high.max(), "low": g.low.min(), "close": g.close.last()}).reindex(cal)
+    # NYSE days without a quote (FX holidays): carry the last close so rolling averages do not break
+    out["close"] = out.close.ffill()
+    for k in ("open", "high", "low"):
+        out[k] = out[k].fillna(out.close)
+    return out
 
 
 def load(cache: str) -> dict:
@@ -92,6 +98,16 @@ def load(cache: str) -> dict:
     return {"ohlc": ohlc, "rates": pd.DataFrame(rates)}
 
 
+def implied_rates(close: pd.DataFrame, n=252) -> pd.DataFrame:
+    """Fallback when FRED is unreachable: each CurrencyShares fund holds a deposit in its currency, so its 1-year
+    return minus the spot move (plus its 0.40% fee) is the deposit rate it earned; USD from BIL. Lags rate changes
+    by up to a year."""
+    out = {"USD": (close.BIL / close.BIL.shift(n) - 1)}
+    for cur, etf in CURRENCY_ETF.items():
+        out[cur] = (close[etf] / close[etf].shift(n)) / (close[cur] / close[cur].shift(n)) - 1 + 0.004
+    return pd.DataFrame(out)
+
+
 def build(data: dict):
     ohlc = data["ohlc"]
     close = pd.DataFrame({t: d.close for t, d in ohlc.items()})
@@ -99,7 +115,9 @@ def build(data: dict):
     rf = close["BIL"].pct_change().fillna(0.0).clip(-0.01, 0.01)
     rates = data["rates"]
     # monthly rates, usable from the first day of the following month; missing currencies earn the US rate
-    if rates.empty:
+    if rates.empty and all(e in close for e in CURRENCY_ETF.values()):
+        rd = implied_rates(close)
+    elif rates.empty:
         rd = pd.DataFrame(index=cal)
     else:
         rd = rates.copy()
@@ -234,7 +252,7 @@ def run_all(data: dict) -> tuple[list, dict]:
 
 def edge(r, spy_sharpe):
     n = r["net"]
-    return n["sharpe"] > spy_sharpe and n["alpha_t"] > 2 and n["cagr_2019_22"] > 0 and n["cagr_2023_26"] > 0
+    return r["chapter"] != "benchmark" and n["sharpe"] > spy_sharpe and n["alpha_t"] > 2 and n["cagr_2019_22"] > 0 and n["cagr_2023_26"] > 0
 
 
 def report(rows, six, out: str):
