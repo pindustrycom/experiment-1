@@ -73,6 +73,10 @@ CATALOG = [
      "Joaquin Philco's memory cells taught like a child: letters by Montessori lessons and negative bonds, words read by "
      "eye movements, words bonded to colours and digits, then two-word phrases with a learned word order. Step through it in 3D.",
      EXPERIMENTS / "exp9_reading"),
+    ("exp10", RESONANCE, "Exp10 words", "Exp10 · words playground",
+     "The best reading model so far, frozen: build any COLOUR NUMBER phrase and watch the eye trace each letter in 3D, teach "
+     "the model your own word bonds and see how it reads with them, and show it colours it has never seen. By Joaquin Philco.",
+     EXPERIMENTS / "exp10_words"),
 ]
 # The overview page is one column per group, side by side; clicking a column opens that group over the whole page. A new
 # project adds its group here and its experiments to CATALOG: (group, page anchor, colour, moving background drawn behind
