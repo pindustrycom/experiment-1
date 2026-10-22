@@ -48,3 +48,9 @@ def test_pipeline(tmp_path):
 def test_clean_drops_bad_prints():
     s = pd.Series([100.0, 101, 1010, 102, 103], index=pd.bdate_range("2020-01-01", periods=5))
     assert list(premia_data.clean(s, "X")) == [100.0, 101, 102, 103]
+
+
+def test_clean_keeps_daily_part():
+    idx = pd.DatetimeIndex(["2000-01-03", "2000-02-01", "2000-03-01"]).append(pd.bdate_range("2000-03-02", periods=5))
+    s = pd.Series(range(100, 108), index=idx, dtype=float)
+    assert premia_data.clean(s, "X").index[0] == pd.Timestamp("2000-03-01")

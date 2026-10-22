@@ -79,6 +79,10 @@ def clean(s: pd.Series, name: str, limit=0.2) -> pd.Series:
     """Drop bad prints: an option-selling index never moves 20% in a day in this window, so a level that jumps
     20%+ and comes back is a data error."""
     s = s[s > 0]
+    gaps = s.index.to_series().diff().dt.days
+    if (gaps > 7).any():                     # early history is sparse (monthly points): keep the daily part only
+        s = s[s.index >= gaps[gaps > 7].index[-1]]
+        print(f"  {name}: daily data from {s.index[0].date()}")
     for _ in range(20):
         r = s.pct_change()
         bad = (r.abs() > limit) & (r.shift(-1).abs() > limit)     # a spike that reverses next day
