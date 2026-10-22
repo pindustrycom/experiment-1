@@ -43,3 +43,8 @@ def test_pipeline(tmp_path):
     assert b["window"].endswith("2026-08-31")                       # stops where the French data stops
     md = premia.report(a, [b], str(tmp_path))
     assert "Hold SPY" in md
+
+
+def test_clean_drops_bad_prints():
+    s = pd.Series([100.0, 101, 1010, 102, 103], index=pd.bdate_range("2020-01-01", periods=5))
+    assert list(premia_data.clean(s, "X")) == [100.0, 101, 102, 103]

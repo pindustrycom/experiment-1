@@ -68,11 +68,25 @@ def cboe(sym: str, cache: str) -> pd.Series | None:
             d.columns = [c.strip().upper() for c in d.columns]
             col = sym if sym in d.columns else "CLOSE"
             s = pd.Series(pd.to_numeric(d[col], errors="coerce").to_numpy(), index=pd.to_datetime(d["DATE"]))
-            return s.dropna().sort_index()
+            return clean(s.dropna().sort_index(), sym)
         except (KeyError, ValueError, pd.errors.ParserError) as e:
             print(f"  cboe {sym}: {e}")
     y = yahoo(f"^{sym}", cache, start="1985-01-01")
     return None if y is None else y.close
+
+
+def clean(s: pd.Series, name: str, limit=0.2) -> pd.Series:
+    """Drop bad prints: an option-selling index never moves 20% in a day in this window, so a level that jumps
+    20%+ and comes back is a data error."""
+    s = s[s > 0]
+    for _ in range(20):
+        r = s.pct_change()
+        bad = (r.abs() > limit) & (r.shift(-1).abs() > limit)     # a spike that reverses next day
+        if not bad.any():
+            break
+        print(f"  {name}: dropping {int(bad.sum())} bad prints, e.g. {s[bad].head(3).to_dict()}")
+        s = s[~bad]
+    return s
 
 
 def _cached(cache: str, name: str, url: str) -> bytes | None:

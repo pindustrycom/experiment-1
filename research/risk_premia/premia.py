@@ -55,10 +55,12 @@ def part_a(ff: pd.DataFrame, cb: dict) -> dict:
         if ser is not None:
             r = ser.pct_change().reindex(ff.index)
             ex[s] = r - ff["RF"] - PUT_HAIRCUT / 252
+    full = ex
     ex = ex[ex.index >= "1990-01-01"]
     out = {}
     for c in ex.columns:
         x = ex[c].dropna()
+        xf = full[c].dropna()           # publication split uses the whole history (French data starts 1963)
         row = {"years": f"{x.index[0].year}-{x.index[-1].year}", "excess_yr": float(x.mean() * 252), "sharpe": sharpe(x),
                "corr_mkt": float(x.corr(ex["Mkt-RF"])) if c != "Mkt-RF" else 1.0}
         for name, a, b in DECADES:
@@ -66,8 +68,8 @@ def part_a(ff: pd.DataFrame, cb: dict) -> dict:
             row[name] = sharpe(xd) if len(xd) > 200 else float("nan")
         if c in PUBLISHED:
             y = PUBLISHED[c]
-            row["sharpe_before_pub"] = sharpe(x[: str(y)]) if len(x[: str(y)]) > 500 else float("nan")
-            row["sharpe_after_pub"] = sharpe(x[str(y + 1):])
+            row["sharpe_before_pub"] = sharpe(xf[: str(y)]) if len(xf[: str(y)]) > 500 else float("nan")
+            row["sharpe_after_pub"] = sharpe(xf[str(y + 1):])
         out[c] = row
     return out
 
@@ -220,6 +222,9 @@ def main(cache: str, out: str):
     print(f"french: {None if ff is None else (ff.index[0].date(), ff.index[-1].date())}")
     for s, ser in data["cboe"].items():
         print(f"cboe {s}: {None if ser is None else (ser.index[0].date(), ser.index[-1].date())}")
+        if ser is not None:
+            yr = ser.resample("YE").last().pct_change().dropna()
+            print("  yearly:", {d.year: round(float(v), 3) for d, v in yr.items()})
     a = part_a(ff, data["cboe"]) if ff is not None else {}
     sl, rf = sleeves(data)
     print("sleeves start:", {c: str(sl[c].first_valid_index().date()) for c in sl if sl[c].first_valid_index() is not None})
