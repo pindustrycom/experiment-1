@@ -13,14 +13,14 @@ import requests
 UA = {"User-Agent": "Mozilla/5.0"}
 
 
-def _get(url: str, **kw) -> requests.Response:
-    for attempt in range(4):
+def _get(url: str, headers=UA, timeout=30, tries=4, **kw) -> requests.Response:
+    for attempt in range(tries):
         try:
-            r = requests.get(url, headers=UA, timeout=30, **kw)
+            r = requests.get(url, headers=headers, timeout=timeout, **kw)
             r.raise_for_status()
             return r
         except Exception:
-            if attempt == 3:
+            if attempt == tries - 1:
                 raise
             time.sleep(2 ** attempt)
 
@@ -56,10 +56,17 @@ def yahoo(ticker: str, cache: str, start: str = "2013-01-01") -> pd.DataFrame | 
 
 
 def fred(series: str) -> pd.Series | None:
-    try:
-        r = _get("https://fred.stlouisfed.org/graph/fredgraph.csv", params={"id": series})
-    except requests.RequestException as e:
-        print(f"  fred {series}: {e}")
+    """FRED sometimes hangs for cloud runners: try both CSV endpoints, with and without a browser user agent."""
+    urls = [(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}", UA),
+            (f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}", {}),
+            (f"https://fred.stlouisfed.org/series/{series}/downloaddata/{series}.csv", {})]
+    for url, hd in urls:
+        try:
+            r = _get(url, headers=hd, timeout=60, tries=2)
+            break
+        except requests.RequestException as e:
+            print(f"  fred {series} {url[:60]}: {e}")
+    else:
         return None
     d = pd.read_csv(io.StringIO(r.text))
     s = pd.to_numeric(d.iloc[:, 1], errors="coerce")

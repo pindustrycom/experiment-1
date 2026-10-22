@@ -75,3 +75,10 @@ def test_full_pipeline_on_fake_data(tmp_path):
     run.report(rows, six, str(tmp_path))
     assert len(rows) > 40 and all(np.isfinite(r["net"]["sharpe"]) for r in rows)
     assert (tmp_path / "table.md").exists()
+
+
+def test_build_without_rates():
+    d = fake(end="2017-06-30")
+    d["rates"] = pd.DataFrame()
+    _, ret, _, rd = run.build(d)
+    assert rd.empty and ret["EUR"].notna().sum() > 100

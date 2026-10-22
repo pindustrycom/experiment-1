@@ -96,9 +96,12 @@ def build(data: dict):
     rf = close["BIL"].pct_change().fillna(0.0).clip(-0.01, 0.01)
     rates = data["rates"]
     # monthly rates, usable from the first day of the following month; missing currencies earn the US rate
-    rd = rates.copy()
-    rd.index = rd.index + pd.offsets.MonthBegin(1)
-    rd = rd.reindex(cal.union(rd.index)).ffill().reindex(cal)
+    if rates.empty:
+        rd = pd.DataFrame(index=cal)
+    else:
+        rd = rates.copy()
+        rd.index = pd.DatetimeIndex(rd.index) + pd.offsets.MonthBegin(1)
+        rd = rd.reindex(cal.union(rd.index)).ffill().reindex(cal)
     us = rd["USD"] if "USD" in rd else rf * 252
     ret = close.pct_change(fill_method=None)
     for cur in RATES:
