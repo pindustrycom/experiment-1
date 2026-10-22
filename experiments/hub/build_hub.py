@@ -239,7 +239,7 @@ BANNER_CSS = """
 
 def _json(p: Path):
     try:
-        return json.loads(p.read_text())
+        return json.loads(p.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
 
@@ -313,12 +313,12 @@ def portfolio_banner(t: dict | None, which: str, root: str) -> str:
 def inject(f: Path, block: str) -> bool:
     if not f.exists() or not block:
         return False
-    s = f.read_text()
+    s = f.read_text(encoding="utf-8")
     if MARK in s:
         s = s[:s.index(MARK)] + s[s.index(MARK_END) + len(MARK_END):]
     if '<main class="wrap">' not in s:
         return False
-    f.write_text(s.replace('<main class="wrap">', '<main class="wrap">' + block, 1))
+    f.write_text(s.replace('<main class="wrap">', '<main class="wrap">' + block, 1), encoding="utf-8")
     return True
 
 
@@ -327,12 +327,12 @@ def theme(site: Path) -> int:
     n = 0
     for d in ("exp1", "exp2", "exp7", "strategies"):
         for f in (site / d).rglob("*.html") if (site / d).is_dir() else []:
-            s = f.read_text()
+            s = f.read_text(encoding="utf-8")
             if GLASS in s:
                 s = s[:s.index(GLASS)] + s[s.index(GLASS_END) + len(GLASS_END):]
             if "</head>" not in s:
                 continue
-            f.write_text(s.replace("</head>", f"{GLASS}<style>{GLASS_CSS}</style>{GLASS_END}</head>", 1))
+            f.write_text(s.replace("</head>", f"{GLASS}<style>{GLASS_CSS}</style>{GLASS_END}</head>", 1), encoding="utf-8")
             n += 1
     return n
 
@@ -357,7 +357,7 @@ def nav_bar(current: str, root: str, site: Path | None = None) -> str:
         links = "".join(link(d, label) for d, grp, label, *_ in CATALOG
                         if grp == g and (site is None or (site / d / "index.html").exists()))
         if links:
-            groups.append(f'<span class="ln-grp"><a class="ln-g" href="{root}index.html#{anchor}">{g}</a>{links}</span>')
+            groups.append(f'<span class="ln-grp"><a class="ln-g" href="{root}index.html#{anchor}">{e(g)}</a>{links}</span>')
     home = ' aria-current="page"' if current == "" else ""
     return (f'{NAV}<style>{NAV_CSS}</style><nav id="labnav" aria-label="Experiments">'
             f'<a class="ln-home" href="{root}index.html"{home}>All experiments</a>{"".join(groups)}</nav>{NAV_SCRIPT}{NAV_END}')
@@ -566,7 +566,7 @@ def keep_old_addresses(site: Path) -> int:
             continue
         dest.parent.mkdir(parents=True, exist_ok=True)
         if f.suffix == ".html":
-            dest.write_text(redirect_page("../" * (len(rel.parts) - 1) + "exp1/" + rel.as_posix()))
+            dest.write_text(redirect_page("../" * (len(rel.parts) - 1) + "exp1/" + rel.as_posix()), encoding="utf-8")
         else:
             shutil.copy2(f, dest)
         n += 1
@@ -609,7 +609,7 @@ def build(site: Path, state: Path | None = None, update: bool = False) -> dict:
         inject(site / "exp2" / "index.html", portfolio_banner(t, "exp2", "../"))
         inject(site / "exp7" / "index.html", portfolio_banner(t, "exp7", "../"))
     theme(site)
-    (site / "index.html").write_text(hub_page(site, t))
+    (site / "index.html").write_text(hub_page(site, t), encoding="utf-8")
     navs = add_nav(site)
     (site / ".nojekyll").write_text("")
     (site / "robots.txt").write_text("User-agent: *\nDisallow: /\n")
