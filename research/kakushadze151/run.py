@@ -83,6 +83,9 @@ def load(cache: str) -> dict:
     rates = {}
     for cur, sid in RATES.items():
         s = fred(sid)
+        if s is None and not rates:
+            print("  FRED unreachable, FX carry strategies will be skipped")
+            break
         if s is not None:
             rates[cur] = s / 100
             print(f"  rate {cur} {sid}: last {s.index[-1].date()} {s.iloc[-1]:.2f}%")

@@ -62,13 +62,13 @@ def fred(series: str) -> pd.Series | None:
             (f"https://fred.stlouisfed.org/series/{series}/downloaddata/{series}.csv", {})]
     for url, hd in urls:
         try:
-            r = _get(url, headers=hd, timeout=60, tries=2)
-            break
-        except requests.RequestException as e:
-            print(f"  fred {series} {url[:60]}: {e}")
-    else:
-        return None
-    d = pd.read_csv(io.StringIO(r.text))
-    s = pd.to_numeric(d.iloc[:, 1], errors="coerce")
-    s.index = pd.to_datetime(d.iloc[:, 0])
-    return s.dropna()
+            r = _get(url, headers=hd, timeout=30, tries=2)
+            d = pd.read_csv(io.StringIO(r.text))
+            s = pd.to_numeric(d.iloc[:, 1], errors="coerce")
+            s.index = pd.to_datetime(d.iloc[:, 0])
+            s = s.dropna()
+            if len(s):
+                return s
+        except (requests.RequestException, pd.errors.ParserError, ValueError, IndexError) as e:   # timeouts, HTML pages
+            print(f"  fred {series} {url[:60]}: {str(e)[:120]}")
+    return None
