@@ -50,7 +50,7 @@ jobs:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: experiments/strategies/requirements.txt
-      - run: pip install -r requirements.txt && sudo apt-get install -y -q poppler-utils
+      - run: pip install -r requirements.txt && sudo apt-get update -q && sudo apt-get install -y -q poppler-utils   # update first: a stale package index 404s
       - name: Tests
         run: ruff check strats tests && python -m pytest -q
 

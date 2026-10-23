@@ -68,6 +68,19 @@ def test_morning_then_evening_then_catch_up():
     assert list(L["source"].tail(2)) == ["catch-up", "catch-up"] and L["date"].is_unique
 
 
+def test_evening_scores_a_ledger_read_back_with_empty_text_columns():
+    df = spy()
+    sig, p_hi = pd.Series(0.01, index=df.index), pd.Series(0.1, index=df.index)
+    plans = {str(m): PLAN for m in pd.period_range("2018-06", "2020-12", freq="M")}
+    R = pd.DataFrame({"AAA": df["r"], "BBB": df["r"]})
+    today = df.index[-3]
+    m = live.morning(pd.DataFrame(columns=live.LOG_COLS), df.iloc[:-3], sig, p_hi, plans, today, datetime(2020, 1, 1, tzinfo=UTC))
+    L = pd.DataFrame([m["row"]], columns=live.LOG_COLS)
+    L["evaluated_at"] = float("nan")                                   # what read_csv gives for a column never filled
+    L, done = live.evening(L, df, plans, R, datetime(2020, 1, 1, tzinfo=UTC))
+    assert done == [str(today.date())] and L.at[0, "evaluated_at"].startswith("2020-01-01")
+
+
 def test_morning_ignores_todays_live_quote():
     df = spy()
     today = df.index[-1]

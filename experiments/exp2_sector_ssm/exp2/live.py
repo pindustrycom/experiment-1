@@ -377,7 +377,11 @@ def evening(L: pd.DataFrame, df: pd.DataFrame, plans: dict, R: pd.DataFrame, now
             res = realize(row, plan, float(df.loc[d, "r"]), R.loc[d] if d in R.index else pd.Series(dtype=float))
             res["evaluated_at"] = now.isoformat(timespec="seconds")
             for k, v in res.items():
-                L.at[i, k] = v
+                try:
+                    L.at[i, k] = v
+                except (TypeError, ValueError):                        # a column read back from CSV as all-empty floats
+                    L[k] = L[k].astype(object)
+                    L.at[i, k] = v
             done.append(str(d.date()))
         elif df.index[-1] > d:                                         # later sessions exist, so the market was closed
             L.at[i, "status"] = "market closed"
