@@ -45,7 +45,7 @@ def position_text(key: str, row: dict | None, events: dict) -> str:
         return f"From the {row['date']} close: " + ", ".join(f"{'long' if x > 0 else 'short'} {t} {abs(x):.0%}" for t, x in legs)
     names = sorted(w)
     left = events.get(key, {})
-    tail = "" if key == "reversal" else f"; next to leave: {min(left, key=left.get)} in {min(left.values())} sessions" if left else ""
+    tail = "" if key.startswith("reversal") else f"; next to leave: {min(left, key=left.get)} in {min(left.values())} sessions" if left else ""
     return (f"From the {row['date']} close: {len(names)} stocks, {inv:.0%} invested, the rest in cash: "
             + ", ".join(names[:25]) + (" …" if len(names) > 25 else "") + tail)
 
@@ -75,6 +75,9 @@ def _replay_block(key: str, rp: dict | None) -> str:
         return ('<p class="small muted">Backtest January 2019 to September 2026 (research/github_bots, Binance 4-hour bars): '
                 '+52.2% a year, Sharpe 1.28, worst drop -50%, against holding BTC +49.5%, 0.97, -77% at 10 bp a side; '
                 '+45.2% and Sharpe 1.15 at the 25 bp this pot pays. In BTC about 44% of the time.</p>')
+    if key == "reversal_stop":
+        return ('<p class="small muted">Replay 2019 to October 2026 with the 5% stop (research/stop_losses): +22.4% a year '
+                'against +28.1% without it; days below -5% fell from 23 to 11, worst day -17% (overnight gaps) against -24%.</p>')
     if not rp or key not in rp or not rp[key]:
         if key in ("pead", "insider"):
             return '<p class="muted small">No replay: the free data does not reach back far enough for earnings and insider events, so this pot is tested forward only.</p>'

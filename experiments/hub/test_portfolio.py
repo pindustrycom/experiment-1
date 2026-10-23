@@ -177,3 +177,26 @@ def test_no_best_pot_when_nothing_is_up():
     assert "None ahead yet" in build_hub.best_pot(rows, pots)
     assert [p[0] for p in build_hub.ranked(rows, pots)] == ["b", "a"]
     assert build_hub.pot_since(rows, "a") == ("2026-10-16", 1) and build_hub.pot_since(rows, "b") == (None, 0)
+
+
+def test_exp1_pair_that_loses_the_stop_sits_out_one_session(tmp_path):
+    site, state = tmp_path / "site", {}
+    rows = [("2026-10-16", 50, 100), ("2026-10-19", 50, 100)]
+    make_site(site, rows)
+    portfolio.update_exp1(state, site)
+    portfolio.update_exp1(state, site)
+    make_site(site, rows + [("2026-10-20", 46, 100)])          # long KO / short PEP: -8% in the session
+    rep = portfolio.update_exp1(state, site)
+    assert "stopped: ko-pep" in rep["exp1"]
+    book = state["exp1"][-1]["book"]
+    assert book[0]["stopped"] and "stopped out" in book[0]["why"]
+    make_site(site, rows + [("2026-10-20", 46, 100), ("2026-10-21", 40, 100)])
+    portfolio.update_exp1(state, site)
+    assert state["exp1"][-1]["ret"] == 0.0                     # in cash while KO fell further
+    assert not state["exp1"][-1]["book"][0].get("stopped")     # and back in the next book
+    assert "in cash" in build_hub.exp1_positions({"exp1_book": book, "exp1_book_date": "2026-10-20"})
+
+
+def test_exp2_session_after_a_stop_is_cash():
+    r = [("a", 0.01), ("b", -0.025), ("c", 0.03), ("d", -0.01), ("e", 0.02)]
+    assert portfolio.with_day_stop(r, 0.02) == [("a", 0.01), ("b", -0.025), ("c", 0.0), ("d", -0.01), ("e", 0.02)]

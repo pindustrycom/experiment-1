@@ -5,7 +5,11 @@ Everything is flat by the last bar's close, and no new trade starts in the final
 Variants
 - flip: always in after the first cross, reversing on every cross (long above VWAP, short below).
 - long: flip, long side only (flat below VWAP).
-- first: one trade a day, the first cross from 10:00 on, held to the opposite cross or the close."""
+- first: one trade a day, the first cross from 10:00 on, held to the opposite cross or the close.
+
+Daily stop (stop=, a fraction): once the day's result (closed trades plus the open one at the bar's low, or high if short)
+reaches -stop, the trade is closed at that level (or the bar's open, if it opened past it) and the rule is flat for the rest
+of the day. It starts again the next morning."""
 from __future__ import annotations
 
 from datetime import time
@@ -39,15 +43,26 @@ def _trade(day, side, entry, exit_time, px) -> dict:
     return {"day": day, "side": side, "entry_time": entry[0], "entry": entry[1], "exit_time": exit_time, "exit": px, "ret": side * (px / entry[1] - 1)}
 
 
-def trades(d: pd.DataFrame, variant: str) -> pd.DataFrame:
+def trades(d: pd.DataFrame, variant: str, stop: float | None = None) -> pd.DataFrame:
     """One row per trade: day, side, entry and exit time and price, gross return (before costs)."""
     out = []
     for day, g in d.groupby("day"):
         side = np.sign((g.ema - g.vwap).to_numpy())
         o, c, t = g.open.to_numpy(), g.close.to_numpy(), g.index
-        pos, entry, done = 0, None, False
+        lo, hi = g.low.to_numpy(), g.high.to_numpy()
+        pos, entry, done, booked, halted = 0, None, False, 0.0, False
 
-        for k in range(1, len(g) - 1):
+        for k in range(1, len(g)):
+            if stop and pos != 0:
+                level = entry[1] * (1 - pos * (stop + booked))      # the price where the day is down `stop`
+                if (lo[k] <= level) if pos > 0 else (hi[k] >= level):
+                    px = min(o[k], level) if pos > 0 else max(o[k], level)
+                    out.append(_trade(day, pos, entry, t[k], px))
+                    pos, entry, halted = 0, None, True
+            if k == len(g) - 1:
+                break
+            if halted:
+                continue
             if side[k] == 0 or side[k - 1] == 0 or side[k] == side[k - 1] or t[k + 1].time() >= LATE:
                 continue
             want = int(side[k])
@@ -62,6 +77,7 @@ def trades(d: pd.DataFrame, variant: str) -> pd.DataFrame:
                 continue
             if pos != 0:
                 out.append(_trade(day, pos, entry, t[k + 1], o[k + 1]))
+                booked += out[-1]["ret"]
                 done = True
             pos, entry = want, ((t[k + 1], o[k + 1]) if want else None)
         if pos != 0:

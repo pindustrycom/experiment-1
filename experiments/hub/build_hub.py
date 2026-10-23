@@ -308,7 +308,8 @@ def exp1_positions(t: dict) -> str:
     if not book:
         return f"In cash since {e(t['exp1_book_date'])}: no pair has a call today."
     return f"Holding from the {e(t['exp1_book_date'])} close: " + "; ".join(
-        f"<b>long {e(b['long'])} / short {e(b['short'])}</b> <span class=\"muted\">({e(b['why'])})</span>" for b in book)
+        (f"<b>{e(b['slug'])} in cash</b> <span class=\"muted\">({e(b['why'])})</span>" if b.get("stopped") else
+         f"<b>long {e(b['long'])} / short {e(b['short'])}</b> <span class=\"muted\">({e(b['why'])})</span>") for b in book)
 
 
 def portfolio_banner(t: dict | None, which: str, root: str) -> str:

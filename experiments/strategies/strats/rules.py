@@ -43,7 +43,9 @@ STRATEGIES = {
     "pelosi": ("Pelosi copy", LONG_TERM, "Buys every stock Nancy Pelosi discloses buying (shares or calls, copied with shares) "
                "after the filing is public; sells when she discloses a sale or after a year."),
     "reversal": ("Weekly reversal", SHORT_TERM, "Each Friday buys the 20 S&P 500 stocks that fell the most that week and holds "
-                 "them until the next Friday."),
+                 "them until the next Friday. No stop loss: the twin of the pot below."),
+    "reversal_stop": ("Weekly reversal, 5% stop", SHORT_TERM, "The same 20 stocks, but a stock that falls 5% in a day is sold "
+                      "and bought back at the close, which caps the pot's daily loss near 5%."),
     "btc_donchian": ("BTC breakout", SHORT_TERM, "Bitcoin on 4-hour bars (Jesse's Donchian example): buys a close above the past "
                      "20 bars' high while above the 200-bar average, sells a close below the past 20 bars' low; trades last "
                      "about 10 days. See crypto.py."),
