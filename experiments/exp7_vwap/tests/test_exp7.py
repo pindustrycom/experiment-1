@@ -81,3 +81,10 @@ def test_daily_stop_closes_at_the_level_and_stays_flat():
     assert len(free) == 1 and free.exit_time.iloc[0] == d.index[-1]
     t = cut.iloc[-1]
     assert t.exit_time == d.index[k] and abs(t.ret - -0.01) < 1e-9 and len(cut) == 1
+
+
+def test_backtest_has_the_stop_rows():
+    rng = np.random.default_rng(1)
+    d1 = pd.concat([_day(100 * np.exp(np.cumsum(rng.normal(0, 0.001, 390))), day) for day in ("2024-03-04", "2024-03-05")])
+    res = backtest.run({"SPY": d1})
+    assert {f"SPY 3m flip stop{x}% cost0.3bp" for x in ("0.5", "1", "2")} <= set(res)

@@ -33,5 +33,28 @@ Exp1 and Exp2, 2019 to 2026-10-15, USD, from research/portfolio_2019 (close-chec
 Neither stop changes much: close-checked stops can't stop a bad day, as the 2026-10-17 intraday study already found
 (no stop beat holding for any pot).
 
-Strategy pots, BTC and Exp7: run on real data by the pull request's trial runs (strategies.yml prints "Stop backtest";
-exp7.yml adds "SPY 3m flip stop…" rows to its grid). Results below.
+Weekly reversal and trend, 2019 to 2026-10-23, Yahoo daily bars, 1 bp a side (strategies.yml trial run on PR #31):
+
+| Rule | % a year | Worst day | Worst drop | Days below -5% | Stops | 2025 to now |
+|---|---|---|---|---|---|---|
+| Reversal, no stop | +28.1 | -24.0% | -67% | 23 | 0 | +56% |
+| Reversal 3% | +19.7 | -17.4% | -56% | 9 | 7,742 | +37% |
+| **Reversal 5% (chosen)** | +22.4 | -17.4% | -57% | 11 | 3,098 | +52% |
+| Reversal 8% | +27.3 | -17.5% | -57% | 20 | 1,013 | +54% |
+| Reversal 10% | +28.3 | -17.9% | -58% | 21 | 565 | +54% |
+| Trend, no stop | +2.8 | -2.2% | -8.2% | 0 | 0 | +14% |
+| **Trend 4% (chosen)** | +2.8 | -2.1% | -7.9% | 0 | 137 | +14% |
+
+The 5% cap halves the reversal pot's days below -5% and its worst day goes from -24% to -17%. It costs about 6 points a
+year: these stocks often dip 5% during the day and come back, and the stop sells the dip. The worst days left are
+overnight gaps (a stock opening 15% down sells at the open), which no daily stop can prevent. An 8% stop costs under
+1 point a year but cuts few bad days. The reversal replay uses today's S&P 500 members, which flatters it.
+
+BTC: only the cached 4-hour bars from 2026-06-25 exist (+6.1%, worst day -3.6%); a 6% stop never fired there, 4% would
+have cost 1 point. Exp7: see the `SPY 3m flip stop…` rows in exp7's backtest results.
+
+What moved on the bad day (2026-10-22, SPY -1.2%), from the same trial run:
+- Reversal: COHR -12.5%, LRCX -11.8%, LITE -11.5%, FLEX -11.1%, CIEN -10.7% (optical and chip stocks, last week's losers
+  fell again). With the 5% stops it would have lost -4.4% instead of -7.0%.
+- Pelosi: VST -9.8%, BE -8.7%, INTC -8.0%, TEM -5.8%, AMZN -4.6%.
+- 2026-10-23 (SPY -0.5%): reversal +0.7%, Pelosi -0.8% (BE -11.2%), the rest within -0.6%.
