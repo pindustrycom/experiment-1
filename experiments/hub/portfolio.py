@@ -32,6 +32,11 @@ from pathlib import Path
 START = "2026-10-19"          # first session the portfolios are tracked
 CAPITAL = 1000.0              # CAD in each pot
 Z_ENTRY = 2.0
+# Stop losses (Joaquin, 2026-10-23), checked at the close since these pots only have closing prices: a pair slice that
+# lost EXP1_STOP or more in a session sits in cash for the next one, and so does the whole Exp2 pot after a session down
+# EXP2_STOP or more; both then trade as usual. In the 2019-2026 replay (research/portfolio_2019) they cost Exp1 0.3 points
+# a year and added 0.2 to Exp2, with 8 Exp2 stops in 7.8 years.
+EXP1_STOP, EXP2_STOP = 0.05, 0.02
 FX_URL = "https://www.bankofcanada.ca/valet/observations/FXUSDCAD/json?start_date={start}"
 
 
@@ -84,6 +89,8 @@ def book_return(book: list[dict], prices: list[dict], d0: str, d1: str) -> tuple
     px = {p["slug"]: p for p in prices}
     tot, n = 0.0, 0
     for leg in book:
+        if leg.get("stopped"):            # in cash for this session
+            continue
         p = px.get(leg["slug"])
         rl = _ret(p, leg["long"], d0, d1) if p else None
         rs = _ret(p, leg["short"], d0, d1) if p else None
@@ -103,15 +110,19 @@ def update_exp1(state: dict, site: Path) -> dict:
     rows = state.setdefault("exp1", [])
     if rows and rows[-1]["date"] >= today:
         return {"exp1": f"already up to {rows[-1]['date']}"}
-    idx, ret, priced = 1.0, 0.0, 0
+    idx, ret, priced, hit = 1.0, 0.0, 0, []
     if rows:
         last = rows[-1]
         ret, priced = book_return(last["book"], prices, last["date"], today)
         if today < START:
             ret = 0.0
         idx = last["index"] * (1 + ret)
-    rows.append({"date": today, "index": idx, "ret": ret, "priced_legs": priced, "book": exp1_book(pairs, prices)})
-    return {"exp1": f"{today}: {ret:+.4%}, {len(rows[-1]['book'])} positions"}
+        hit = [g["slug"] for g in last["book"] if not g.get("stopped") and today >= START
+               and (r := book_return([g], prices, last["date"], today))[1] and r[0] <= -EXP1_STOP]
+    book = [{**g, "stopped": True, "why": f"stopped out: lost {100 * EXP1_STOP:.0f}% or more on {today}; back tomorrow"}
+            if g["slug"] in hit else g for g in exp1_book(pairs, prices)]
+    rows.append({"date": today, "index": idx, "ret": ret, "priced_legs": priced, "book": book})
+    return {"exp1": f"{today}: {ret:+.4%}, {len(book)} positions" + (f", stopped: {' '.join(hit)}" if hit else "")}
 
 
 # ---------------------------------------------------------------- Experiment 2
@@ -132,6 +143,15 @@ def exp2_returns(site: Path) -> list[tuple[str, float]]:
             except (KeyError, ValueError):
                 continue
     return sorted(out)
+
+
+def with_day_stop(rets: list[tuple[str, float]], stop: float) -> list[tuple[str, float]]:
+    """A session after one that lost stop or more is spent in cash (return 0)."""
+    out, prev = [], 0.0
+    for d, r in rets:
+        out.append((d, 0.0 if prev <= -stop else r))
+        prev = r
+    return out
 
 
 def exp2_position(site: Path) -> str:
@@ -221,7 +241,7 @@ def table(state: dict, site: Path) -> dict:
     fx = state.get("fx") or {}
     e1 = [(r["date"], r["index"]) for r in state.get("exp1", []) if r["date"] >= START]
     e2, idx2 = {}, 1.0
-    for d, r in exp2_returns(site):
+    for d, r in with_day_stop(exp2_returns(site), EXP2_STOP):
         idx2 *= 1 + r
         e2[d] = idx2
     e7, idx7 = {}, 1.0

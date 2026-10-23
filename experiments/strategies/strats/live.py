@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import copy, crypto, rules
+from . import copy, crypto, rules, stops
 
 COST = 0.0001          # 1 bp of the traded amount, each side
 REPLAY_FROM = "2019-01-01"
@@ -34,10 +34,11 @@ def _last(rows: list[dict]) -> dict | None:
 
 
 def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], earnings: pd.DataFrame, insiders: pd.DataFrame,
-         cp: dict | None = None, btc: pd.DataFrame | None = None, origin: str = ORIGIN) -> dict:
+         cp: dict | None = None, btc: pd.DataFrame | None = None, origin: str = ORIGIN,
+         bars: dict[str, pd.DataFrame] | None = None) -> dict:
     """Move every pot to the close of d. Safe to repeat: a pot already at d is left alone. A pot that does not reach back to
     the origin close (a new pot, or one added after the first) is first rebuilt from there, session by session, with only
-    what was known at each close; those rows are marked as replayed."""
+    what was known at each close; those rows are marked as replayed. bars: the day's open/low/high for the stop losses."""
     pots = state.setdefault("pots", {k: [] for k in rules.STRATEGIES})
     state.setdefault("events", {"pead": {}, "insider": {}})
     state.setdefault("seen", {"pead": []})
@@ -48,9 +49,9 @@ def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], ear
     for key in rules.STRATEGIES:
         rows = pots.get(key) or []
         if o is not None and (not rows or rows[0]["date"] > o.strftime("%Y-%m-%d")):
-            if (done := catch_up(state, key, px, after, members, earnings, insiders, cp, btc)):
+            if (done := catch_up(state, key, px, after, members, earnings, insiders, cp, btc, bars)):
                 rep[f"{key}_replayed"] = done
-        rep[key] = step_pot(state, key, px, d, ds, members, earnings, insiders, cp, btc)
+        rep[key] = step_pot(state, key, px, d, ds, members, earnings, insiders, cp, btc, bars)
     state["seen"]["pead"] = state["seen"]["pead"][-3000:]
     firsts = [r[0]["date"] for r in pots.values() if r]
     if firsts:
@@ -59,7 +60,7 @@ def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], ear
 
 
 def catch_up(state: dict, key: str, px: pd.DataFrame, sessions: pd.DatetimeIndex, members: list[str], earnings: pd.DataFrame,
-             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None) -> str:
+             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None, bars: dict | None = None) -> str:
     """Rebuild one pot from the first of sessions, each step seeing prices only up to its own close."""
     state["pots"][key] = []
     if key in state["events"]:
@@ -67,7 +68,7 @@ def catch_up(state: dict, key: str, px: pd.DataFrame, sessions: pd.DatetimeIndex
     if key == "pead":
         state["seen"]["pead"] = []
     for s in sessions:
-        step_pot(state, key, px.loc[:s], s, s.strftime("%Y-%m-%d"), members, earnings, insiders, cp, btc)
+        step_pot(state, key, px.loc[:s], s, s.strftime("%Y-%m-%d"), members, earnings, insiders, cp, btc, bars)
     rows = state["pots"].get(key) or []
     for r in rows:
         r["replayed"] = True
@@ -75,7 +76,7 @@ def catch_up(state: dict, key: str, px: pd.DataFrame, sessions: pd.DatetimeIndex
 
 
 def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, members: list[str], earnings: pd.DataFrame,
-             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None) -> str:
+             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None, bars: dict | None = None) -> str:
     """Move one pot to the close of d."""
     pots, events, seen = state["pots"], state["events"], state["seen"]
     rows = pots.setdefault(key, [])
@@ -88,7 +89,7 @@ def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, 
             pots.pop(key, None)
         return out
     old_w = last["w"] if last else {}
-    hold = book_return(old_w, px, pd.Timestamp(last["date"]), d) if last else 0.0
+    hold, hit = stops.held_return(old_w, px, bars, pd.Timestamp(last["date"]), d, stops.STOPS.get(key), COST) if last else (0.0, [])
     if key in copy.KEYS:
         if not copy.has_data(cp):
             if not last:
@@ -123,15 +124,17 @@ def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, 
                     h.setdefault(s, rules.INSIDER_HOLD)
         events[key] = h
         new_w = rules.event_weights(h)
-    ret = hold - COST * rules.turnover(old_w, new_w) if last else -COST * rules.turnover({}, new_w)
+    held = {k: v for k, v in old_w.items() if k not in hit}      # a stopped position is cash at the close
+    ret = hold - COST * rules.turnover(held, new_w) if last else -COST * rules.turnover({}, new_w)
     idx = (last["index"] if last else 1.0) * (1 + ret)
-    rows.append({"date": ds, "ret": ret, "index": idx, "w": {k: round(v, 6) for k, v in new_w.items()}, "reb": reb})
-    return f"{ds}: {ret:+.4%}, {len(new_w)} positions"
+    rows.append({"date": ds, "ret": ret, "index": idx, "w": {k: round(v, 6) for k, v in new_w.items()}, "reb": reb,
+                 **({"stopped": hit} if hit else {})})
+    return f"{ds}: {ret:+.4%}, {len(new_w)} positions" + (f", stopped out: {' '.join(hit)}" if hit else "")
 
 
 def step_btc(rows: list[dict], last: dict | None, btc: pd.DataFrame | None, d: pd.Timestamp, ds: str) -> str:
     """The BTC pot earns the 4-hour rule's equity change between the bars marked at the last and this US close."""
-    eq = crypto.run_rule(btc) if btc is not None and len(btc) > crypto.TREND else None
+    eq = crypto.run_rule(btc, stop=stops.STOPS.get(crypto.KEY)) if btc is not None and len(btc) > crypto.TREND else None
     b = crypto.mark_bar(eq, d) if eq is not None else None
     if b is None:
         if not last:
@@ -152,12 +155,6 @@ def due_now(rows: list[dict], d: pd.Timestamp, freq: str, due) -> bool:
     if not reb:
         return True
     return due(d) or pd.Timestamp(reb[-1]).to_period(freq) < d.to_period(freq) - 1
-
-
-def book_return(w: dict, px: pd.DataFrame, d0: pd.Timestamp, d1: pd.Timestamp) -> float:
-    if d0 not in px.index or d1 not in px.index:
-        return 0.0
-    return rules.book_return(w, px, d0, d1)
 
 
 # ---------------------------------------------------------------- replay

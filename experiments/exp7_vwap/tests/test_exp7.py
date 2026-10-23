@@ -68,3 +68,16 @@ def test_live_run_writes_site(tmp_path):
     html = (tmp_path / "site" / "index.html").read_text()
     assert '<main class="wrap">' in html and "</head>" in html
     assert (tmp_path / "site" / "data" / "daily.csv").read_text().startswith("date,ret,trades")
+
+
+def test_daily_stop_closes_at_the_level_and_stays_flat():
+    # climbs (long after the cross), then one bar trades down to -3% and recovers: the stop sells at -1% and waits
+    p = list(np.linspace(100, 99, 60)) + list(np.linspace(99, 102, 330))
+    raw = _day(p)
+    k = 250
+    raw.iloc[k, raw.columns.get_loc("low")] = raw.close.iloc[k - 1] * 0.95
+    d = strategy.indicators(strategy.resample(raw, 1))
+    free, cut = strategy.trades(d, "long"), strategy.trades(d, "long", 0.01)
+    assert len(free) == 1 and free.exit_time.iloc[0] == d.index[-1]
+    t = cut.iloc[-1]
+    assert t.exit_time == d.index[k] and abs(t.ret - -0.01) < 1e-9 and len(cut) == 1

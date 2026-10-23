@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import copy, copy_data, crypto, data, live, rules, site
+from . import copy, copy_data, crypto, data, live, rules, site, stops
 
 
 def closed(px: pd.DataFrame, now: pd.Timestamp | None = None) -> pd.DataFrame:
@@ -34,7 +34,8 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     if fetch:
         rep["prices"] = data.update_prices(data_dir, tickers)
         rep["prices"]["failed"] = rep["prices"]["failed"][:30]
-    px = closed(data.load_prices(data_dir, tickers))
+    bars = data.load_bars(data_dir, tickers)
+    px = closed(bars.pop("close"))
     spy = px["SPY"].dropna()
     d = spy.index[-1]
     px = px.loc[px.index.isin(spy.index)]
@@ -58,7 +59,16 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     if fetch:
         rep["btc"] = crypto.update(data_dir)
     state = live.load_state(state_f)
-    rep["step"] = live.step(state, px, d, members, earnings, insiders, cp, crypto.load(data_dir))
+    btc = crypto.load(data_dir)
+    rep["step"] = live.step(state, px, d, members, earnings, insiders, cp, btc, bars=bars)
+    rep["what_moved"] = {str(x.date()): stops.explain(state, px, x) for x in px.index[-2:]}
+    if os.environ.get("STOP_BACKTEST"):       # pull requests: how the stop levels would have done since 2019
+        try:
+            lv = [0.0, 0.03, 0.05, 0.08, 0.10]
+            rep["stop_backtest"] = stops.backtest(px, bars, members, live.REPLAY_FROM, {"reversal": lv, "trend": [0.0, 0.02, 0.03, 0.04, 0.06]}, live.COST)
+            rep["stop_backtest"] |= stops.backtest_btc(btc, [0.0, 0.04, 0.06, 0.08, 0.10])
+        except Exception as ex:  # noqa: BLE001 - a report, not the run
+            rep["stop_backtest"] = f"failed: {type(ex).__name__}: {str(ex)[:300]}"
     live.save_state(state_f, state)
     rp = None
     try:

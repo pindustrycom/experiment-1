@@ -8,6 +8,7 @@ import pandas as pd
 from . import strategy
 
 BARS, VARIANTS, COSTS = (1, 3, 5, 10), ("flip", "long", "first"), (0.0, 0.3, 1.0)
+STOPS = (0.005, 0.01, 0.02)
 
 
 def stats(r: pd.Series, tr: pd.DataFrame | None = None, cost_bp: float = 0.0) -> dict:
@@ -41,6 +42,12 @@ def run(bars1: dict[str, pd.DataFrame]) -> dict:
                     for y in sorted(set(days.str[:4])):
                         row[y] = stats(r[r.index.str[:4] == y], tr[tr.day.str[:4] == y], c)
                     res[f"{tk} {m}m {v} cost{c:g}bp"] = row
+            if m == 3 and v == "flip":        # the tracked rule with the daily stop loss (live.DAY_STOP)
+                for st in STOPS:
+                    tr = strategy.trades(d, v, st)
+                    r = strategy.daily(tr, days, 0.3)
+                    res[f"{tk} 3m flip stop{100 * st:g}% cost0.3bp"] = {"all": stats(r, tr, 0.3)} | {
+                        y: stats(r[r.index.str[:4] == y], tr[tr.day.str[:4] == y], 0.3) for y in sorted(set(days.str[:4]))}
     return res
 
 

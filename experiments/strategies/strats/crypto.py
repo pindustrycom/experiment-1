@@ -93,33 +93,51 @@ def load(data: Path) -> pd.DataFrame:
     return pd.read_csv(f, index_col="t", parse_dates=["t"]).sort_index()
 
 
-def run_rule(d: pd.DataFrame, cost: float = COST) -> pd.DataFrame:
+def us_close_bars(idx: pd.DatetimeIndex) -> np.ndarray:
+    """True for each bar that is the last one closed by 16:00 New York on its day (where the daily stop resets)."""
+    c = (idx + BAR).tz_localize("UTC").tz_convert("America/New_York")
+    by_close = (c.hour * 60 + c.minute) <= 16 * 60
+    nxt = np.r_[c[1:], [c[-1] + pd.Timedelta(days=1)]] if len(c) else c
+    nxt = pd.DatetimeIndex(nxt)
+    return np.asarray(by_close & ((nxt.date != c.date) | ((nxt.hour * 60 + nxt.minute) > 16 * 60)))
+
+
+def run_rule(d: pd.DataFrame, cost: float = COST, stop: float | None = None) -> pd.DataFrame:
     """Per bar: the pot's equity at the bar's close (1 at the start), whether BTC was held through the bar, and whether
-    it is held after the decision at the bar's close."""
+    it is held after the decision at the bar's close.
+    stop: the daily stop loss (stops.py). Once a bar's low is stop below BTC's price at the last US close (or the entry
+    price, if bought since), the pot sells at that level (or the bar's open, if it opened below) and stays in cash until
+    the next US close; then it follows the rule again, buying back at the next bar's open if the rule is still long."""
     o, h, lo, c = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
     hi = pd.Series(h).rolling(CHANNEL).max().shift().to_numpy()
     low = pd.Series(lo).rolling(CHANNEL).min().shift().to_numpy()
     sma = pd.Series(c).rolling(TREND).mean().to_numpy()
+    mark = us_close_bars(d.index) if stop else np.zeros(len(c), bool)
     n = len(c)
     eq, held, after = np.ones(n), np.zeros(n, bool), np.zeros(n, bool)
-    e, pos, pending = 1.0, False, None
+    e, pos, want, out, ref = 1.0, False, False, False, 0.0
     for j in range(n):
-        if pending == "buy":
+        go = want and not out                 # the position decided at the last bar's close, filled at this open
+        if go and not pos:
             e *= (1 - cost) * c[j] / o[j]
-            pos = True
-        elif pending == "sell":
+            pos, ref = True, o[j]
+        elif pos and not go:
             e *= (1 - cost) * o[j] / c[j - 1]
             pos = False
         elif pos:
             e *= c[j] / c[j - 1]
-        pending = None
         held[j] = pos
+        if pos and stop and lo[j] <= ref * (1 - stop):
+            e *= (1 - cost) * min(o[j], ref * (1 - stop)) / c[j]
+            pos, out = False, True
         eq[j] = e
-        if not pos and c[j] > hi[j] and c[j] > sma[j]:
-            pending = "buy"
-        elif pos and c[j] < low[j]:
-            pending = "sell"
-        after[j] = pos != (pending is not None)
+        if not want and c[j] > hi[j] and c[j] > sma[j]:
+            want = True
+        elif want and c[j] < low[j]:
+            want = False
+        if mark[j]:
+            out, ref = False, c[j]
+        after[j] = want and not out
     return pd.DataFrame({"equity": eq, "held": held, "after": after}, index=d.index)
 
 

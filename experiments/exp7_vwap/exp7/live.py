@@ -1,5 +1,6 @@
 """Daily paper tracking of the reel's rule: SPY, 3-minute bars, 9 EMA crossing the session VWAP, always in after the
-first cross (long above VWAP, short below), flat at the close. Run after each close: it replays the day's 1-minute bars
+first cross (long above VWAP, short below), flat at the close, and flat for the rest of the day once the day is down
+DAY_STOP. Run after each close: it replays the day's 1-minute bars
 and records the trades the rule would have made. 0.3 bp is charged per side. No orders are placed anywhere.
 
 Writes into the site folder:
@@ -21,6 +22,7 @@ from . import bars, strategy
 
 START = "2026-10-19"
 TICKER, MINUTES, VARIANT, COST_BP = "SPY", 3, "flip", 0.3
+DAY_STOP = 0.01   # daily stop loss (Joaquin, 2026-10-23): flat for the rest of the day once the day is down 1%
 BACKTEST_ROWS = [("SPY 3m flip cost0.3bp", "The reel's rule, SPY 3-minute"), ("SPY 3m long cost0.3bp", "Long side only"),
                  ("SPY open-to-close hold", "Holding SPY from open to close")]
 e = html.escape
@@ -29,7 +31,7 @@ e = html.escape
 def replay(d1: pd.DataFrame, start: str = START) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Trades and day returns from `start` on. Indicators use all earlier bars (the EMA carries across days)."""
     d = strategy.indicators(strategy.resample(d1, MINUTES))
-    tr = strategy.trades(d[d.day >= start], VARIANT) if (d.day >= start).any() else strategy.trades(d.iloc[:0], VARIANT)
+    tr = strategy.trades(d[d.day >= start], VARIANT, DAY_STOP) if (d.day >= start).any() else strategy.trades(d.iloc[:0], VARIANT)
     days = pd.Index(sorted(d.day[d.day >= start].unique()))
     r = strategy.daily(tr, days, COST_BP)
     daily = pd.DataFrame({"date": days, "ret": r.to_numpy(), "trades": tr.groupby("day").size().reindex(days, fill_value=0).to_numpy()})
@@ -76,7 +78,8 @@ details summary{{cursor:pointer}}footer{{color:var(--muted);font-size:13px;paddi
 <main class="wrap"><h1>Experiment 7 · VWAP + 9 EMA cross</h1>
 <p class="muted">From an Instagram reel: on a 3-minute SPY chart, go long when the 9-period EMA crosses above the day's VWAP and short when it crosses
 below, and be flat at the close. Each evening the day's 1-minute bars are replayed and the trades the rule would have made are recorded, at
-0.3 bp per side. Signals are read at a bar's close and filled at the next bar's open.</p>
+0.3 bp per side. Signals are read at a bar's close and filled at the next bar's open. Daily stop loss: once the day is down 1%, the trade is
+closed and the rule waits for the next morning.</p>
 <div class="panel"><h2 style="margin-top:0">{'Trades on ' + e(last_day) if last_day else 'Trades'}</h2>{today_html}</div>
 <div class="panel"><h2 style="margin-top:0">Every session</h2><div class="scroll"><table><tr><th>Date</th><th>Trades</th><th>Day result</th></tr>{hist}</table></div></div>
 <div class="panel"><h2 style="margin-top:0">Backtest before tracking</h2>{bt_html}

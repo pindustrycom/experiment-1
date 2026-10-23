@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from strats import cli, copy, crypto, live, rules, site
+from strats import cli, copy, crypto, data, live, rules, site, stops
 
 
 def prices(n=600, seed=0, tickers=None):
@@ -225,7 +225,7 @@ def test_btc_pot_steps_with_the_rule_equity():
     for day in days:
         live.step(st, px, day, [], pd.DataFrame(), pd.DataFrame(), None, d)
     rows = st["pots"]["btc_donchian"]
-    eq = crypto.run_rule(d)["equity"]
+    eq = crypto.run_rule(d, stop=stops.STOPS["btc_donchian"])["equity"]
     assert [r["date"] for r in rows] == ["2026-09-08", "2026-09-09", "2026-09-10"] and rows[0]["ret"] == 0.0
     b0, b2 = pd.Timestamp(rows[0]["bar"]), pd.Timestamp(rows[2]["bar"])
     assert rows[2]["index"] == pytest.approx(eq[b2] / eq[b0])
@@ -259,3 +259,87 @@ def test_pots_added_later_are_replayed_from_the_origin():
     assert not any(k.endswith("_replayed") for k in live.step(st, px, d, members, earn, pd.DataFrame(), origin=str(o.date())))
     out = site.page({"strategies": {"trend": {"name": "Trend following", "category": rules.LONG_TERM, "what": "", "position": ""}}}, st["pots"])
     assert f"replayed with the same rule up to the {px.index[-2].date()} close" in out
+
+
+def ohlc(px, low_cut=None, high_pop=None, gap=None):
+    """Daily bars around the closes; low_cut/high_pop/gap: {(date, ticker): fraction of the previous close}."""
+    op, lo, hi = px.shift().fillna(px), px * 0.995, px * 1.005
+    lo, hi = np.minimum(lo, op), np.maximum(hi, op)
+    for (d, t), f in (low_cut or {}).items():
+        lo.at[d, t] = px.shift().at[d, t] * f
+    for (d, t), f in (high_pop or {}).items():
+        hi.at[d, t] = px.shift().at[d, t] * f
+    for (d, t), f in (gap or {}).items():
+        op.at[d, t] = lo.at[d, t] = px.shift().at[d, t] * f
+    return {"open": op, "low": lo, "high": hi}
+
+
+def test_stop_sells_at_the_stop_or_the_gap_and_shorts_use_the_high():
+    px = prices(30)
+    d0, d1, d2 = px.index[10], px.index[11], px.index[12]
+    a, b, c = "S00", "S01", "S02"
+    bars = ohlc(px, low_cut={(d1, a): 0.90}, high_pop={(d1, b): 1.10}, gap={(d1, c): 0.85})
+    w = {a: 0.5, b: -0.25, c: 0.25}
+    r, hit = stops.held_return(w, px, bars, d0, d1, 0.08)
+    p0 = px.loc[d0]
+    want = 0.5 * -0.08 - 0.25 * 0.08 + 0.25 * -0.15
+    assert sorted(hit) == [a, b, c] and r == pytest.approx(want)
+    assert stops.held_return(w, px, bars, d0, d1, None) == (pytest.approx(rules.book_return(w, px, d0, d1)), [])
+    # over two sessions the stop is checked against each previous close; a stopped position earns nothing after
+    r2, hit2 = stops.held_return({a: 1.0}, px, bars, d0, d2, 0.08)
+    assert hit2 == [a] and r2 == pytest.approx(-0.08)
+    assert p0[a] > 0
+
+
+def test_stopped_position_is_cash_at_the_close_and_bought_back():
+    px = prices()
+    members = [f"S{i:02d}" for i in range(40)]
+    d0, d1 = px.index[-2], px.index[-1]
+    st = {}
+    live.step(st, px.loc[:d0], d0, members, pd.DataFrame(), pd.DataFrame(), origin=str(d0.date()))
+    held = st["pots"]["reversal"][-1]["w"]
+    t = sorted(held)[0]
+    bars = ohlc(px, low_cut={(d1, t): 0.80})
+    rep = live.step(st, px, d1, members, pd.DataFrame(), pd.DataFrame(), origin=str(d0.date()), bars=bars)
+    row = st["pots"]["reversal"][-1]
+    assert row["stopped"] == [t] and "stopped out" in rep["reversal"]
+    plain = rules.book_return(held, px, d0, d1)
+    lost = held[t] * (px.at[d1, t] / px.at[d0, t] - 1)
+    rebuy = live.COST * rules.turnover({k: v for k, v in held.items() if k != t}, row["w"])     # back in at the close
+    assert row["ret"] == pytest.approx(plain - lost + held[t] * -stops.REVERSAL_CAP - live.COST * held[t] - rebuy, abs=1e-12)
+
+
+def test_btc_stop_sells_and_waits_for_the_us_close():
+    d = btc_bars()
+    base = crypto.run_rule(d, cost=0.0)
+    j = int(np.argmax(base["held"].to_numpy())) + 2           # a bar while the rule holds BTC
+    d2 = d.copy()
+    d2.iloc[j, d2.columns.get_loc("low")] = d2.close.iloc[j - 1] * 0.5
+    eq = crypto.run_rule(d2, cost=0.0, stop=0.06)
+    assert eq["held"].iloc[j] and not eq["after"].iloc[j]
+    mark = crypto.us_close_bars(d2.index)
+    k = j + int(np.argmax(mark[j:]))                           # back in after the next US close, if the rule still wants it
+    assert not eq["held"].iloc[j + 1: k + 1].any()
+    assert eq["equity"].iloc[j] < base["equity"].iloc[j]
+    assert crypto.run_rule(d, stop=None)["equity"].equals(crypto.run_rule(d)["equity"])
+
+
+def test_yahoo_bars_are_adjusted_like_the_close():
+    ts = [int(pd.Timestamp(f"2026-10-0{i} 20:00", tz="UTC").timestamp()) for i in (1, 2)]
+    payload = {"chart": {"result": [{"timestamp": ts, "indicators": {
+        "quote": [{"open": [10.0, 11.0], "low": [9.0, 10.0], "high": [11.0, 12.0], "close": [10.0, 11.5]}],
+        "adjclose": [{"adjclose": [5.0, 5.75]}]}}]}}
+    b = data.parse_yahoo_bars(payload)
+    assert list(b["adj_low"]) == [4.5, 5.0] and list(b["adj_open"]) == [5.0, 5.5]
+
+
+def test_stop_backtest_and_explain_run():
+    px = prices()
+    members = [f"S{i:02d}" for i in range(40)]
+    res = stops.backtest(px, ohlc(px), members, str(px.index[300].date()), {"reversal": [0.0, 0.05], "trend": [0.0]}, live.COST)
+    assert set(res) == {"reversal stop 0%", "reversal stop 5%", "trend stop 0%"}
+    st = {}
+    for s in px.index[-3:]:
+        live.step(st, px.loc[:s], s, members, pd.DataFrame(), pd.DataFrame(), origin=str(px.index[-3].date()))
+    ex = stops.explain(st, px, px.index[-1])
+    assert "reversal" in ex and len(ex["reversal"]["worst"]) == 5

@@ -29,6 +29,7 @@ env:
   SKILL_REPO: https://github.com/Jakeschincariol/trader-skill.git
   SKILL_COMMIT: 5189e79b9a480755a3733ac9713f5353981dbe18
   TRIAL: ${{ github.event_name == 'pull_request' }}
+  STOP_BACKTEST: ${{ github.event_name == 'pull_request' && '1' || '' }}   # trial runs also test the stop levels since 2019
 
 jobs:
   run:
@@ -92,6 +93,8 @@ jobs:
           print(f"\n**Close {s['last_close']}**\n")
           for k, v in s["step"].items():
               print(f"- {k}: {v}")
+          print(f"\nWhat moved: {json.dumps(s.get('what_moved'))[:3000]}")
+          print(f"\nStop backtest: {json.dumps(s.get('stop_backtest'))}")
           print(f"\nReplay: {json.dumps(s.get('replay'))[:600]}")
           print(f"\nPrices: {json.dumps(s.get('prices'))[:300]}; earnings: {s.get('earnings')}; insiders: {s.get('insiders')}")
           print(f"\nFilings for the copy pots: {s.get('copy_data')}")

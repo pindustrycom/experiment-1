@@ -29,13 +29,25 @@ def parse_yahoo_chart(payload: dict) -> pd.Series:
     return s[~s.index.duplicated(keep="last")].dropna()
 
 
-def fetch_yahoo(ticker: str, start: str = START) -> pd.Series:
+def parse_yahoo_bars(payload: dict) -> pd.DataFrame:
+    """adj_close plus the day's open, low and high, adjusted by the same factor (for the stop losses, stops.py)."""
+    adj = parse_yahoo_chart(payload)
+    res = payload["chart"]["result"][0]
+    q = res["indicators"]["quote"][0]
+    dates = pd.to_datetime(res["timestamp"], unit="s", utc=True).tz_convert("America/New_York").normalize().tz_localize(None)
+    raw = pd.DataFrame({k: pd.Series(q.get(k), index=dates, dtype=float) for k in ("open", "low", "high", "close")})
+    raw = raw[~raw.index.duplicated(keep="last")].reindex(adj.index)
+    f = adj / raw["close"]
+    return pd.DataFrame({"adj_close": adj, **{f"adj_{k}": raw[k] * f for k in ("open", "low", "high")}})
+
+
+def fetch_yahoo(ticker: str, start: str = START) -> pd.DataFrame:
     t0 = int(pd.Timestamp(start, tz="UTC").timestamp())
     r = requests.get(f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker.replace('.', '-')}",
                      params={"period1": t0, "period2": int(time.time()) + 86400, "interval": "1d", "includeAdjustedClose": "true"},
                      headers={"User-Agent": "Mozilla/5.0"}, timeout=30)
     r.raise_for_status()
-    return parse_yahoo_chart(r.json())
+    return parse_yahoo_bars(r.json())
 
 
 def update_prices(data: Path, tickers: list[str], pause: float = 0.15) -> dict:
@@ -47,7 +59,7 @@ def update_prices(data: Path, tickers: list[str], pause: float = 0.15) -> dict:
         try:
             s = fetch_yahoo(t)
             if len(s) > 30:
-                s.rename("adj_close").to_csv(d / f"{t}.csv", index_label="date")
+                s.to_csv(d / f"{t}.csv", index_label="date")
                 out["fetched"] += 1
             else:
                 out["failed"].append(t)
@@ -57,14 +69,22 @@ def update_prices(data: Path, tickers: list[str], pause: float = 0.15) -> dict:
     return out
 
 
-def load_prices(data: Path, tickers: list[str]) -> pd.DataFrame:
-    cols = {}
+def load_bars(data: Path, tickers: list[str]) -> dict[str, pd.DataFrame]:
+    """Adjusted close, open, low and high, one column per ticker each. A cache from before the stops has closes only."""
+    cols: dict[str, dict] = {k: {} for k in ("close", "open", "low", "high")}
     for t in tickers:
         f = data / "prices" / f"{t}.csv"
         if f.exists():
-            s = pd.read_csv(f, index_col="date", parse_dates=["date"])["adj_close"]
-            cols[t] = s[~s.index.duplicated(keep="last")]
-    return pd.DataFrame(cols).sort_index()
+            df = pd.read_csv(f, index_col="date", parse_dates=["date"])
+            df = df[~df.index.duplicated(keep="last")]
+            for k in cols:
+                if f"adj_{k}" in df.columns:
+                    cols[k][t] = df[f"adj_{k}"]
+    return {k: pd.DataFrame(v).sort_index() for k, v in cols.items()}
+
+
+def load_prices(data: Path, tickers: list[str]) -> pd.DataFrame:
+    return load_bars(data, tickers)["close"]
 
 
 def sp500_members(data: Path) -> list[str]:
