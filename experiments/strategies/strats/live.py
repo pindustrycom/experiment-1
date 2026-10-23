@@ -98,7 +98,7 @@ def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, 
             new_w, reb = old_w, False
         else:
             new_w, reb = copy.WEIGHTS[key](cp, px, d), True
-    elif key in ("trend", "reversal"):
+    elif key in ("trend", "reversal", "reversal_stop"):
         freq, due = ("M", rules.is_last_session_of_month) if key == "trend" else ("W", rules.is_last_session_of_week)
         if due_now(rows, d, freq, due):
             new_w = rules.trend_weights(px, d) if key == "trend" else rules.reversal_weights(px, d, members)

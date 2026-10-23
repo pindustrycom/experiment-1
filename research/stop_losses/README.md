@@ -7,7 +7,8 @@ next day") and a cap on what the weekly reversal pot can lose in a day. No real 
 
 | Pot | Checked on | Stop | After a stop |
 |---|---|---|---|
-| Weekly reversal | each stock's daily low (Yahoo) | 5% below the previous close; 20 stocks at 5% each, so this caps the pot's day near -5% | sold at the stop (or the open, on a gap), bought back at that close if the rule still holds it |
+| Weekly reversal (plain) | none: kept without a stop to compare (Joaquin, 2026-10-23) | | |
+| Weekly reversal, 5% stop (new pot `reversal_stop`, replayed from 2026-10-16) | each stock's daily low (Yahoo) | 5% below the previous close; 20 stocks at 5% each, so this caps the pot's day near -5% | sold at the stop (or the open, on a gap), bought back at that close if the rule still holds it |
 | Earnings drift, insider buying, best ideas, fund conviction, Pelosi copy | each stock's daily low | 8% | same |
 | Trend following (ETFs, long and short) | daily low (high for shorts) | 4% | same |
 | BTC breakout | 4-hour bar lows | 6% below BTC at the last US close (or the entry price) | cash until the next US close, then the rule again |

@@ -97,7 +97,7 @@ def test_replay_and_site(tmp_path):
     out = site.write(tmp_path, st, rp, {})
     assert out["sessions"] == 1
     head = (tmp_path / "data" / "daily.csv").read_text().splitlines()[0]
-    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,btc_donchian"
+    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,reversal_stop,btc_donchian"
     s = json.loads((tmp_path / "data" / "summary.json").read_text())
     assert s["strategies"]["pead"]["category"] == rules.LONG_TERM and "cash" in s["strategies"]["pead"]["position"]
     page = (tmp_path / "index.html").read_text()
@@ -297,12 +297,13 @@ def test_stopped_position_is_cash_at_the_close_and_bought_back():
     d0, d1 = px.index[-2], px.index[-1]
     st = {}
     live.step(st, px.loc[:d0], d0, members, pd.DataFrame(), pd.DataFrame(), origin=str(d0.date()))
-    held = st["pots"]["reversal"][-1]["w"]
+    held = st["pots"]["reversal_stop"][-1]["w"]
     t = sorted(held)[0]
     bars = ohlc(px, low_cut={(d1, t): 0.80})
     rep = live.step(st, px, d1, members, pd.DataFrame(), pd.DataFrame(), origin=str(d0.date()), bars=bars)
-    row = st["pots"]["reversal"][-1]
-    assert row["stopped"] == [t] and "stopped out" in rep["reversal"]
+    row = st["pots"]["reversal_stop"][-1]
+    assert row["stopped"] == [t] and "stopped out" in rep["reversal_stop"]
+    assert "stopped" not in st["pots"]["reversal"][-1]                  # the twin without a stop keeps holding
     plain = rules.book_return(held, px, d0, d1)
     lost = held[t] * (px.at[d1, t] / px.at[d0, t] - 1)
     rebuy = live.COST * rules.turnover({k: v for k, v in held.items() if k != t}, row["w"])     # back in at the close
@@ -342,4 +343,4 @@ def test_stop_backtest_and_explain_run():
     for s in px.index[-3:]:
         live.step(st, px.loc[:s], s, members, pd.DataFrame(), pd.DataFrame(), origin=str(px.index[-3].date()))
     ex = stops.explain(st, px, px.index[-1])
-    assert "reversal" in ex and len(ex["reversal"]["worst"]) == 5
+    assert "reversal_stop" in ex and len(ex["reversal"]["worst"]) == 5

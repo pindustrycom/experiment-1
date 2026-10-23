@@ -5,7 +5,7 @@ Each position has a stop a fixed percentage below the previous close (above it f
 and sits in cash for the rest of the day. At that close the pot forms its book as usual, so the strategy carries on the
 next day (the stopped position is bought back if the rule still wants it, at 1 bp a side like any trade).
 
-The weekly reversal pot is 20 stocks at 5% each, so its stop is also its daily loss cap: the pot cannot lose much more
+The weekly reversal pot with the stop (reversal_stop; the plain reversal pot has none, for comparison) is 20 stocks at 5% each, so its stop is also its daily loss cap: the pot cannot lose much more
 than REVERSAL_CAP in a session unless stocks open below their stop (an overnight gap fills at the open).
 
 Prices are Yahoo's daily bars, adjusted like the closes. A ticker without that day's low/high (an old cache) is not
@@ -23,7 +23,7 @@ STOPS = {                    # stop distance from the previous close, per positi
     "best_ideas": 0.08,
     "conviction": 0.08,
     "pelosi": 0.08,
-    "reversal": REVERSAL_CAP,
+    "reversal_stop": REVERSAL_CAP,   # the plain "reversal" pot keeps no stop, to compare the two
     "btc_donchian": 0.06,    # BTC from its price at the last US close, checked on 4-hour bars (crypto.py)
 }
 
