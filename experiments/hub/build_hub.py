@@ -77,6 +77,10 @@ CATALOG = [
      "The best reading model so far, frozen: build any COLOUR NUMBER phrase and watch the eye trace each letter in 3D, teach "
      "the model your own word bonds and see how it reads with them, and show it colours it has never seen. By Joaquin Philco.",
      EXPERIMENTS / "exp10_words"),
+    ("resonance_writeup", RESONANCE, "Write-up", "Write-up · resonant sensors, with controls",
+     "A short paper on what the resonance experiments showed: as a sensor front end resonance beats fair low-pass controls on "
+     "spoken digits, spoken words and eye movements; the learning rules built after it did not beat simple controls. By Joaquin Philco.",
+     EXPERIMENTS / "resonance_writeup"),
 ]
 # The overview page is one column per group, side by side; clicking a column opens that group over the whole page. A new
 # project adds its group here and its experiments to CATALOG: (group, page anchor, colour, moving background drawn behind
