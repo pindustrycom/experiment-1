@@ -40,7 +40,7 @@ if(/(\\.html?|\\/)$/i.test(u.pathname))return;ev.preventDefault();
 try{const k=JSON.parse(sessionStorage.getItem(S)),key=await crypto.subtle.importKey("raw",Uint8Array.from(atob(k.key),c=>c.charCodeAt(0)),"AES-GCM",false,["decrypt"]);
 const b=new Uint8Array(await (await fetch(u.href,{cache:"no-store"})).arrayBuffer());
 const p=await crypto.subtle.decrypt({name:"AES-GCM",iv:b.slice(0,12)},key,b.slice(12));
-const t={csv:"text/csv",json:"application/json",txt:"text/plain",png:"image/png",svg:"image/svg+xml"}[u.pathname.split(".").pop().toLowerCase()]||"application/octet-stream";
+const t={csv:"text/csv",json:"application/json",txt:"text/plain",png:"image/png",svg:"image/svg+xml",pdf:"application/pdf"}[u.pathname.split(".").pop().toLowerCase()]||"application/octet-stream";
 const o=URL.createObjectURL(new Blob([p],{type:t})),d=document.createElement("a");d.href=o;d.download=u.pathname.split("/").pop();
 document.body.appendChild(d);d.click();d.remove();setTimeout(()=>URL.revokeObjectURL(o),60000)}catch(e){alert("Could not open this file.")}})})();</script>"""
 
