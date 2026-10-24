@@ -59,3 +59,27 @@ What moved on the bad day (2026-10-22, SPY -1.2%), from the same trial run:
   fell again). With the 5% stops it would have lost -4.4% instead of -7.0%.
 - Pelosi: VST -9.8%, BE -8.7%, INTC -8.0%, TEM -5.8%, AMZN -4.6%.
 - 2026-10-23 (SPY -0.5%): reversal +0.7%, Pelosi -0.8% (BE -11.2%), the rest within -0.6%.
+
+## Weekly reversal with and without the 5% stop, year by year (2026-10-24)
+
+Joaquin asked for the two weekly reversal pots compared from the start of the 2019 data. Same run as above (PR #33 trial,
+Yahoo daily bars, 1 bp a side, USD, today's S&P 500 members, which flatters both). 1,000 at the start of 2019:
+
+| Year | No stop | 5% stop | SPY |
+|---|---|---|---|
+| 2019 | +47.2% | +40.4% | +31.1% |
+| 2020 | +27.8% | +26.4% | +18.3% |
+| 2021 | +20.2% | +8.8% | +28.7% |
+| 2022 | -7.9% | -15.7% | -18.2% |
+| 2023 | +55.2% | +48.9% | +26.2% |
+| 2024 | +36.7% | +31.9% | +24.9% |
+| 2025 | +27.5% | +24.9% | +17.7% |
+| 2026 to Oct 23 | +22.4% | +21.5% | +12.3% |
+| **% a year** | **+28.1** | **+22.5** | +17.0 |
+| **1,000 became** | **6,898** | **4,845** | 3,404 |
+| Worst day | -24.0% | -17.4% | -10.9% |
+| Worst drop | -67% | -57% | -34% |
+| Days below -5% | 23 | 11 | 6 |
+
+No stop wins in every year; the stop's best year against it is 2026 (-0.9 pp). The stop cuts the worst days but not
+the worst drop much (-57% vs -67%, both in March 2020). Month ends: reversal_2019_month_ends.csv; chart: reversal_2019_growth.png.

@@ -99,7 +99,8 @@ def explain(state: dict, px: pd.DataFrame, d: pd.Timestamp, top: int = 5) -> dic
 
 def backtest(px: pd.DataFrame, bars: dict[str, pd.DataFrame], members: list[str], start: str, levels: dict[str, list[float]],
              cost: float) -> dict:
-    """Trend and reversal replayed from start with each stop level (0 = no stop): yearly return, worst day, worst drop, stops."""
+    """Trend and reversal replayed from start with each stop level (0 = no stop): yearly return, worst day, worst drop, stops,
+    return per calendar year and the growth of 1 at each month end (one "YYYY-MM:value" string, to keep the log short)."""
     from . import rules
     dates = px.index[px.index >= start]
     me, we = rules.month_end(px.index), rules.week_end(px.index)
@@ -121,14 +122,22 @@ def backtest(px: pd.DataFrame, bars: dict[str, pd.DataFrame], members: list[str]
                 nxt = books[dates[i + 1]] if i + 1 < len(dates) else w
                 r.append(ret - cost * rules.turnover({k: v for k, v in w.items() if k not in hit}, nxt))
                 prev = d1
-            r = pd.Series(r, index=dates[1:])
-            eq = (1 + r).cumprod()
-            yrs = len(r) / 252
-            res[f"{key} stop {s:.0%}"] = {"annual_pct": round(100 * (eq.iloc[-1] ** (1 / yrs) - 1), 1),
-                                          "worst_day_pct": round(100 * r.min(), 1), "worst_drop_pct": round(100 * (eq / eq.cummax() - 1).min(), 1),
-                                          "days_below_minus5pct": int((r < -0.05).sum()), "stops": n,
-                                          "since_2025_pct": round(100 * ((1 + r[r.index >= "2025-01-01"]).prod() - 1), 1)}
+            res[f"{key} stop {s:.0%}"] = summary(pd.Series(r, index=dates[1:]), n)
+    if "SPY" in px:
+        res["SPY"] = summary(px["SPY"].loc[dates].pct_change().dropna(), 0)
     return res
+
+
+def summary(r: pd.Series, n: int) -> dict:
+    """One backtest line from its daily returns and the number of stops hit."""
+    eq = (1 + r).cumprod()
+    yrs = len(r) / 252
+    return {"annual_pct": round(100 * (eq.iloc[-1] ** (1 / yrs) - 1), 1),
+            "worst_day_pct": round(100 * r.min(), 1), "worst_drop_pct": round(100 * (eq / eq.cummax() - 1).min(), 1),
+            "days_below_minus5pct": int((r < -0.05).sum()), "stops": n,
+            "since_2025_pct": round(100 * ((1 + r[r.index >= "2025-01-01"]).prod() - 1), 1),
+            "years": {str(y): round(100 * ((1 + g).prod() - 1), 1) for y, g in r.groupby(r.index.year)},
+            "month_ends": ",".join(f"{d:%Y-%m}:{v:.4f}" for d, v in eq.groupby(eq.index.to_period("M")).tail(1).items())}
 
 
 def backtest_btc(btc: pd.DataFrame, levels: list[float]) -> dict:
