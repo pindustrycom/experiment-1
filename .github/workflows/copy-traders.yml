@@ -1,0 +1,57 @@
+name: Copy-trader backtests
+
+# Research only, paper only (research/copy_traders): backtests of the copy ideas from the "Copying known traders" doc.
+# - best ideas, conviction + consensus, Pelosi pot: on the trader-skill cache (release trader-skill-data, 13F + House PTRs)
+# - activist 13D: SEC EDGAR's quarterly index of original Schedule 13Ds, prices from Yahoo
+# Results are printed in the log and saved as the run's artifact. Nothing is deployed and nothing is saved to a release.
+
+on:
+  pull_request:
+    paths: ["research/copy_traders/**", ".github/workflows/copy-traders.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: copy-traders-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: research/copy_traders
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/copy_traders/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Tests
+        run: ruff check . && python -m pytest -q
+
+      - name: Best ideas, conviction, Pelosi (trader-skill cache)
+        run: |
+          set -o pipefail
+          gh release download trader-skill-data --repo "$GITHUB_REPOSITORY" --pattern cache.tar.gz --dir /tmp/ts
+          mkdir -p /tmp/ts/cache && tar xzf /tmp/ts/cache.tar.gz -C /tmp/ts/cache
+          python backtest.py /tmp/ts/cache out | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Activist 13D (SEC EDGAR)
+        run: |
+          set -o pipefail
+          python activist13d.py /tmp/act out | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: copy-traders-results
+          path: research/copy_traders/out

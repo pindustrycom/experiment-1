@@ -30,7 +30,7 @@
 html, body { height: 100%; }
 [hidden] { display: none !important; }
 body { background: var(--bench); color: var(--ink); font-family: var(--f-body); font-size: 14px; overflow: hidden; }
-#app { position: relative; height: 100%; width: 100%; overflow: hidden; }
+#app { position: relative; height: calc(100% - var(--site-nav-h, 0px)); width: 100%; overflow: hidden; }
 canvas#gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
 .gl-fail { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); max-width: min(440px, calc(100% - 32px)); padding: 16px 18px; border: 1px solid var(--line, #263442); border-radius: 10px; background: rgba(11,16,22,.92); color: var(--ink, #e4ecf2); font-size: 14px; line-height: 1.5; z-index: 5; }
 canvas#gl.dragging { cursor: grabbing; }
@@ -141,7 +141,6 @@ textarea#exportBox { width: 100%; height: 90px; font-family: var(--f-mono); font
   <header class="top">
     <h1>Resonance <span>Playground</span></h1>
     <div class="credit">Resonance index and rule set by <b>Joaquin Philco</b></div>
-    <a class="credit" href="../index.html" style="color:var(--ink-2)">All experiments</a>
     <div class="seg tabs" role="tablist" aria-label="View">
       <button id="tab-arch" class="on" role="tab">Architecture</button>
       <button id="tab-cell" role="tab">One cell</button>
@@ -282,7 +281,8 @@ textarea#exportBox { width: 100%; height: 90px; font-family: var(--f-mono); font
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js" integrity="sha384-vV17nr/rMaJqmeZkFUzXLpHdQ+ME5QHKdydaqqN+3Ga39RJlNrTatJxHwGV4ml2C" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="../hub/gl_runtime.js"></script>
 <script>
 (() => {
 "use strict";
@@ -292,26 +292,9 @@ const COL = { bench: 0x0b1016, ink: 0xe4ecf2, ink2: 0x9cadbb, line: 0x263442, ph
 
 // ---------- renderer / scene ----------
 const canvas = document.getElementById("gl");
-function glGuard(canvas, opts) {
-  // Chrome turns WebGL off for a site after its pages lose the GPU context a few times; say so instead of a blank page.
-  const fail = msg => {
-    if (canvas.nextElementSibling && canvas.nextElementSibling.classList.contains("gl-fail")) return;
-    const d = document.createElement("div"); d.className = "gl-fail"; d.setAttribute("role", "status"); d.innerHTML = msg;
-    canvas.style.visibility = "hidden"; canvas.insertAdjacentElement("afterend", d);
-  };
-  const BLOCKED = "<b>The 3D view could not start.</b> Your browser has turned off WebGL for this site, usually after a page lost its graphics context. Quit the browser completely (every window) and open this page again. If it still fails, check that hardware acceleration is on in the browser settings.";
-  let r;
-  try { r = new THREE.WebGLRenderer(Object.assign({ canvas }, opts)); } catch (e) { fail(BLOCKED); return null; }
-  const state = { renderer: r, lost: false };
-  canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); state.lost = true; fail("<b>The 3D view lost its graphics context.</b> It will come back on its own if the browser restores it; otherwise reload the page."); });
-  canvas.addEventListener("webglcontextrestored", () => location.reload());
-  window.addEventListener("pagehide", e => { if (e.persisted) return; r.dispose(); r.forceContextLoss(); });
-  return state;
-}
-const gl = glGuard(canvas, { antialias: true });
+const gl = LabGL.start(canvas, { antialias: true });
 if (!gl) return;
 const renderer = gl.renderer;
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 renderer.setClearColor(COL.bench, 1);
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(COL.bench, 90, 170);
@@ -1080,7 +1063,7 @@ function posOf(id) {
   return blocks[id]?.pos;
 }
 function rebuildUserLinks() {
-  while (userGroupLinks.children.length) { const c = userGroupLinks.children.pop(); c.geometry.dispose(); }
+  while (userGroupLinks.children.length) { LabGL.dispose(userGroupLinks.children.pop()); }
   userLinks.forEach(l => {
     const a = posOf(l.a), b = posOf(l.b); if (!a || !b) return;
     const curve = new THREE.CatmullRomCurve3(arc(a, b, Math.min(6, a.distanceTo(b) * .18)));
@@ -1248,7 +1231,7 @@ function buildCellGeometry() {
   let hmax = 0; SIM.H.forEach(h => h.forEach(([a, b]) => { hmax = Math.max(hmax, Math.hypot(a, b)); }));
   HS = hmax > 1e-6 ? 2.0 / hmax : 1;
   res.forEach((R, f) => {
-    if (R.spiral) { cellScene.remove(R.spiral); R.spiral.geometry.dispose(); }
+    if (R.spiral) { cellScene.remove(R.spiral); LabGL.dispose(R.spiral); }
     const pts = SIM.H[f].map(([hr, hi], t) => { const m = Math.hypot(hr, hi), s = m > 0 ? sat(m * HS) / m : 0; return new V3(tx(t), hr * s, R.z + hi * s); });
     if (pts.length < 2) return;
     const curve = new THREE.CatmullRomCurve3(pts, false, "catmullrom", .2);
@@ -1259,7 +1242,7 @@ function buildCellGeometry() {
   cellPick.splice(0, cellPick.length, ...cellPick.filter(m => !String(m.userData.id).startsWith("cell:res") || m.geometry.type !== "TubeGeometry"), ...res.map(R => R.spiral).filter(Boolean));
   const ymax = Math.max(1e-6, ...SIM.c), yo = Math.max(1e-6, ...SIM.y, CP.gain);
   const mk = (arr, y0, scale, col) => { const pts = arr.map((v, t) => new V3(tx(t), y0 + 2.6 * v / scale, WZ)); return new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, false, "catmullrom", .1), (T - 1) * 3, .07, 5, false), new THREE.MeshBasicMaterial({ color: col })); };
-  [cTrace, yTrace].forEach(m => { if (m) { cellScene.remove(m); m.geometry.dispose(); } });
+  [cTrace, yTrace].forEach(m => { if (m) { cellScene.remove(m); LabGL.dispose(m); } });
   cTrace = mk(SIM.c, 3.2, ymax, COL.front); yTrace = mk(SIM.y, -2.8, yo, COL.soma); cellScene.add(cTrace, yTrace);
   cellReadout();
 }
@@ -1379,7 +1362,6 @@ function frame(now) {
     L.el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%) scale(${sc})`;
     L.el.style.opacity = Math.max(.25, Math.min(1, 95 / dist));
   }
-  requestAnimationFrame(frame);
 }
 if (window.innerWidth <= 860) { orbit.r = 125; VIEWS.all.r = 125; }
 const archOrbit = orbit, cellOrbit = { theta: -.62, phi: 1.12, r: window.innerWidth <= 860 ? 78 : 50, target: new V3(5, -.5, -1.5) };
@@ -1418,7 +1400,7 @@ document.getElementById("cInput").onchange = e => { CP.input = e.target.value; d
 });
 simulate();
 
-inspect(null); loadUser(); requestAnimationFrame(frame);
+inspect(null); loadUser(); gl.loop(frame);
 window.__pg = { play, resetAll, setV1, flyTo, VIEWS, setTab, CP, simulate };
 if (location.hash === "#cell") setTab("cell");
 })();

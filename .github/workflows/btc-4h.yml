@@ -1,0 +1,82 @@
+name: BTC pot, 4-hour runs
+
+# The BTC breakout pot (experiments/strategies/strats/crypto.py) follows a rule on 4-hour bars, and BTC trades every
+# day, so the once-a-weekday strategies.yml run is too slow to place its trades on time (research/twice_daily: trading
+# once a weekday made +36.5% a year against +45.1% at every 4-hour bar, 2019-2026, 25 bp a side). This runs a few
+# minutes after each 4-hour bar closes, every day: it brings the bars up to date and, when the rule flips, writes the
+# trade down at BTC's price right then. Paper only, no orders anywhere. The journal and the bars are kept in the
+# "btc-live" release (encrypted like the other states); strategies.yml shows the journal on the pot's page.
+
+on:
+  pull_request:   # tests, plus a trial run that saves nothing
+    paths: ["experiments/strategies/strats/crypto.py", ".github/workflows/btc-4h.yml"]
+  schedule:
+    - cron: "7 0,4,8,12,16,20 * * *"   # 4-hour bars close at 00, 04, ... UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the state release
+
+concurrency:
+  group: btc-4h-${{ github.event_name == 'pull_request' && github.ref || 'live' }}
+  cancel-in-progress: false
+
+env:
+  STATE_TAG: btc-live
+  TRIAL: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STATE_KEY: ${{ secrets.STATE_KEY || secrets.PASSWORD }}
+      CRYPT: ${{ github.workspace }}/experiments/hub/state_crypt.sh
+    defaults:
+      run:
+        working-directory: experiments/strategies
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: experiments/strategies/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Tests
+        if: env.TRIAL == 'true'
+        run: ruff check strats tests && python -m pytest -q
+
+      - name: Restore the journal and bars
+        run: |
+          mkdir -p state/crypto
+          if [ "$TRIAL" != "true" ] && gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx btc-live.tar.gz; then
+            gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --pattern btc-live.tar.gz --dir /tmp/prev
+            "$CRYPT" open /tmp/prev/btc-live.tar.gz
+            tar xzf /tmp/prev/btc-live.tar.gz -C state
+          elif gh release view strategies-state --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # first run: seed the bars from the daily job's cache, so the history matches the pot's
+            gh release download strategies-state --repo "$GITHUB_REPOSITORY" --pattern strategies-state.tar.gz --dir /tmp/seed
+            "$CRYPT" open /tmp/seed/strategies-state.tar.gz
+            tar xzf /tmp/seed/strategies-state.tar.gz -C /tmp/seed ./data/crypto/btc_4h.csv || true
+            cp /tmp/seed/data/crypto/btc_4h.csv state/crypto/ 2>/dev/null || true
+          fi
+          ls -la state/crypto
+
+      - name: Check the rule and journal a trade if it flipped
+        run: |
+          set -o pipefail
+          python -m strats btc-tick --data state --journal state/crypto/journal.json | tee /tmp/tick.json
+          python -c 'import json; print(json.load(open("/tmp/tick.json")).get("tick"))' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save the journal and bars
+        if: env.TRIAL != 'true'
+        run: |
+          mkdir -p /tmp/out
+          tar czf /tmp/out/btc-live.tar.gz -C state crypto
+          "$CRYPT" seal /tmp/out/btc-live.tar.gz
+          gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --title "BTC pot journal" --latest=false \
+              --notes "Journal and 4-hour bars of the BTC paper pot's live runs. Not a software release."
+          gh release upload "$STATE_TAG" /tmp/out/btc-live.tar.gz --repo "$GITHUB_REPOSITORY" --clobber

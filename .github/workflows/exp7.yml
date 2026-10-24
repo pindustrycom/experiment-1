@@ -44,6 +44,8 @@ jobs:
     env:
       TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
       GH_TOKEN: ${{ github.token }}
+      STATE_KEY: ${{ secrets.STATE_KEY || secrets.PASSWORD }}
+      CRYPT: ${{ github.workspace }}/experiments/hub/state_crypt.sh
     defaults:
       run:
         working-directory: experiments/exp7_vwap
@@ -78,7 +80,8 @@ jobs:
           set -o pipefail
           mkdir -p /tmp/state
           if [ "$MODE" = backtest ]; then cp results/results.json /tmp/state/results.json; else
-            gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --pattern results.json --dir /tmp/state 2>/dev/null || true; fi
+            gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --pattern results.json --dir /tmp/state 2>/dev/null || true
+            [ ! -f /tmp/state/results.json ] || "$CRYPT" open /tmp/state/results.json; fi
           [ "$MODE" = live ] || export TIINGO_API_KEY=""   # the backtest step already fetched
           python -m exp7 live --data data --out site --tickers SPY --start 2019-01 --minutes-budget 20 --results /tmp/state/results.json | tee /tmp/live.json
 
@@ -88,10 +91,11 @@ jobs:
             gh release create "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --title "Experiment 7 state" --latest=false \
               --notes "Experiment 7's pages (exp7-site.tar.gz) and backtest results. Not a software release."
           if [ "$MODE" = live ]; then
-            tar czf /tmp/exp7-site.tar.gz -C site .
+            tar czf /tmp/exp7-site.tar.gz -C site . && "$CRYPT" seal /tmp/exp7-site.tar.gz
             gh release upload "$STATE_TAG" /tmp/exp7-site.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
           else
-            gh release upload "$STATE_TAG" /tmp/state/results.json --repo "$GITHUB_REPOSITORY" --clobber
+            mkdir -p /tmp/out && cp /tmp/state/results.json /tmp/out/ && "$CRYPT" seal /tmp/out/results.json
+            gh release upload "$STATE_TAG" /tmp/out/results.json --repo "$GITHUB_REPOSITORY" --clobber
           fi
 
       - name: Save cached bars

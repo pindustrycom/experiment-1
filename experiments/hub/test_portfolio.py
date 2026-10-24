@@ -126,7 +126,7 @@ def test_exp7_pot_is_separate_from_the_combined_one(tmp_path, fx):
     last = json.loads((site / "data" / "portfolio.json").read_text())["rows"][-1]
     assert last["exp7"] == pytest.approx(1020.0) and last["combined"] == pytest.approx(1000.0)
     hub = (site / "index.html").read_text()
-    assert "Exp7 · VWAP + 9 EMA" in hub and 'href="exp7/index.html">Experiment 7' in hub
+    assert "Exp7 VWAP" in hub and "Short-term" in hub and 'href="exp7/index.html">Exp7 VWAP</a>' in hub
     page = (site / "exp7" / "index.html").read_text()
     assert "Exp7 paper portfolio" in page and "3 trades" in page and "backdrop-filter" in page
 
@@ -136,3 +136,72 @@ def test_no_exp7_card_without_exp7(tmp_path):
     make_site(site, [("2026-10-16", 100, 100), ("2026-10-19", 100, 100)])
     build_hub.build(site, tmp_path / "p.json", update=True)
     assert "Exp7" not in (site / "index.html").read_text()
+
+
+def test_strategy_pots_split_long_and_short(tmp_path, fx):
+    site, state = tmp_path / "site", tmp_path / "p.json"
+    make_site(site, [("2026-10-16", 100, 100), ("2026-10-19", 100, 100), ("2026-10-20", 100, 100)], direction="neutral", z=None)
+    write_exp2(site, ["2026-10-19,live,scored,0.0,True,True,18", "2026-10-20,live,scored,0.0,True,True,18"])
+    d = site / "strategies" / "data"
+    d.mkdir(parents=True)
+    (site / "strategies" / "index.html").write_text("<html><head></head><body><main class=\"wrap\">pots</main></body></html>")
+    # trend joins on 10-19 (the first close only forms the book) and makes 1% on 10-20; reversal joins on 10-20
+    (d / "daily.csv").write_text("date,trend,pead,insider,reversal\n2026-10-19,0.0,,,\n2026-10-20,0.01,,,0.0\n")
+    (d / "summary.json").write_text(json.dumps({"strategies": {
+        "trend": {"name": "Trend following", "category": "Long-term", "what": "ETFs by trend", "position": "long SPY 9%"},
+        "reversal": {"name": "Weekly reversal", "category": "Short-term", "what": "losers", "position": "20 stocks"},
+        "pead": {"name": "Earnings drift", "category": "Long-term", "what": "beats", "position": "cash"}}}))
+    build_hub.build(site, state, update=True)
+    last = json.loads((site / "data" / "portfolio.json").read_text())["rows"][-1]
+    assert last["trend"] == pytest.approx(1000 * 1.01 * 1.414 / 1.40) and last["reversal"] == pytest.approx(1000.0)   # joined on 10-20, after the currency move
+    assert "pead" not in last and last["combined"] == pytest.approx(last["exp1"] / 2 + last["exp2"] / 2)
+    hub = (site / "index.html").read_text()
+    assert 'id="long"' in hub and 'id="short"' in hub and 'href="#markets">← Markets' in hub
+    lo, sh = hub.index('id="long"'), hub.index('id="short"')
+    assert "Trend following" in hub[lo:sh] and "Weekly reversal" not in hub[lo:sh] and "Weekly reversal" in hub[sh:]
+    assert "4 × 1,000 CAD" in hub and "long SPY 9%" in hub and 'href="strategies/index.html#trend"' in hub
+    assert "backdrop-filter" in (site / "strategies" / "index.html").read_text()
+    # the best % return on its 1,000 CAD leads the Markets page, the table is ranked, and the overview door names it
+    best = hub.index("Best strategy so far")
+    assert best < hub.index("All pots together: profit") and 'href="strategies/index.html#trend">Trend following</a> <span class="pos">+2.01%' in hub
+    assert '<div class="v pos">+20.10 CAD</div>' in hub[best:] and 'class="big minor"' in hub
+    assert "from 1,000 CAD on 2026-10-19" in hub and "a lead this young is mostly luck" in hub
+    table = hub[hub.index("<table class=\"mk-pots\">"):]
+    assert '<tr class=lead><td class="mono">1</td><td><a href="strategies/index.html#trend">' in table
+    assert table.index("Trend following") < table.index("Weekly reversal")
+    door = hub[hub.index('id="markets"'):hub.index('class="open"')]
+    assert 'Best strategy</span><span class="v mono pos">+20.10 CAD</span>' in door and "<b>Trend following</b>" in door
+    assert "all pots together" in door
+
+
+def test_best_pot_still_named_when_nothing_is_up():
+    rows = [{"date": "2026-10-16", "a": 1000.0, "b": 1000.0}, {"date": "2026-10-19", "a": 990.0, "b": 995.0}]
+    pots = [("a", "A", "Long-term", "a.html"), ("b", "B", "Short-term", "b.html")]
+    box = build_hub.best_pot(rows, pots)
+    assert '<a href="b.html">B</a>' in box and '<div class="v neg">' in box and "losing least" in box
+    rows[-1]["b"] = 1000.0
+    assert [p[0] for p in build_hub.ranked(rows, pots)] == ["b", "a"]
+    assert build_hub.pot_since(rows, "a") == ("2026-10-16", 1) and build_hub.pot_since(rows, "b") == (None, 0)
+
+
+def test_exp1_pair_that_loses_the_stop_sits_out_one_session(tmp_path):
+    site, state = tmp_path / "site", {}
+    rows = [("2026-10-16", 50, 100), ("2026-10-19", 50, 100)]
+    make_site(site, rows)
+    portfolio.update_exp1(state, site)
+    portfolio.update_exp1(state, site)
+    make_site(site, rows + [("2026-10-20", 46, 100)])          # long KO / short PEP: -8% in the session
+    rep = portfolio.update_exp1(state, site)
+    assert "stopped: ko-pep" in rep["exp1"]
+    book = state["exp1"][-1]["book"]
+    assert book[0]["stopped"] and "stopped out" in book[0]["why"]
+    make_site(site, rows + [("2026-10-20", 46, 100), ("2026-10-21", 40, 100)])
+    portfolio.update_exp1(state, site)
+    assert state["exp1"][-1]["ret"] == 0.0                     # in cash while KO fell further
+    assert not state["exp1"][-1]["book"][0].get("stopped")     # and back in the next book
+    assert "in cash" in build_hub.exp1_positions({"exp1_book": book, "exp1_book_date": "2026-10-20"})
+
+
+def test_exp2_session_after_a_stop_is_cash():
+    r = [("a", 0.01), ("b", -0.025), ("c", 0.03), ("d", -0.01), ("e", 0.02)]
+    assert portfolio.with_day_stop(r, 0.02) == [("a", 0.01), ("b", -0.025), ("c", 0.0), ("d", -0.01), ("e", 0.02)]

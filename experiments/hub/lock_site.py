@@ -29,7 +29,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 ITERATIONS = 600_000
 LOCKED = "<!--locked-->"
-SKIP = {".nojekyll"}
+SKIP = {".nojekyll", "robots.txt"}  # served as they are: neither says anything about the site
 
 # Added to each page before it is encrypted: once the page is unlocked, links to the site's own data files
 # (which are stored encrypted) are fetched, decrypted with the session key and saved.
@@ -40,14 +40,14 @@ if(/(\\.html?|\\/)$/i.test(u.pathname))return;ev.preventDefault();
 try{const k=JSON.parse(sessionStorage.getItem(S)),key=await crypto.subtle.importKey("raw",Uint8Array.from(atob(k.key),c=>c.charCodeAt(0)),"AES-GCM",false,["decrypt"]);
 const b=new Uint8Array(await (await fetch(u.href,{cache:"no-store"})).arrayBuffer());
 const p=await crypto.subtle.decrypt({name:"AES-GCM",iv:b.slice(0,12)},key,b.slice(12));
-const t={csv:"text/csv",json:"application/json",txt:"text/plain",png:"image/png",svg:"image/svg+xml"}[u.pathname.split(".").pop().toLowerCase()]||"application/octet-stream";
+const t={csv:"text/csv",json:"application/json",txt:"text/plain",png:"image/png",svg:"image/svg+xml",pdf:"application/pdf"}[u.pathname.split(".").pop().toLowerCase()]||"application/octet-stream";
 const o=URL.createObjectURL(new Blob([p],{type:t})),d=document.createElement("a");d.href=o;d.download=u.pathname.split("/").pop();
 document.body.appendChild(d);d.click();d.remove();setTimeout(()=>URL.revokeObjectURL(o),60000)}catch(e){alert("Could not open this file.")}})})();</script>"""
 
 # The login page: pure black, a spinning point-cloud torus behind one password field. A wrong password turns
 # the field and the torus red until the visitor types again.
 LOGIN = """<!doctype html><html lang="en"><head><meta charset="utf-8">""" + LOCKED + """
-<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
 <title>Private dashboard</title><style>
 :root{color-scheme:dark;--text:#f5f5f7;--line:rgba(255,255,255,.14);--hi:#ff453a}
 *{box-sizing:border-box}html,body{margin:0;height:100%;background:#000;overflow:hidden}

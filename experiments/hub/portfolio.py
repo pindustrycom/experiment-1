@@ -10,6 +10,9 @@ Three pots, each starting with a fake 1000 CAD on START:
   Combined (the main dashboard): 500 CAD in each of the two.
   Exp7 portfolio (its own pot, not in the combined one): the VWAP + 9 EMA day-trading rule on SPY; each session earns the
       day's result of the rule's trades after 0.3 bp per side (exp7/data/daily.csv, built by experiments/exp7_vwap).
+  Strategy pots (each its own 1000 CAD, not in the combined one): trend following, earnings drift, insider buying and
+      weekly reversal; each session earns the pot's return after 1 bp per side (strategies/data/daily.csv, built by
+      experiments/strategies).
 The pots are invested in US markets, so each day's value is converted to CAD at the Bank of Canada USD/CAD rate.
 No costs, borrow fees or interest are included.
 
@@ -29,6 +32,11 @@ from pathlib import Path
 START = "2026-10-19"          # first session the portfolios are tracked
 CAPITAL = 1000.0              # CAD in each pot
 Z_ENTRY = 2.0
+# Stop losses (Joaquin, 2026-10-23), checked at the close since these pots only have closing prices: a pair slice that
+# lost EXP1_STOP or more in a session sits in cash for the next one, and so does the whole Exp2 pot after a session down
+# EXP2_STOP or more; both then trade as usual. In the 2019-2026 replay (research/portfolio_2019) they cost Exp1 0.3 points
+# a year and added 0.2 to Exp2, with 8 Exp2 stops in 7.8 years.
+EXP1_STOP, EXP2_STOP = 0.05, 0.02
 FX_URL = "https://www.bankofcanada.ca/valet/observations/FXUSDCAD/json?start_date={start}"
 
 
@@ -81,6 +89,8 @@ def book_return(book: list[dict], prices: list[dict], d0: str, d1: str) -> tuple
     px = {p["slug"]: p for p in prices}
     tot, n = 0.0, 0
     for leg in book:
+        if leg.get("stopped"):            # in cash for this session
+            continue
         p = px.get(leg["slug"])
         rl = _ret(p, leg["long"], d0, d1) if p else None
         rs = _ret(p, leg["short"], d0, d1) if p else None
@@ -100,15 +110,19 @@ def update_exp1(state: dict, site: Path) -> dict:
     rows = state.setdefault("exp1", [])
     if rows and rows[-1]["date"] >= today:
         return {"exp1": f"already up to {rows[-1]['date']}"}
-    idx, ret, priced = 1.0, 0.0, 0
+    idx, ret, priced, hit = 1.0, 0.0, 0, []
     if rows:
         last = rows[-1]
         ret, priced = book_return(last["book"], prices, last["date"], today)
         if today < START:
             ret = 0.0
         idx = last["index"] * (1 + ret)
-    rows.append({"date": today, "index": idx, "ret": ret, "priced_legs": priced, "book": exp1_book(pairs, prices)})
-    return {"exp1": f"{today}: {ret:+.4%}, {len(rows[-1]['book'])} positions"}
+        hit = [g["slug"] for g in last["book"] if not g.get("stopped") and today >= START
+               and (r := book_return([g], prices, last["date"], today))[1] and r[0] <= -EXP1_STOP]
+    book = [{**g, "stopped": True, "why": f"stopped out: lost {100 * EXP1_STOP:.0f}% or more on {today}; back tomorrow"}
+            if g["slug"] in hit else g for g in exp1_book(pairs, prices)]
+    rows.append({"date": today, "index": idx, "ret": ret, "priced_legs": priced, "book": book})
+    return {"exp1": f"{today}: {ret:+.4%}, {len(book)} positions" + (f", stopped: {' '.join(hit)}" if hit else "")}
 
 
 # ---------------------------------------------------------------- Experiment 2
@@ -129,6 +143,15 @@ def exp2_returns(site: Path) -> list[tuple[str, float]]:
             except (KeyError, ValueError):
                 continue
     return sorted(out)
+
+
+def with_day_stop(rets: list[tuple[str, float]], stop: float) -> list[tuple[str, float]]:
+    """A session after one that lost stop or more is spent in cash (return 0)."""
+    out, prev = [], 0.0
+    for d, r in rets:
+        out.append((d, 0.0 if prev <= -stop else r))
+        prev = r
+    return out
 
 
 def exp2_position(site: Path) -> str:
@@ -171,6 +194,34 @@ def exp7_position(site: Path) -> str:
     return (_json(site / "exp7" / "data" / "summary.json", {}) or {}).get("position", "")
 
 
+# ---------------------------------------------------------------- Strategy pots (experiments/strategies)
+
+STRATS = ["trend", "pead", "insider", "best_ideas", "conviction", "pelosi", "reversal", "reversal_stop", "btc_donchian"]
+
+
+def strategy_returns(site: Path) -> dict[str, list[tuple[str, float]]]:
+    """Each strategy pot's sessions from START on, as (date, return as a fraction, after costs); strategies/data/daily.csv."""
+    try:
+        with (site / "strategies" / "data" / "daily.csv").open() as fh:
+            rows = list(csv.DictReader(fh))
+    except OSError:
+        return {}
+    out = {k: [] for k in STRATS}
+    for r in rows:
+        for k in STRATS:
+            try:
+                if r["date"] >= START and r.get(k):
+                    out[k].append((r["date"], float(r[k])))
+            except (KeyError, ValueError):
+                continue
+    return {k: sorted(v) for k, v in out.items() if v}
+
+
+def strategy_info(site: Path) -> dict:
+    """name, category, what and position of each strategy pot, from strategies/data/summary.json."""
+    return (_json(site / "strategies" / "data" / "summary.json", {}) or {}).get("strategies", {})
+
+
 # ---------------------------------------------------------------- FX and the daily table
 
 def fetch_fx(start: str) -> dict[str, float]:
@@ -190,32 +241,44 @@ def table(state: dict, site: Path) -> dict:
     fx = state.get("fx") or {}
     e1 = [(r["date"], r["index"]) for r in state.get("exp1", []) if r["date"] >= START]
     e2, idx2 = {}, 1.0
-    for d, r in exp2_returns(site):
+    for d, r in with_day_stop(exp2_returns(site), EXP2_STOP):
         idx2 *= 1 + r
         e2[d] = idx2
     e7, idx7 = {}, 1.0
     for d, r in exp7_returns(site):
         idx7 *= 1 + r
         e7[d] = idx7
-    dates = sorted({d for d, _ in e1} | set(e2) | set(e7))
+    es = {}
+    for k, rs in strategy_returns(site).items():
+        idx, es[k] = 1.0, {}
+        for d, r in rs:
+            idx *= 1 + r
+            es[k][d] = idx
+    dates = sorted({d for d, _ in e1} | set(e2) | set(e7) | {d for v in es.values() for d in v})
     base_day = (date.fromisoformat(START) - timedelta(days=1)).isoformat()
     fx0 = _asof(fx, base_day) or (fx[min(fx)] if fx else None)
     e1d = dict(e1)
     pre = [r["index"] for r in state.get("exp1", []) if r["date"] < START]
     i1 = pre[-1] if pre else 1.0
     base1 = i1
-    rows = [{"date": base_day, "exp1": CAPITAL, "exp2": CAPITAL, "combined": CAPITAL, "exp7": CAPITAL, "fx": fx0}]
+    rows = [{"date": base_day, "exp1": CAPITAL, "exp2": CAPITAL, "combined": CAPITAL, "exp7": CAPITAL, **{s: CAPITAL for s in es}, "fx": fx0}]
     i2 = i7 = 1.0
+    ix = {s: 1.0 for s in es}
+    # a strategy pot that joined later is converted to CAD from its own first close, not from START's rate
+    fxs = {s: _asof(fx, min(es[s])) or fx0 for s in es}
     for d in dates:
         i1, i2, i7 = e1d.get(d, i1), e2.get(d, i2), e7.get(d, i7)
+        ix = {s: es[s].get(d, ix[s]) for s in es}
         f = _asof(fx, d) or fx0
         k = f / fx0 if f and fx0 else 1.0
         v1, v2 = CAPITAL * i1 / base1 * k, CAPITAL * i2 * k
-        rows.append({"date": d, "exp1": v1, "exp2": v2, "combined": (v1 + v2) / 2, "exp7": CAPITAL * i7 * k, "fx": f})
+        rows.append({"date": d, "exp1": v1, "exp2": v2, "combined": (v1 + v2) / 2, "exp7": CAPITAL * i7 * k,
+                     **{s: CAPITAL * ix[s] * (f / fxs[s] if f and fxs[s] and d >= min(es[s]) else 1.0) for s in es}, "fx": f})
     last = state["exp1"][-1] if state.get("exp1") else None
     return {"start": START, "rows": rows, "fx_known": fx0 is not None,
             "exp1_book": last["book"] if last else [], "exp1_book_date": last["date"] if last else None,
-            "exp2_position": exp2_position(site), "exp7": bool(e7) or (site / "exp7" / "index.html").exists(), "exp7_position": exp7_position(site)}
+            "exp2_position": exp2_position(site), "exp7": bool(e7) or (site / "exp7" / "index.html").exists(), "exp7_position": exp7_position(site),
+            "strategies": {k: v for k, v in strategy_info(site).items() if k in es}}
 
 
 def run(site: Path, state_file: Path, update: bool) -> dict:
