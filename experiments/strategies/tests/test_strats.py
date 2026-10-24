@@ -338,7 +338,13 @@ def test_stop_backtest_and_explain_run():
     px = prices()
     members = [f"S{i:02d}" for i in range(40)]
     res = stops.backtest(px, ohlc(px), members, str(px.index[300].date()), {"reversal": [0.0, 0.05], "trend": [0.0]}, live.COST)
-    assert set(res) == {"reversal stop 0%", "reversal stop 5%", "trend stop 0%"}
+    assert set(res) - {"SPY"} == {"reversal stop 0%", "reversal stop 5%", "trend stop 0%"}
+    for v in res.values():
+        total = 1.0
+        for y in v["years"].values():
+            total *= 1 + y / 100
+        last = float(v["month_ends"].rsplit(":", 1)[1])
+        assert abs(total - last) < 0.01 * last and v["month_ends"].count(":") > 12
     st = {}
     for s in px.index[-3:]:
         live.step(st, px.loc[:s], s, members, pd.DataFrame(), pd.DataFrame(), origin=str(px.index[-3].date()))
