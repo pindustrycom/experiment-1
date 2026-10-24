@@ -14,10 +14,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - run: pip install numpy pandas
+      - run: pip install numpy pandas requests
       - uses: actions/cache@v4
         with:
           path: /tmp/klines
           key: binance-klines-1h-${{ github.run_id }}
           restore-keys: binance-klines-
-      - run: python research/twice_daily/btc_freq.py /tmp/klines | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: set -o pipefail; python research/twice_daily/btc_freq.py /tmp/klines | tee -a "$GITHUB_STEP_SUMMARY"
