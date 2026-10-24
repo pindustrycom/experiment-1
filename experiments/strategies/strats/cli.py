@@ -76,7 +76,10 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
         rep["replay"] = {k: {m: round(v, 4) for m, v in rp[k].items() if m != "years"} for k in rp if k in rules.STRATEGIES or k == "SPY"}
     except Exception as ex:  # noqa: BLE001 - the pages still build
         rep["replay"] = f"failed: {type(ex).__name__}: {str(ex)[:200]}"
-    rep["site"] = site.write(out, state, rp, {"members": len(members), "priced": int(px.loc[d].notna().sum())})
+    jf = data_dir / "crypto" / "journal.json"
+    journal = json.loads(jf.read_text()) if jf.exists() else None
+    rep["site"] = site.write(out, state, rp, {"members": len(members), "priced": int(px.loc[d].notna().sum())},
+                             btc_trades=crypto.journal_rows(journal, btc), btc_journal=journal)
     return rep
 
 
@@ -88,6 +91,12 @@ def main() -> None:
     p.add_argument("--state", type=Path, default=Path("state/state.json"))
     p.add_argument("--out", type=Path, default=Path("site"))
     p.add_argument("--no-network", action="store_true")
+    t = sub.add_parser("btc-tick", help="the 4-hour BTC run: update the bars and write down a trade when the rule flips")
+    t.add_argument("--data", type=Path, default=Path("data"))
+    t.add_argument("--journal", type=Path, default=Path("data/crypto/journal.json"))
     a = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
+    if a.cmd == "btc-tick":
+        print(json.dumps(crypto.tick(a.data, a.journal, stop=stops.STOPS.get(crypto.KEY)), indent=1, default=str))
+        return
     print(json.dumps(run(a.data, a.state, a.out, fetch=not a.no_network), indent=1, default=str))

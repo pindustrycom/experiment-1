@@ -2,7 +2,8 @@ name: Strategy pots
 
 # Paper strategies, each with its own 1000 CAD pot (experiments/strategies; no orders placed anywhere):
 #   long-term: trend following (ETFs), earnings drift, insider cluster buying, and three copy pots (funds' best ideas,
-#   fund conviction, Pelosi); short-term: weekly reversal, and BTC breakout (4-hour bars from Kraken's public API).
+#   fund conviction, Pelosi); short-term: weekly reversal, and BTC breakout (4-hour bars from Kraken's public API; its trades are placed by
+#   btc-4h.yml every 4 hours, and this run shows that journal).
 # Weekdays after the close: fetch prices (Yahoo), the S&P 500 list, earnings results and insider filings (Finnhub), new
 # 13Fs (SEC EDGAR) and Pelosi's PTRs (House Clerk), move every pot to the close and form the next books, replay the pots
 # that have a history from 2019, and build the pages. The copy pots' filing history is seeded once from the
@@ -81,6 +82,17 @@ jobs:
           git -C /tmp/trader-skill checkout -q FETCH_HEAD
           test "$(git -C /tmp/trader-skill rev-parse HEAD)" = "$SKILL_COMMIT"
           echo "TRADER_SKILL=/tmp/trader-skill" >> "$GITHUB_ENV"
+
+      - name: BTC journal from the 4-hour runs (btc-4h.yml)
+        if: env.TRIAL != 'true'
+        run: |
+          if gh release view btc-live --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx btc-live.tar.gz; then
+            gh release download btc-live --repo "$GITHUB_REPOSITORY" --pattern btc-live.tar.gz --dir /tmp/btc
+            "$CRYPT" open /tmp/btc/btc-live.tar.gz
+            mkdir -p /tmp/btc/x state/data/crypto
+            tar xzf /tmp/btc/btc-live.tar.gz -C /tmp/btc/x
+            cp /tmp/btc/x/crypto/journal.json state/data/crypto/journal.json
+          fi
 
       - name: Trade the close
         run: |

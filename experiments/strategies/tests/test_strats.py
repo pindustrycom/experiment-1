@@ -344,3 +344,26 @@ def test_stop_backtest_and_explain_run():
         live.step(st, px.loc[:s], s, members, pd.DataFrame(), pd.DataFrame(), origin=str(px.index[-3].date()))
     ex = stops.explain(st, px, px.index[-1])
     assert "reversal_stop" in ex and len(ex["reversal"]["worst"]) == 5
+
+
+def test_btc_tick_journals_a_trade_only_when_the_rule_flips(tmp_path):
+    d = btc_bars()
+    (tmp_path / "crypto").mkdir()
+    d.to_csv(tmp_path / "crypto" / "btc_4h.csv", index_label="t")
+    jf = tmp_path / "crypto" / "journal.json"
+    eq = crypto.run_rule(d)
+    flips = eq.index[eq["after"].ne(eq["after"].shift()) & (np.arange(len(eq)) > crypto.TREND)]
+    b = flips[0]
+    before = b - crypto.BAR                                      # last bar before the flip
+    r = crypto.tick(tmp_path, jf, now=before + crypto.BAR, fetch=False)
+    assert "journal started" in r["tick"] and r["held"] == bool(eq.at[before, "after"])
+    r = crypto.tick(tmp_path, jf, now=b + crypto.BAR, price=(123.0, "test"), fetch=False)
+    j = json.loads(jf.read_text())
+    assert len(j["trades"]) == 1 and j["trades"][0]["price"] == 123.0 and j["trades"][0]["bar"] == str(b)
+    assert j["trades"][0]["side"] == ("buy" if eq.at[b, "after"] else "sell")
+    crypto.tick(tmp_path, jf, now=b + crypto.BAR + pd.Timedelta(minutes=30), price=(1.0, "test"), fetch=False)
+    assert len(json.loads(jf.read_text())["trades"]) == 1        # same bar again: no new trade
+    rows = crypto.journal_rows(j, d)
+    assert rows[0]["rule_price"] == pytest.approx(d.at[b + crypto.BAR, "open"])
+    html = site._btc_live(rows, j)
+    assert "123.00" in html and "Rule fill" in html
