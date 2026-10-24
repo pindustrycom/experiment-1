@@ -1,0 +1,23 @@
+name: BTC run-frequency backtest (research, temporary)
+on:
+  push:
+    branches: [claude/project-thread-wplyfq]
+    paths: ["research/twice_daily/**", ".github/workflows/btc-freq.yml"]
+permissions:
+  contents: read
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install numpy pandas
+      - uses: actions/cache@v4
+        with:
+          path: /tmp/klines
+          key: binance-klines-1h-${{ github.run_id }}
+          restore-keys: binance-klines-
+      - run: python research/twice_daily/btc_freq.py /tmp/klines | tee -a "$GITHUB_STEP_SUMMARY"
