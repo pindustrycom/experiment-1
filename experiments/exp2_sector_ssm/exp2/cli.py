@@ -209,6 +209,15 @@ def main(argv=None) -> None:
     lp.add_argument("--state", type=Path, default=Path("live_state"))
     lp.add_argument("--site", type=Path, default=Path("site"))
     lp.add_argument("--no-network", action="store_true")
+    ob = sub.add_parser("openbb-ideas", help="VIX products, yield curve, options: ideas from the OpenBB data (exp2/openbb_ideas.py)")
+    ob.add_argument("--data", type=Path, default=Path("papers_data"))
+    ob.add_argument("--out", type=Path, default=Path("openbb_results"))
+    ob.add_argument("--ref-sleeves", type=Path, required=True, help="sleeves_monthly.csv from the collapse run")
+    ob.add_argument("--no-network", action="store_true")
+    os_ = sub.add_parser("options-snapshot", help="append today's implied vol, skew and put/call ratios (exp2/openbb_ideas.py)")
+    os_.add_argument("--data", type=Path, default=Path("papers_data"), help="for the S&P 500 member list")
+    os_.add_argument("--out", type=Path, default=Path("options_daily.csv"))
+    os_.add_argument("--max-tickers", type=int, default=0, help="0 = all")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
     if a.cmd == "topo":
@@ -232,6 +241,19 @@ def main(argv=None) -> None:
         rep = tech.run(a.data, a.out, fetch=not a.no_network)
         print(json.dumps({k: rep.get(k) for k in ("warnings", "fetch", "history_from", "universe_size_today", "combined",
                                                    "corr_with_spy_portfolio", "half_and_half", "seconds")}, indent=1, default=str))
+        return
+    if a.cmd == "openbb-ideas":
+        from . import openbb_ideas
+        rep = openbb_ideas.run(a.data, a.out, a.ref_sleeves, fetch=not a.no_network)
+        print(json.dumps(rep, indent=1, default=str))
+        return
+    if a.cmd == "options-snapshot":
+        from . import openbb_ideas
+        cur = pd.read_csv(a.data / "sp500_current.csv")
+        tick = ["SPY", "QQQ", "IWM", *sorted(cur["ticker"])]
+        if a.max_tickers:
+            tick = tick[:a.max_tickers]
+        print(json.dumps(openbb_ideas.options_snapshot(tick, a.out), indent=1, default=str))
         return
     if a.cmd == "live":
         from . import live

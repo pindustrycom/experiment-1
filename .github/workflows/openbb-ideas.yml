@@ -1,0 +1,138 @@
+name: OpenBB ideas
+
+# Three uses of the free data OpenBB opens up (experiments/exp2_sector_ssm/exp2/openbb_ideas.py). Paper research only:
+#   research  Experiment 2's vol timing applied to tradeable products (SVXY, short VIXY, VIX futures from Cboe), and the
+#             Treasury yield curve (Federal Reserve) as a regime signal. Runs on pull requests and by hand; results go
+#             to the "openbb-ideas" release (summary.json, monthly sleeves).
+#   options   each weekday after the close, today's implied vol, skew and put/call ratios for SPY, QQQ, IWM and the
+#             S&P 500 members (Cboe option chains), appended to options_daily.csv in the "options-data" release.
+#             Free chains have no history, so this builds one; a pull request only tries a few names and saves nothing.
+
+on:
+  pull_request:
+    paths: ["experiments/exp2_sector_ssm/exp2/openbb_ideas.py", "experiments/exp2_sector_ssm/tests/test_openbb_ideas.py",
+            ".github/workflows/openbb-ideas.yml"]
+  schedule:
+    - cron: "30 21 * * 1-5"   # 17:30 New York in summer, 16:30 in winter: after the close
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "research (ideas 1 and 2) or options (today's snapshot)"
+        type: choice
+        options: [research, options]
+        default: research
+
+permissions:
+  contents: write   # the result and data releases
+
+concurrency:
+  group: openbb-ideas-${{ github.event_name == 'pull_request' && github.ref || inputs.job || 'options' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  research:
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.job == 'research')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: experiments/exp2_sector_ssm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: experiments/exp2_sector_ssm/requirements.txt
+      - run: |
+          pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+      - name: Tests
+        run: ruff check exp2 tests && python -m pytest -q tests/test_openbb_ideas.py tests/test_openbb_src.py
+
+      - name: Restore the price cache and Experiment 2's sleeves
+        run: |
+          mkdir -p papers_data /tmp/res
+          gh release download papers-data --repo "$GITHUB_REPOSITORY" --pattern papers-data.tar.gz --dir /tmp/prev
+          tar xzf /tmp/prev/papers-data.tar.gz -C papers_data
+          gh release download papers-data --repo "$GITHUB_REPOSITORY" --pattern papers-results.tar.gz --dir /tmp/prev
+          tar xzf /tmp/prev/papers-results.tar.gz -C /tmp/res ./collapse/sleeves_monthly.csv
+
+      - name: Ideas 1 and 2
+        run: |
+          set -o pipefail
+          python -m exp2 openbb-ideas --data papers_data --out openbb_results --ref-sleeves /tmp/res/collapse/sleeves_monthly.csv > /tmp/ideas.log
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          s = json.load(open("openbb_results/summary.json"))   # stdout also carries OpenBB's start-up lines
+          print("\n**Fetch:**", json.dumps(s.get("fetch", {}), default=str)[:600])
+          print("\n| Sleeve | From | Sharpe before 2019 | Sharpe 2019+ | Worst month 2019+ | Feb 2018 | Mar 2020 |\n|---|---|---|---|---|---|---|")
+          for k, v in s["vol_products"].items():
+              b, t = v.get("before_test", {}), v.get("test", {})
+              f = lambda x: "" if x is None else f"{x:.2f}"
+              print(f"| {k} | {v['from']} | {f(b.get('sharpe'))} | {f(t.get('sharpe'))} | {f(t.get('worst_month_pct'))} | {v['month_2018-02']} | {v['month_2020-03']} |")
+          print("\n| Portfolio (min variance) | Sharpe 2019+ | Max drawdown | Chosen |\n|---|---|---|---|")
+          for k, p in [("reference", s["reference_portfolio"]), *s["portfolio_with"].items()]:
+              print(f"| {k} | {p.get('sharpe')} | {p.get('max_drawdown_pct')} | {', '.join(p.get('chosen') or [])} |")
+          c = s.get("curve")
+          if c:
+              print("\n**Yield curve:**", json.dumps({k: c[k] for k in ("last", "inverted_share_since_2005", "vol_forecast")}, default=str))
+              print("\n**Curve portfolio:**", json.dumps(c["portfolio_with_curve_variants"], default=str)[:600])
+          PY
+
+      - name: Save results
+        if: always()
+        run: |
+          [ -d openbb_results ] || exit 0
+          gh release view openbb-ideas --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create openbb-ideas --repo "$GITHUB_REPOSITORY" --title "OpenBB ideas results" --latest=false \
+              --notes "Results of exp2/openbb_ideas.py (VIX products, yield curve) and the data it fetched. Paper research, not a software release."
+          cp papers_data/vx_curve_monthly.csv papers_data/treasury_curve.csv openbb_results/ 2>/dev/null || true
+          tar czf /tmp/openbb-ideas-results.tar.gz -C openbb_results .
+          gh release upload openbb-ideas /tmp/openbb-ideas-results.tar.gz openbb_results/summary.json --repo "$GITHUB_REPOSITORY" --clobber
+
+  options:
+    if: github.event_name != 'workflow_dispatch' || inputs.job == 'options'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TRIAL: ${{ github.event_name == 'pull_request' }}
+    defaults:
+      run:
+        working-directory: experiments/exp2_sector_ssm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: experiments/exp2_sector_ssm/requirements.txt
+      - run: |
+          pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+      - name: Restore the member list and the options history
+        run: |
+          mkdir -p papers_data
+          gh release download papers-data --repo "$GITHUB_REPOSITORY" --pattern papers-data.tar.gz --dir /tmp/prev
+          tar xzf /tmp/prev/papers-data.tar.gz -C papers_data ./sp500_current.csv
+          if [ "$TRIAL" != "true" ] && gh release view options-data --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx options_daily.csv; then
+            gh release download options-data --repo "$GITHUB_REPOSITORY" --pattern options_daily.csv --dir .
+          fi
+      - name: Today's options snapshot
+        run: |
+          set -o pipefail
+          max=$([ "$TRIAL" = "true" ] && echo 12 || echo 0)
+          python -m exp2 options-snapshot --data papers_data --out options_daily.csv --max-tickers "$max" | tee /tmp/opt.json
+          echo '```' >> "$GITHUB_STEP_SUMMARY"; cat /tmp/opt.json >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
+          [ -f options_daily.csv ] && { echo; tail -n 13 options_daily.csv | cut -c1-200; } >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Save the options history
+        if: env.TRIAL != 'true'
+        run: |
+          [ -f options_daily.csv ] || { echo "Nothing collected."; exit 1; }
+          gh release view options-data --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create options-data --repo "$GITHUB_REPOSITORY" --title "Options data" --latest=false \
+              --notes "Daily implied vol, skew and put/call ratios per ticker from Cboe option chains (exp2/openbb_ideas.py). Not a software release."
+          gh release upload options-data options_daily.csv --repo "$GITHUB_REPOSITORY" --clobber
