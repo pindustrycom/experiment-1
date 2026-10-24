@@ -12,6 +12,7 @@ the rule uses only finished bars, so this is what trading it every 4 hours would
 """
 from __future__ import annotations
 
+import json
 import logging
 import time
 from pathlib import Path
@@ -27,6 +28,8 @@ COST = 0.0025          # 25 bp a side: a Canadian retail exchange's taker fee an
 BAR = pd.Timedelta(hours=4)
 KRAKEN = "https://api.kraken.com/0/public/OHLC"
 COINBASE = "https://api.exchange.coinbase.com/products/BTC-USD/candles"
+KRAKEN_TICKER = "https://api.kraken.com/0/public/Ticker"
+COINBASE_TICKER = "https://api.exchange.coinbase.com/products/BTC-USD/ticker"
 UA = {"User-Agent": "experiment-1 research (https://github.com/pindustrycom/experiment-1)"}
 
 
@@ -146,6 +149,69 @@ def mark_bar(eq: pd.DataFrame, us_close: pd.Timestamp) -> pd.Timestamp | None:
     t = (us_close.normalize() + pd.Timedelta(hours=16)).tz_localize("America/New_York").tz_convert("UTC").tz_localize(None)
     done = eq.index[eq.index + BAR <= t]
     return done[-1] if len(done) else None
+
+
+def price_now() -> tuple[float, str] | None:
+    """BTC's last traded price in USD: Kraken, then Coinbase."""
+    for name, fn in (("kraken", lambda j: next(iter(j["result"].values()))["c"][0]), ("coinbase", lambda j: j["price"])):
+        try:
+            url, params = (KRAKEN_TICKER, {"pair": "XBTUSD"}) if name == "kraken" else (COINBASE_TICKER, None)
+            r = requests.get(url, params=params, headers=UA, timeout=30)
+            r.raise_for_status()
+            return float(fn(r.json())), name
+        except Exception as ex:  # noqa: BLE001 - try the next source
+            log.warning("btc price from %s failed: %s", name, ex)
+    return None
+
+
+def tick(data: Path, journal: Path, stop: float | None = None, now: pd.Timestamp | None = None,
+         price: tuple[float, str] | None = None, fetch: bool = True) -> dict:
+    """One 4-hour run (btc-4h.yml, a few minutes after each 4-hour bar closes): bring the bars up to date, ask the rule
+    for its position after the last finished bar, and if that differs from the journal's position, write the trade
+    down at BTC's price right now. The pot's P/L still comes from the rule (step_btc); the journal shows the trades
+    were placed on time and how far the live price was from the rule's fill at the next bar's open."""
+    now = now if now is not None else pd.Timestamp.now(tz="UTC").tz_localize(None)
+    rep = update(data) if fetch else {}
+    j = json.loads(journal.read_text()) if journal.exists() else {"position": None, "trades": [], "runs": []}
+    d = finished(load(data), now)
+    if len(d) <= TREND:
+        rep["tick"] = "not enough bars for the rule yet"
+        return rep
+    eq = run_rule(d, stop=stop)
+    bar, want = eq.index[-1], bool(eq["after"].iloc[-1])
+    at = now.strftime("%Y-%m-%d %H:%M")
+    if j["position"] is None:                       # first run: take the rule's position as it stands, no trade
+        j["position"] = want
+        j["start"] = {"at": at, "bar": str(bar), "held": want}
+        rep["tick"] = f"journal started {'holding BTC' if want else 'in cash'}"
+    elif want != j["position"]:
+        p = price if price is not None else (price_now() if fetch else None)
+        px, src = p if p else (float(d["close"].iloc[-1]), "last bar close")
+        j["trades"].append({"at": at, "bar": str(bar), "side": "buy" if want else "sell", "price": round(px, 2), "source": src})
+        j["position"] = want
+        rep["tick"] = f"{'bought' if want else 'sold'} BTC at {px:,.2f} ({src})"
+    else:
+        rep["tick"] = f"no trade: {'holding BTC' if want else 'in cash'}"
+    j["runs"] = (j["runs"] + [{"at": at, "bar": str(bar), "held": want}])[-60:]
+    journal.parent.mkdir(parents=True, exist_ok=True)
+    journal.write_text(json.dumps(j, indent=1))
+    rep |= {"bar": str(bar), "held": want, "trades": len(j["trades"])}
+    return rep
+
+
+def journal_rows(journal: dict | None, bars: pd.DataFrame | None, n: int = 10) -> list[dict]:
+    """The latest live trades, each with the rule's fill (the open of the bar after the signal bar) when known."""
+    if not journal:
+        return []
+    out = []
+    for t in journal.get("trades", [])[-n:][::-1]:
+        fill = None
+        if bars is not None and len(bars):
+            nxt = pd.Timestamp(t["bar"]) + BAR
+            if nxt in bars.index:
+                fill = float(bars.at[nxt, "open"])
+        out.append(t | {"rule_price": fill, "gap": (t["price"] / fill - 1) if fill else None})
+    return out
 
 
 def position_text(row: dict | None) -> str:

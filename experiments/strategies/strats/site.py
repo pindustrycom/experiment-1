@@ -50,7 +50,8 @@ def position_text(key: str, row: dict | None, events: dict) -> str:
             + ", ".join(names[:25]) + (" …" if len(names) > 25 else "") + tail)
 
 
-def write(out: Path, state: dict, summary_replay: dict | None, info: dict) -> dict:
+def write(out: Path, state: dict, summary_replay: dict | None, info: dict, btc_trades: list[dict] | None = None,
+          btc_journal: dict | None = None) -> dict:
     (out / "data").mkdir(parents=True, exist_ok=True)
     pots = state.get("pots", {})
     dates = sorted({r["date"] for rows in pots.values() for r in rows})
@@ -66,7 +67,7 @@ def write(out: Path, state: dict, summary_replay: dict | None, info: dict) -> di
                               for k, (n, c, w) in rules.STRATEGIES.items()},
                "replay": summary_replay}
     (out / "data" / "summary.json").write_text(json.dumps(summary, indent=1))
-    (out / "index.html").write_text(page(summary, pots))
+    (out / "index.html").write_text(page(summary, pots, _btc_live(btc_trades or [], btc_journal)))
     return {"sessions": len(dates), "last": summary["last"]}
 
 
@@ -100,7 +101,25 @@ def _replay_block(key: str, rp: dict | None) -> str:
             f'<div class="stat"><div class="k">Correlation with SPY</div><div class="v">{rp["corr_spy"][key]:+.2f}</div></div></div>{yt}')
 
 
-def page(summary: dict, pots: dict) -> str:
+def _btc_live(trades: list[dict], journal: dict | None) -> str:
+    """The 4-hour run's journal: when each trade was placed and at what price, against the rule's fill."""
+    if not journal:
+        return '<p class="small muted">Live 4-hour runs start with the next scheduled run (every 4 hours, every day).</p>'
+    runs = journal.get("runs") or []
+    head = (f'<p class="small">Checked every 4 hours, every day; last check {e(runs[-1]["at"])} UTC'
+            f'{", holding BTC" if runs[-1]["held"] else ", in cash"}.</p>') if runs else ""
+    if not trades:
+        start = journal.get("start") or {}
+        return head + f'<p class="small muted">No live trades yet (journal started {e(start.get("at", "?"))} UTC).</p>'
+    rows = "".join(f'<tr><td>{e(t["at"])}</td><td>{e(t["side"])}</td><td>{t["price"]:,.2f}</td>'
+                   f'<td>{"–" if t.get("rule_price") is None else f"{t['rule_price']:,.2f}"}</td>'
+                   f'<td>{"–" if t.get("gap") is None else f"{t['gap']:+.2%}"}</td></tr>' for t in trades)
+    return (head + '<div class="scroll"><table><tr><th>Placed (UTC)</th><th>Side</th><th>Live price</th>'
+            '<th>Rule fill (next bar open)</th><th>Difference</th></tr>' + rows + "</table></div>"
+            '<p class="small muted">The pot is valued on the rule\'s fills; the difference column shows what placing the trade at the live run cost or saved.</p>')
+
+
+def page(summary: dict, pots: dict, btc_live: str = "") -> str:
     rp = summary.get("replay")
     parts = []
     for cat in (rules.LONG_TERM, rules.SHORT_TERM):
@@ -115,7 +134,7 @@ def page(summary: dict, pots: dict) -> str:
                      f'traded live after that)') if rp_rows else ""
             parts.append(f'<section class="panel" id="{k}"><h3>{e(s["name"])}</h3><p class="muted">{e(s["what"])}</p>'
                          f'<p class="small">Paper pot since {e(rows[0]["date"]) if rows else "the next close"}{since}: {pct(live)} in USD (the Markets page shows it in CAD)</p>'
-                         f'<p class="small">{e(s["position"])}</p>{_replay_block(k, rp)}</section>')
+                         f'<p class="small">{e(s["position"])}</p>{btc_live if k == crypto.KEY else ""}{_replay_block(k, rp)}</section>')
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Strategy pots</title><style>{CSS}</style></head><body>
 <main class="wrap"><h1>Strategy pots</h1><p class="muted">{len(summary["strategies"])} rules, each traded every day on paper with its own
