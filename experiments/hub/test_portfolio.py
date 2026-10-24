@@ -162,19 +162,24 @@ def test_strategy_pots_split_long_and_short(tmp_path, fx):
     assert "4 × 1,000 CAD" in hub and "long SPY 9%" in hub and 'href="strategies/index.html#trend"' in hub
     assert "backdrop-filter" in (site / "strategies" / "index.html").read_text()
     # the best % return on its 1,000 CAD leads the Markets page, the table is ranked, and the overview door names it
-    best = hub.index("Best pot so far")
-    assert best < hub.index("All paper pots") and 'href="strategies/index.html#trend">Trend following</a> <span class="pos">+2.01%' in hub
+    best = hub.index("Best strategy so far")
+    assert best < hub.index("All pots together: profit") and 'href="strategies/index.html#trend">Trend following</a> <span class="pos">+2.01%' in hub
+    assert '<div class="v pos">+20.10 CAD</div>' in hub[best:] and 'class="big minor"' in hub
     assert "from 1,000 CAD on 2026-10-19" in hub and "a lead this young is mostly luck" in hub
     table = hub[hub.index("<table class=\"mk-pots\">"):]
     assert '<tr class=lead><td class="mono">1</td><td><a href="strategies/index.html#trend">' in table
     assert table.index("Trend following") < table.index("Weekly reversal")
-    assert 'Best pot: <b>Trend following</b>' in hub[:hub.index('class="open"')]
+    door = hub[hub.index('id="markets"'):hub.index('class="open"')]
+    assert 'Best strategy</span><span class="v mono pos">+20.10 CAD</span>' in door and "<b>Trend following</b>" in door
+    assert "all pots together" in door
 
 
-def test_no_best_pot_when_nothing_is_up():
-    rows = [{"date": "2026-10-16", "a": 1000.0, "b": 1000.0}, {"date": "2026-10-19", "a": 990.0, "b": 1000.0}]
+def test_best_pot_still_named_when_nothing_is_up():
+    rows = [{"date": "2026-10-16", "a": 1000.0, "b": 1000.0}, {"date": "2026-10-19", "a": 990.0, "b": 995.0}]
     pots = [("a", "A", "Long-term", "a.html"), ("b", "B", "Short-term", "b.html")]
-    assert "None ahead yet" in build_hub.best_pot(rows, pots)
+    box = build_hub.best_pot(rows, pots)
+    assert '<a href="b.html">B</a>' in box and '<div class="v neg">' in box and "losing least" in box
+    rows[-1]["b"] = 1000.0
     assert [p[0] for p in build_hub.ranked(rows, pots)] == ["b", "a"]
     assert build_hub.pot_since(rows, "a") == ("2026-10-16", 1) and build_hub.pot_since(rows, "b") == (None, 0)
 
