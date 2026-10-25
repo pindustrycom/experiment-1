@@ -304,7 +304,7 @@ const pick=document.getElementById("sv-pick"),cv=document.getElementById("sv-3d"
 let yaw=-0.75,pitch=0.5;
 // sequential ramp: deep violet (low vol) to pale lavender (high vol)
 const ramp=t=>{const a=[42,24,88],b=[236,228,255],k=Math.max(0,Math.min(1,t));return`rgb(${a.map((v,i)=>Math.round(v+(b[i]-v)*k)).join(",")})`};
-function draw3d(){if(!cv||!S[cur])return;const s=S[cur],g=s.grid,ex=s.expiries,d=Math.min(devicePixelRatio||1,2),W=cv.clientWidth*d,H=cv.clientHeight*d;
+function draw3d(){if(!cv||!S[cur])return;const s=S[cur],g=s.grid,ex=s.expiries.filter(e=>e.iv.filter(v=>v!=null).length>=g.length-2),d=Math.min(devicePixelRatio||1,2),W=cv.clientWidth*d,H=cv.clientHeight*d;
  cv.width=W;cv.height=H;const x=cv.getContext("2d");x.clearRect(0,0,W,H);
  const vals=ex.flatMap(e=>e.iv).filter(v=>v!=null),lo=Math.min(...vals),hi=Math.max(...vals),dmax=Math.max(...ex.map(e=>e.dte));
  document.getElementById("sv-scale").textContent=`Colour runs from ${pc(lo)} (dark) to ${pc(hi)} (light).`;
