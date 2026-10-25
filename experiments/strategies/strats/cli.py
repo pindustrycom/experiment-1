@@ -91,11 +91,20 @@ def main() -> None:
     p.add_argument("--state", type=Path, default=Path("state/state.json"))
     p.add_argument("--out", type=Path, default=Path("site"))
     p.add_argument("--no-network", action="store_true")
+    q = sub.add_parser("quant", help="the Quant lab page: option chains to vol surfaces, market regimes, event-driven backtest (quant.py)")
+    q.add_argument("--data", type=Path, default=Path("data"))
+    q.add_argument("--options", type=Path, help="options_daily.csv from the options-data release (optional)")
+    q.add_argument("--out", type=Path, default=Path("quant_site"))
+    q.add_argument("--no-network", action="store_true")
     t = sub.add_parser("btc-tick", help="the 4-hour BTC run: update the bars and write down a trade when the rule flips")
     t.add_argument("--data", type=Path, default=Path("data"))
     t.add_argument("--journal", type=Path, default=Path("data/crypto/journal.json"))
     a = ap.parse_args()
     logging.basicConfig(level=logging.WARNING)
+    if a.cmd == "quant":
+        from . import quant
+        print(json.dumps(quant.run(a.data, a.options, a.out, fetch=not a.no_network), indent=1, default=str))
+        return
     if a.cmd == "btc-tick":
         print(json.dumps(crypto.tick(a.data, a.journal, stop=stops.STOPS.get(crypto.KEY)), indent=1, default=str))
         return

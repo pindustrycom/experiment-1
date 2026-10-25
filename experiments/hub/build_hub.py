@@ -49,6 +49,10 @@ CATALOG = [
     ("strategies", MARKETS, "Strategy pots", "Strategy pots · trend, earnings, insiders, reversal, BTC",
      "Four rules with their own pots: trend following across ETFs, buying after earnings beats, buying after insiders "
      "buy, and buying the week's biggest losers.", None),
+    ("quant", MARKETS, "Quant lab", "Quant lab · vol surface, regimes, event-driven test",
+     "Three quant studies run each night on the pots' own data: SPY, QQQ and IWM implied volatility surfaces worked back "
+     "from option prices, market regimes found by K-Means and how every pot does in each, and the pots re-run through an "
+     "event-driven backtest with next-open fills and real costs. Research only, no pot.", None),
     ("trader_skill", MARKETS, "Copy-trading test", "trader-skill test · copying funds and Congress",
      "A backtest of the trader-skill Claude skills: copying 23 famous funds' 13F filings and every stock buy the House "
      "discloses, against SPY. Research only, no pot.", EXPERIMENTS / "trader_skill"),
@@ -339,7 +343,7 @@ def inject(f: Path, block: str) -> bool:
 def theme(site: Path) -> int:
     """Lay the glass theme over every experiment page (replacing any earlier copy)."""
     n = 0
-    for d in ("exp1", "exp2", "exp7", "strategies"):
+    for d in ("exp1", "exp2", "exp7", "strategies", "quant"):
         for f in (site / d).rglob("*.html") if (site / d).is_dir() else []:
             s = f.read_text()
             if GLASS in s:

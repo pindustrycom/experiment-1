@@ -10,6 +10,10 @@ name: Strategy pots
 # trader-skill-data release and read with the trader-skill pack at the commit research/trader_skill reviewed.
 # The state and the price cache are saved to the "strategies-state" release (encrypted with state_crypt.sh, as the other
 # experiments), and the pages as strategies-site.tar.gz, which pages.yml puts under /strategies/ and into the Markets dashboard.
+# Then the Quant lab (strats/quant.py): today's SPY, QQQ and IWM option chains from Cboe (kept 30 days in the state), the
+# implied vol surfaces worked back from them, K-Means market regimes with every replayed pot scored by regime, and the trend
+# and reversal pots through an event-driven backtest. Its page is saved as quant-site.tar.gz, which pages.yml puts under /quant/.
+# A failure there never stops the pots.
 
 on:
   pull_request:   # tests, plus a trial run on real data that saves nothing
@@ -112,6 +116,20 @@ jobs:
           print(f"\nFilings for the copy pots: {s.get('copy_data')}")
           PY
 
+      - name: Quant lab
+        run: |
+          mkdir -p /tmp/opt
+          gh release download options-data --repo "$GITHUB_REPOSITORY" --pattern options_daily.csv --dir /tmp/opt 2>/dev/null || true
+          opt=(); [ -f /tmp/opt/options_daily.csv ] && opt=(--options /tmp/opt/options_daily.csv)
+          if python -m strats quant --data state/data "${opt[@]}" --out quant_site > /tmp/quant.json; then
+            { echo; echo "**Quant lab**"; echo '```'; head -c 4000 /tmp/quant.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            if [ "$TRIAL" = "true" ]; then   # the surfaces' numbers, to check the page against
+              python -c 'import json; q=json.load(open("quant_site/data/quant.json")); print(json.dumps({"surface": q["surface"], "options_history": q["options_history"]}))'
+            fi
+          else
+            echo "Quant lab failed: the page keeps its last version." >> "$GITHUB_STEP_SUMMARY"; tail -30 /tmp/quant.json || true
+          fi
+
       - name: Save the state and the pages
         if: env.TRIAL != 'true'
         run: |
@@ -119,6 +137,7 @@ jobs:
           mkdir -p /tmp/out
           tar czf /tmp/out/strategies-state.tar.gz -C state .
           tar czf /tmp/out/strategies-site.tar.gz -C site .
+          [ -f quant_site/index.html ] && tar czf /tmp/out/quant-site.tar.gz -C quant_site .
           "$CRYPT" seal /tmp/out/*.tar.gz
           gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --title "Strategy pots state" --latest=false \
