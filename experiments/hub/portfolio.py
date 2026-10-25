@@ -13,6 +13,8 @@ Three pots, each starting with a fake 1000 CAD on START:
   Strategy pots (each its own 1000 CAD, not in the combined one): trend following, earnings drift, insider buying and
       weekly reversal; each session earns the pot's return after 1 bp per side (strategies/data/daily.csv, built by
       experiments/strategies).
+  Top 3 pot (its own 1000 CAD, not in the combined one): the three best strategies so far (TOP3), equal money in each,
+      evened out at every week's last close; between Fridays each slice moves with its pot's CAD value.
 The pots are invested in US markets, so each day's value is converted to CAD at the Bank of Canada USD/CAD rate.
 No costs, borrow fees or interest are included.
 
@@ -31,6 +33,9 @@ from pathlib import Path
 
 START = "2026-10-19"          # first session the portfolios are tracked
 CAPITAL = 1000.0              # CAD in each pot
+# The concentrated pot: picked on 2020-2025 replays (best return per strategy and best 3-way mix: +28.8%/yr vs SPY +15.0%),
+# then checked on Jan-Oct 2026 (+27.4%/yr vs SPY +17.7%). research/regime_walkforward has the study.
+TOP3 = ("reversal", "pelosi", "exp2")
 Z_ENTRY = 2.0
 # Stop losses (Joaquin, 2026-10-23), checked at the close since these pots only have closing prices: a pair slice that
 # lost EXP1_STOP or more in a session sits in cash for the next one, and so does the whole Exp2 pot after a session down
@@ -275,10 +280,27 @@ def table(state: dict, site: Path) -> dict:
         rows.append({"date": d, "exp1": v1, "exp2": v2, "combined": (v1 + v2) / 2, "exp7": CAPITAL * i7 * k,
                      **{s: CAPITAL * ix[s] * (f / fxs[s] if f and fxs[s] and d >= min(es[s]) else 1.0) for s in es}, "fx": f})
     last = state["exp1"][-1] if state.get("exp1") else None
-    return {"start": START, "rows": rows, "fx_known": fx0 is not None,
+    top3 = list(TOP3) if concentrate(rows) else []
+    return {"start": START, "rows": rows, "top3": top3, "fx_known": fx0 is not None,
             "exp1_book": last["book"] if last else [], "exp1_book_date": last["date"] if last else None,
             "exp2_position": exp2_position(site), "exp7": bool(e7) or (site / "exp7" / "index.html").exists(), "exp7_position": exp7_position(site),
             "strategies": {k: v for k, v in strategy_info(site).items() if k in es}}
+
+
+def concentrate(rows: list[dict], keys: tuple[str, ...] = TOP3, name: str = "top3") -> bool:
+    """Add a pot that holds equal CAD in each of keys, reset to equal at each week's last row. False if a pot is missing."""
+    if not rows or any(k not in rows[0] for k in keys):
+        return False
+    week = [date.fromisoformat(r["date"]).isocalendar()[:2] for r in rows]
+    w = dict.fromkeys(keys, 1 / len(keys))
+    v = rows[0][name] = CAPITAL
+    for i in range(1, len(rows)):
+        g = {k: rows[i][k] / rows[i - 1][k] for k in keys}
+        grow = sum(w[k] * g[k] for k in keys)
+        v *= grow
+        rows[i][name] = v
+        w = dict.fromkeys(keys, 1 / len(keys)) if i + 1 == len(rows) or week[i + 1] != week[i] else {k: w[k] * g[k] / grow for k in keys}
+    return True
 
 
 def run(site: Path, state_file: Path, update: bool) -> dict:

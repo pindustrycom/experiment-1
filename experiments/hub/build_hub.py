@@ -3,7 +3,7 @@
     python experiments/hub/build_hub.py --site _site --state state/portfolio.json [--update]
 
 The root page is one column per group of experiments (GROUPS below): the market experiments (traded on paper, headlined
-by the best strategy pot's money from portfolio.py, all pots together shown smaller) and the resonance research pages. Clicking a column opens that group
+by the best strategy pot's money from portfolio.py, then the Top 3 pot: the three best strategies together) and the resonance research pages. Clicking a column opens that group
 over the whole page (root/index.html#markets, ...). Each market experiment's page gets
 its own 1000 CAD portfolio box at the top.
 
@@ -209,7 +209,7 @@ color:var(--text);background:linear-gradient(0deg,rgba(0,0,0,.8),rgba(0,0,0,0) 6
 .mk-pots td,.mk-pots th{padding:7px 8px;text-align:right;white-space:nowrap}.mk-pots td:first-child,.mk-pots th:first-child,.mk-pots td:nth-child(2),.mk-pots th:nth-child(2),.mk-pots td:nth-child(3),.mk-pots th:nth-child(3){text-align:left}
 .mk-pots{width:100%;border-collapse:collapse;font-size:14px}.mk-pots th{font-size:12px;color:var(--muted);font-weight:500}
 .mk-pots tr+tr td{border-top:1px solid var(--line)}.mk-pots tr.lead td{font-weight:650}.mk-pots td:first-child{color:var(--muted)}
-.big.best .name{font-size:clamp(20px,3vw,26px);font-weight:650;margin:2px 0 6px}.big.best .name a{color:var(--text)}.big.minor .v{font-size:28px}.big.best .d+.d{margin-top:4px}.door .lead{font-size:14px;color:var(--text)}.mk-pots .cat{font-size:12px;color:var(--muted)}.tw{overflow-x:auto}
+.big.best .name{font-size:clamp(20px,3vw,26px);font-weight:650;margin:2px 0 6px}.big.best .name a{color:var(--text)}.big.minor .v{font-size:28px}.big.best .d+.d{margin-top:4px}.door .lead{font-size:14px;color:var(--text)}.big.top3 .v{font-size:40px}.big.top3 .d+.d{margin-top:6px}.big.top3 .d a{color:var(--text)}.tag3{font-size:11px;font-weight:600;color:#a593d4;border:1px solid rgba(165,147,212,.5);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:1px}.mk-pots .cat{font-size:12px;color:var(--muted)}.tw{overflow-x:auto}
 @keyframes open{from{opacity:0;transform:translateY(16px)}}
 @media (max-width:640px){.split{flex-direction:column}.split>.half{border-right:0;border-bottom:1px solid var(--glass-line);min-height:300px}
 .split.sub>.half{min-height:400px}.mk-pots .cat{display:none}}
@@ -484,8 +484,6 @@ def best_pot(rows: list[dict], pots: list[tuple]) -> str:
         pl2 = rows[-1][k2] - CAPITAL
         nxt = f' · runner-up <a href="{href2}">{e(label2)}</a> <span class="{pl_class(pl2)}">{100 * pl2 / CAPITAL:+.2f}%</span>'
     notes = []
-    if pl_class(pl) != "pos":
-        notes.append(f"No pot is above its {CAPITAL:,.0f} CAD start yet: this is the one losing least.")
     if days < 60:
         notes.append(f'Only {days} trading day{"s" * (days != 1)} so far: a lead this young is mostly luck.')
     return (f'<div class="big best"><div class="k">Best strategy so far · {e(cat)}</div>'
@@ -496,13 +494,39 @@ def best_pot(rows: list[dict], pots: list[tuple]) -> str:
             + "".join(f'<div class="d small">{n}</div>' for n in notes) + "</div>")
 
 
-def pots_table(rows: list[dict], pots: list[tuple]) -> str:
+def top3_box(rows: list[dict], pots: list[tuple], keys: list[str]) -> str:
+    """The concentrated pot: 1,000 CAD split evenly across the three best strategies so far, and each of their own pots."""
+    if not keys or "top3" not in rows[-1]:
+        return ""
+    info = {p[0]: p for p in pots}
+    v = rows[-1]["top3"]
+    pl, day = v - CAPITAL, v - rows[-2]["top3"] if len(rows) > 1 else 0.0
+    names = [info[k][1] if k in info else k for k in keys]
+    each = []
+    for k in keys:
+        if k not in info:
+            continue
+        _, label, _, href, *_ = info[k]
+        p = rows[-1][k] - CAPITAL
+        each.append(f'<a href="{href}">{e(label)}</a> <span class="mono {pl_class(p)}">{cad(rows[-1][k])} ({100 * p / CAPITAL:+.2f}%)</span>')
+    return (f'<div class="big top3"><div class="k">Top 3 strategies together · concentrated pot</div>'
+            f'<div class="v {pl_class(pl)}">{cad(pl, True)}</div>'
+            f'<div class="d">Worth <b>{cad(v)}</b> from {CAPITAL:,.0f} CAD ({100 * pl / CAPITAL:+.2f}%) · today '
+            f'<span class="{pl_class(day)}">{cad(day, True)}</span> · last update {e(rows[-1]["date"])}</div>'
+            f'<div class="d">Equal money in {e(", ".join(names[:-1]))} and {e(names[-1])}, evened out every Friday. '
+            f'Each one on its own 1,000 CAD: {" · ".join(each)}</div>'
+            f'<div class="d small">Picked on 2020–2025 replays: together +28.8% a year vs SPY +15.0%; on Jan–Oct 2026, '
+            f'kept apart as a test, +27.4% a year vs SPY +17.7%. Past replays, not a promise.</div></div>')
+
+
+def pots_table(rows: list[dict], pots: list[tuple], top: list[str] | None = None) -> str:
     out = ['<div class="panel"><div class="tw"><table class="mk-pots"><tr><th>#</th><th>Pot</th><th class="cat">Holds for</th><th>Worth</th>'
            '<th>Profit / loss</th><th>Today</th></tr>']
     for n, (k, label, cat, href, *_) in enumerate(ranked(rows, pots), 1):
         v = rows[-1][k]
         pl, day = v - CAPITAL, v - rows[-2][k] if len(rows) > 1 else 0.0
-        out.append(f'<tr{" class=lead" * (n == 1 and pl_class(pl) == "pos")}><td class="mono">{n}</td><td><a href="{href}">{e(label)}</a></td>'
+        tag = ' <span class="tag3">Top 3</span>' if k in (top or []) else ""
+        out.append(f'<tr{" class=lead" * (n == 1 and pl_class(pl) == "pos")}><td class="mono">{n}</td><td><a href="{href}">{e(label)}</a>{tag}</td>'
                    f'<td class="cat">{e(cat)}</td><td class="mono">{cad(v)}</td>'
                    f'<td class="mono {pl_class(pl)}">{cad(pl, True)} ({100 * pl / CAPITAL:+.2f}%)</td>'
                    f'<td class="mono {pl_class(day)}">{cad(day, True)}</td></tr>')
@@ -514,8 +538,8 @@ def markets_body(t: dict) -> tuple[str, str]:
     rows, pots = t["rows"], pots_in(t)
     keys = [p[0] for p in pots]
     fx = "" if t.get("fx_known") else " USD/CAD rate unavailable: values exclude currency moves."
-    head = (best_pot(rows, pots) + pots_table(rows, pots)
-            + total_number(rows, keys, "All pots together: profit / loss", t.get("start"), minor=True)
+    top = t.get("top3") or []
+    head = (best_pot(rows, pots) + top3_box(rows, pots, top) + pots_table(rows, pots, top)
             + pots_chart(rows, pots)
             + f'<p class="small muted">Every pot started with a fake {CAPITAL:,.0f} CAD and trades every trading day from its own rule; US positions, '
             f'valued in CAD at the Bank of Canada rate. All pots count from the same start as Exp1; a strategy added later is replayed from that day with the data known each day.{fx}</p>')
@@ -532,11 +556,13 @@ def markets_body(t: dict) -> tuple[str, str]:
         halves.append(half(cat, anchor, color, bg, intro, [p[1] for p in mine], stat, body, unit="pot", back=("#markets", "Markets")))
     total = sum(rows[-1][k] for k in keys) - CAPITAL * len(keys)
     stat = f'<span class="lead">All pots together: <span class="mono {pl_class(total)}">{cad(total, True)}</span></span>'
+    t3 = rows[-1].get("top3", CAPITAL) - CAPITAL
     for k, label, *_ in ranked(rows, pots)[:1]:
         pl = rows[-1][k] - CAPITAL
         stat = (f'<span class="k mono">Best strategy</span><span class="v mono {pl_class(pl)}">{cad(pl, True)}</span>'
                 f'<span class="lead"><b>{e(label)}</b> <span class="mono {pl_class(pl)}">{100 * pl / CAPITAL:+.2f}%</span>'
-                f' · all pots together <span class="mono {pl_class(total)}">{cad(total, True)}</span></span>')
+                + (f' · top 3 together <span class="mono {pl_class(t3)}">{cad(t3, True)}</span>' if top else
+                   f' · all pots together <span class="mono {pl_class(total)}">{cad(total, True)}</span>') + '</span>')
     return head + f'<div class="split sub">{"".join(halves)}</div>', stat
 
 

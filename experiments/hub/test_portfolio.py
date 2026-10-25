@@ -159,12 +159,13 @@ def test_strategy_pots_split_long_and_short(tmp_path, fx):
     assert 'id="long"' in hub and 'id="short"' in hub and 'href="#markets">← Markets' in hub
     lo, sh = hub.index('id="long"'), hub.index('id="short"')
     assert "Trend following" in hub[lo:sh] and "Weekly reversal" not in hub[lo:sh] and "Weekly reversal" in hub[sh:]
-    assert "4 × 1,000 CAD" in hub and "long SPY 9%" in hub and 'href="strategies/index.html#trend"' in hub
+    assert "long SPY 9%" in hub and 'href="strategies/index.html#trend"' in hub
     assert "backdrop-filter" in (site / "strategies" / "index.html").read_text()
     # the best % return on its 1,000 CAD leads the Markets page, the table is ranked, and the overview door names it
     best = hub.index("Best strategy so far")
-    assert best < hub.index("All pots together: profit") and 'href="strategies/index.html#trend">Trend following</a> <span class="pos">+2.01%' in hub
-    assert '<div class="v pos">+20.10 CAD</div>' in hub[best:] and 'class="big minor"' in hub
+    assert "Top 3 strategies together" not in hub and "All pots together: profit" not in hub      # pelosi, exp2 or reversal missing
+    assert 'href="strategies/index.html#trend">Trend following</a> <span class="pos">+2.01%' in hub
+    assert '<div class="v pos">+20.10 CAD</div>' in hub[best:]
     assert "from 1,000 CAD on 2026-10-19" in hub and "a lead this young is mostly luck" in hub
     table = hub[hub.index("<table class=\"mk-pots\">"):]
     assert '<tr class=lead><td class="mono">1</td><td><a href="strategies/index.html#trend">' in table
@@ -178,7 +179,7 @@ def test_best_pot_still_named_when_nothing_is_up():
     rows = [{"date": "2026-10-16", "a": 1000.0, "b": 1000.0}, {"date": "2026-10-19", "a": 990.0, "b": 995.0}]
     pots = [("a", "A", "Long-term", "a.html"), ("b", "B", "Short-term", "b.html")]
     box = build_hub.best_pot(rows, pots)
-    assert '<a href="b.html">B</a>' in box and '<div class="v neg">' in box and "losing least" in box
+    assert '<a href="b.html">B</a>' in box and '<div class="v neg">' in box and "losing least" not in box
     rows[-1]["b"] = 1000.0
     assert [p[0] for p in build_hub.ranked(rows, pots)] == ["b", "a"]
     assert build_hub.pot_since(rows, "a") == ("2026-10-16", 1) and build_hub.pot_since(rows, "b") == (None, 0)
@@ -205,3 +206,19 @@ def test_exp1_pair_that_loses_the_stop_sits_out_one_session(tmp_path):
 def test_exp2_session_after_a_stop_is_cash():
     r = [("a", 0.01), ("b", -0.025), ("c", 0.03), ("d", -0.01), ("e", 0.02)]
     assert portfolio.with_day_stop(r, 0.02) == [("a", 0.01), ("b", -0.025), ("c", 0.0), ("d", -0.01), ("e", 0.02)]
+
+
+def test_top3_pot_is_even_each_friday_and_follows_its_pots_between():
+    rows = [{"date": "2026-10-16", "a": 1000.0, "b": 1000.0, "c": 1000.0},
+            {"date": "2026-10-19", "a": 1100.0, "b": 1000.0, "c": 1000.0},     # Monday: a +10%
+            {"date": "2026-10-23", "a": 1100.0, "b": 1000.0, "c": 1000.0},     # Friday: back to equal thirds
+            {"date": "2026-10-26", "a": 1210.0, "b": 1000.0, "c": 900.0}]
+    assert portfolio.concentrate(rows, ("a", "b", "c"))
+    v1 = 1000 * (1.1 + 1 + 1) / 3
+    assert rows[1]["top3"] == pytest.approx(v1) and rows[2]["top3"] == pytest.approx(v1)
+    assert rows[3]["top3"] == pytest.approx(v1 * (1.1 + 1 + 0.9) / 3)
+    assert not portfolio.concentrate(rows, ("a", "zz"))
+    pots = [(k, k.upper(), "Long-term", f"{k}.html") for k in "abc"]
+    box = build_hub.top3_box(rows, pots, ["a", "b", "c"])
+    assert "Top 3 strategies together" in box and '<a href="a.html">A</a>' in box and "A, B and C" in box
+    assert box.count('class="tag3"') == 0 and build_hub.pots_table(rows, pots, ["a"]).count('class="tag3"') == 1
