@@ -1,0 +1,2036 @@
+{
+ "features": "VIX level and VIX minus SPY 21d realized vol; k=3, refit every Friday on 1998..that Friday",
+ "train": [
+  "2020-01-01",
+  "2025-12-31"
+ ],
+ "test": {
+  "Regime method (with fluke filter)": {
+   "end_cad": 561.61,
+   "made_cad": 61.61,
+   "trades": 60,
+   "log": [
+    {
+     "date": "2025-12-31",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.343,
+      "SPY": 0.104,
+      "best_ideas": 0.068,
+      "conviction": 0.049,
+      "pelosi": 0.035,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-01-02",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.343,
+      "SPY": 0.104,
+      "best_ideas": 0.068,
+      "conviction": 0.05,
+      "pelosi": 0.036,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-01-09",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.33,
+      "reversal": 0.027,
+      "SPY": 0.099,
+      "best_ideas": 0.066,
+      "conviction": 0.051,
+      "pelosi": 0.034,
+      "exp2": 0.394
+     }
+    },
+    {
+     "date": "2026-01-16",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.334,
+      "reversal": 0.028,
+      "SPY": 0.099,
+      "best_ideas": 0.066,
+      "conviction": 0.048,
+      "pelosi": 0.036,
+      "exp2": 0.389
+     }
+    },
+    {
+     "date": "2026-01-20",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.045,
+      "SPY": 0.083,
+      "best_ideas": 0.114,
+      "conviction": 0.124,
+      "pelosi": 0.087,
+      "exp2": 0.38,
+      "exp7": 0.165
+     }
+    },
+    {
+     "date": "2026-01-21",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.334,
+      "reversal": 0.028,
+      "SPY": 0.099,
+      "best_ideas": 0.066,
+      "conviction": 0.048,
+      "pelosi": 0.036,
+      "exp2": 0.389
+     }
+    },
+    {
+     "date": "2026-01-23",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.34,
+      "reversal": 0.028,
+      "SPY": 0.097,
+      "best_ideas": 0.067,
+      "conviction": 0.047,
+      "pelosi": 0.035,
+      "exp2": 0.385
+     }
+    },
+    {
+     "date": "2026-01-30",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.327,
+      "reversal": 0.026,
+      "SPY": 0.101,
+      "best_ideas": 0.065,
+      "conviction": 0.047,
+      "pelosi": 0.038,
+      "exp2": 0.396
+     }
+    },
+    {
+     "date": "2026-02-03",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.047,
+      "SPY": 0.084,
+      "best_ideas": 0.115,
+      "conviction": 0.126,
+      "pelosi": 0.085,
+      "exp2": 0.386,
+      "exp7": 0.157
+     }
+    },
+    {
+     "date": "2026-02-06",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.044,
+      "SPY": 0.085,
+      "best_ideas": 0.111,
+      "conviction": 0.126,
+      "pelosi": 0.086,
+      "exp2": 0.389,
+      "exp7": 0.158
+     }
+    },
+    {
+     "date": "2026-02-09",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.336,
+      "reversal": 0.025,
+      "SPY": 0.098,
+      "best_ideas": 0.067,
+      "conviction": 0.045,
+      "pelosi": 0.035,
+      "exp2": 0.394
+     }
+    },
+    {
+     "date": "2026-02-12",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.044,
+      "SPY": 0.085,
+      "best_ideas": 0.111,
+      "conviction": 0.126,
+      "pelosi": 0.086,
+      "exp2": 0.389,
+      "exp7": 0.158
+     }
+    },
+    {
+     "date": "2026-02-13",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.046,
+      "SPY": 0.085,
+      "best_ideas": 0.111,
+      "conviction": 0.127,
+      "pelosi": 0.086,
+      "exp2": 0.394,
+      "exp7": 0.15
+     }
+    },
+    {
+     "date": "2026-02-20",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.046,
+      "SPY": 0.084,
+      "best_ideas": 0.111,
+      "conviction": 0.125,
+      "pelosi": 0.086,
+      "exp2": 0.397,
+      "exp7": 0.15
+     }
+    },
+    {
+     "date": "2026-02-25",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.359,
+      "SPY": 0.098,
+      "best_ideas": 0.066,
+      "conviction": 0.043,
+      "pelosi": 0.035,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-02-26",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.046,
+      "SPY": 0.084,
+      "best_ideas": 0.111,
+      "conviction": 0.125,
+      "pelosi": 0.086,
+      "exp2": 0.397,
+      "exp7": 0.15
+     }
+    },
+    {
+     "date": "2026-02-27",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.045,
+      "SPY": 0.084,
+      "best_ideas": 0.111,
+      "conviction": 0.122,
+      "pelosi": 0.085,
+      "exp2": 0.4,
+      "exp7": 0.152
+     }
+    },
+    {
+     "date": "2026-03-06",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.045,
+      "SPY": 0.084,
+      "best_ideas": 0.115,
+      "conviction": 0.125,
+      "pelosi": 0.085,
+      "exp2": 0.393,
+      "exp7": 0.153
+     }
+    },
+    {
+     "date": "2026-03-13",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.048,
+      "SPY": 0.083,
+      "best_ideas": 0.116,
+      "conviction": 0.124,
+      "pelosi": 0.085,
+      "exp2": 0.383,
+      "exp7": 0.162
+     }
+    },
+    {
+     "date": "2026-03-20",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.049,
+      "SPY": 0.083,
+      "best_ideas": 0.118,
+      "conviction": 0.127,
+      "pelosi": 0.085,
+      "exp2": 0.377,
+      "exp7": 0.161
+     }
+    },
+    {
+     "date": "2026-03-27",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.052,
+      "SPY": 0.081,
+      "best_ideas": 0.119,
+      "conviction": 0.131,
+      "pelosi": 0.085,
+      "exp2": 0.361,
+      "exp7": 0.17
+     }
+    },
+    {
+     "date": "2026-04-02",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.085,
+      "best_ideas": 0.122,
+      "conviction": 0.134,
+      "pelosi": 0.088,
+      "exp2": 0.354,
+      "exp7": 0.163
+     }
+    },
+    {
+     "date": "2026-04-08",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.358,
+      "SPY": 0.098,
+      "best_ideas": 0.064,
+      "conviction": 0.045,
+      "pelosi": 0.036,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-04-10",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.358,
+      "SPY": 0.099,
+      "best_ideas": 0.063,
+      "conviction": 0.043,
+      "pelosi": 0.037,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-04-17",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.346,
+      "reversal": 0.025,
+      "SPY": 0.1,
+      "best_ideas": 0.063,
+      "conviction": 0.045,
+      "pelosi": 0.037,
+      "exp2": 0.385
+     }
+    },
+    {
+     "date": "2026-04-24",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.338,
+      "reversal": 0.027,
+      "SPY": 0.103,
+      "best_ideas": 0.064,
+      "conviction": 0.046,
+      "pelosi": 0.037,
+      "exp2": 0.385
+     }
+    },
+    {
+     "date": "2026-05-01",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.33,
+      "reversal": 0.026,
+      "SPY": 0.104,
+      "best_ideas": 0.066,
+      "conviction": 0.049,
+      "pelosi": 0.038,
+      "exp2": 0.387
+     }
+    },
+    {
+     "date": "2026-05-04",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.089,
+      "best_ideas": 0.123,
+      "conviction": 0.134,
+      "pelosi": 0.09,
+      "exp2": 0.363,
+      "exp7": 0.147
+     }
+    },
+    {
+     "date": "2026-05-05",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.33,
+      "reversal": 0.026,
+      "SPY": 0.104,
+      "best_ideas": 0.066,
+      "conviction": 0.049,
+      "pelosi": 0.038,
+      "exp2": 0.387
+     }
+    },
+    {
+     "date": "2026-05-08",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.33,
+      "reversal": 0.027,
+      "SPY": 0.106,
+      "best_ideas": 0.067,
+      "conviction": 0.048,
+      "pelosi": 0.037,
+      "exp2": 0.385
+     }
+    },
+    {
+     "date": "2026-05-11",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.089,
+      "best_ideas": 0.122,
+      "conviction": 0.134,
+      "pelosi": 0.089,
+      "exp2": 0.366,
+      "exp7": 0.146
+     }
+    },
+    {
+     "date": "2026-05-14",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.33,
+      "reversal": 0.027,
+      "SPY": 0.106,
+      "best_ideas": 0.067,
+      "conviction": 0.048,
+      "pelosi": 0.037,
+      "exp2": 0.385
+     }
+    },
+    {
+     "date": "2026-05-15",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.053,
+      "SPY": 0.089,
+      "best_ideas": 0.12,
+      "conviction": 0.132,
+      "pelosi": 0.088,
+      "exp2": 0.37,
+      "exp7": 0.148
+     }
+    },
+    {
+     "date": "2026-05-20",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.329,
+      "reversal": 0.026,
+      "SPY": 0.106,
+      "best_ideas": 0.066,
+      "conviction": 0.047,
+      "pelosi": 0.037,
+      "exp2": 0.389
+     }
+    },
+    {
+     "date": "2026-05-22",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.327,
+      "reversal": 0.027,
+      "SPY": 0.106,
+      "best_ideas": 0.066,
+      "conviction": 0.046,
+      "pelosi": 0.037,
+      "exp2": 0.391
+     }
+    },
+    {
+     "date": "2026-05-29",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.328,
+      "reversal": 0.027,
+      "SPY": 0.107,
+      "best_ideas": 0.066,
+      "conviction": 0.047,
+      "pelosi": 0.037,
+      "exp2": 0.389
+     }
+    },
+    {
+     "date": "2026-06-05",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.089,
+      "best_ideas": 0.119,
+      "conviction": 0.132,
+      "pelosi": 0.086,
+      "exp2": 0.373,
+      "exp7": 0.146
+     }
+    },
+    {
+     "date": "2026-06-12",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.321,
+      "reversal": 0.029,
+      "SPY": 0.107,
+      "best_ideas": 0.065,
+      "conviction": 0.047,
+      "pelosi": 0.037,
+      "exp2": 0.394
+     }
+    },
+    {
+     "date": "2026-06-18",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.327,
+      "reversal": 0.026,
+      "SPY": 0.107,
+      "best_ideas": 0.066,
+      "conviction": 0.047,
+      "pelosi": 0.038,
+      "exp2": 0.388
+     }
+    },
+    {
+     "date": "2026-06-26",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.339,
+      "SPY": 0.107,
+      "best_ideas": 0.067,
+      "conviction": 0.048,
+      "pelosi": 0.04,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-07-02",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.318,
+      "reversal": 0.026,
+      "SPY": 0.106,
+      "best_ideas": 0.066,
+      "conviction": 0.048,
+      "pelosi": 0.037,
+      "exp2": 0.399
+     }
+    },
+    {
+     "date": "2026-07-10",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.312,
+      "reversal": 0.026,
+      "SPY": 0.109,
+      "best_ideas": 0.066,
+      "conviction": 0.049,
+      "pelosi": 0.038,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-07-17",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.088,
+      "best_ideas": 0.117,
+      "conviction": 0.131,
+      "pelosi": 0.085,
+      "exp2": 0.372,
+      "exp7": 0.152
+     }
+    },
+    {
+     "date": "2026-07-21",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.311,
+      "reversal": 0.026,
+      "SPY": 0.109,
+      "best_ideas": 0.067,
+      "conviction": 0.05,
+      "pelosi": 0.038,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-07-23",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.088,
+      "best_ideas": 0.117,
+      "conviction": 0.131,
+      "pelosi": 0.085,
+      "exp2": 0.372,
+      "exp7": 0.152
+     }
+    },
+    {
+     "date": "2026-07-24",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.089,
+      "best_ideas": 0.117,
+      "conviction": 0.131,
+      "pelosi": 0.084,
+      "exp2": 0.374,
+      "exp7": 0.152
+     }
+    },
+    {
+     "date": "2026-07-30",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.312,
+      "reversal": 0.026,
+      "SPY": 0.11,
+      "best_ideas": 0.065,
+      "conviction": 0.049,
+      "pelosi": 0.038,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-07-31",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.324,
+      "SPY": 0.116,
+      "best_ideas": 0.071,
+      "conviction": 0.049,
+      "pelosi": 0.04,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-08-07",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.308,
+      "reversal": 0.027,
+      "SPY": 0.11,
+      "best_ideas": 0.067,
+      "conviction": 0.049,
+      "pelosi": 0.038,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-08-14",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.308,
+      "reversal": 0.029,
+      "SPY": 0.11,
+      "best_ideas": 0.064,
+      "conviction": 0.052,
+      "pelosi": 0.038,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-08-21",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.31,
+      "reversal": 0.028,
+      "SPY": 0.107,
+      "best_ideas": 0.063,
+      "conviction": 0.054,
+      "pelosi": 0.038,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-08-28",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.306,
+      "reversal": 0.028,
+      "SPY": 0.107,
+      "best_ideas": 0.066,
+      "conviction": 0.057,
+      "pelosi": 0.036,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-09-04",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.306,
+      "reversal": 0.028,
+      "SPY": 0.108,
+      "best_ideas": 0.064,
+      "conviction": 0.054,
+      "pelosi": 0.04,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-09-10",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.055,
+      "SPY": 0.089,
+      "best_ideas": 0.118,
+      "conviction": 0.132,
+      "pelosi": 0.083,
+      "exp2": 0.376,
+      "exp7": 0.148
+     }
+    },
+    {
+     "date": "2026-09-11",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.304,
+      "reversal": 0.028,
+      "SPY": 0.107,
+      "best_ideas": 0.067,
+      "conviction": 0.056,
+      "pelosi": 0.038,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-09-14",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.055,
+      "SPY": 0.089,
+      "best_ideas": 0.118,
+      "conviction": 0.131,
+      "pelosi": 0.083,
+      "exp2": 0.377,
+      "exp7": 0.146
+     }
+    },
+    {
+     "date": "2026-09-17",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.304,
+      "reversal": 0.028,
+      "SPY": 0.107,
+      "best_ideas": 0.067,
+      "conviction": 0.056,
+      "pelosi": 0.038,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-09-18",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.301,
+      "reversal": 0.029,
+      "SPY": 0.109,
+      "best_ideas": 0.066,
+      "conviction": 0.055,
+      "pelosi": 0.04,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-09-25",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.3,
+      "reversal": 0.028,
+      "SPY": 0.111,
+      "best_ideas": 0.066,
+      "conviction": 0.055,
+      "pelosi": 0.041,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-10-01",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.295,
+      "reversal": 0.029,
+      "SPY": 0.112,
+      "best_ideas": 0.068,
+      "conviction": 0.056,
+      "pelosi": 0.041,
+      "exp2": 0.4
+     }
+    }
+   ],
+   "worst_drop_pct": -4.6,
+   "sharpe_cad": 1.78
+  },
+  "Regime method, no fluke filter": {
+   "end_cad": 561.57,
+   "made_cad": 61.57,
+   "trades": 60,
+   "log": [
+    {
+     "date": "2025-12-31",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.32,
+      "reversal": 0.024,
+      "SPY": 0.097,
+      "best_ideas": 0.064,
+      "conviction": 0.046,
+      "pelosi": 0.033,
+      "exp1": 0.03,
+      "exp2": 0.386
+     }
+    },
+    {
+     "date": "2026-01-02",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.318,
+      "reversal": 0.025,
+      "SPY": 0.096,
+      "best_ideas": 0.063,
+      "conviction": 0.046,
+      "pelosi": 0.033,
+      "exp1": 0.027,
+      "exp2": 0.391
+     }
+    },
+    {
+     "date": "2026-01-09",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.32,
+      "reversal": 0.027,
+      "SPY": 0.096,
+      "best_ideas": 0.064,
+      "conviction": 0.049,
+      "pelosi": 0.033,
+      "exp1": 0.031,
+      "exp2": 0.382
+     }
+    },
+    {
+     "date": "2026-01-16",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.328,
+      "reversal": 0.028,
+      "SPY": 0.097,
+      "best_ideas": 0.065,
+      "conviction": 0.047,
+      "pelosi": 0.036,
+      "exp1": 0.019,
+      "exp2": 0.381
+     }
+    },
+    {
+     "date": "2026-01-20",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.045,
+      "SPY": 0.083,
+      "best_ideas": 0.114,
+      "conviction": 0.124,
+      "pelosi": 0.087,
+      "exp2": 0.38,
+      "exp7": 0.165
+     }
+    },
+    {
+     "date": "2026-01-21",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.328,
+      "reversal": 0.028,
+      "SPY": 0.097,
+      "best_ideas": 0.065,
+      "conviction": 0.047,
+      "pelosi": 0.036,
+      "exp1": 0.019,
+      "exp2": 0.381
+     }
+    },
+    {
+     "date": "2026-01-23",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.335,
+      "reversal": 0.028,
+      "SPY": 0.096,
+      "best_ideas": 0.066,
+      "conviction": 0.046,
+      "pelosi": 0.034,
+      "exp1": 0.016,
+      "exp2": 0.379
+     }
+    },
+    {
+     "date": "2026-01-30",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.318,
+      "reversal": 0.025,
+      "SPY": 0.098,
+      "best_ideas": 0.063,
+      "conviction": 0.046,
+      "pelosi": 0.037,
+      "exp1": 0.028,
+      "exp2": 0.385
+     }
+    },
+    {
+     "date": "2026-02-03",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.047,
+      "SPY": 0.084,
+      "best_ideas": 0.115,
+      "conviction": 0.126,
+      "pelosi": 0.085,
+      "exp2": 0.386,
+      "exp7": 0.157
+     }
+    },
+    {
+     "date": "2026-02-06",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.044,
+      "SPY": 0.085,
+      "best_ideas": 0.111,
+      "conviction": 0.126,
+      "pelosi": 0.086,
+      "exp2": 0.389,
+      "exp7": 0.158
+     }
+    },
+    {
+     "date": "2026-02-09",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.328,
+      "reversal": 0.025,
+      "SPY": 0.096,
+      "best_ideas": 0.065,
+      "conviction": 0.044,
+      "pelosi": 0.034,
+      "exp1": 0.025,
+      "exp2": 0.384
+     }
+    },
+    {
+     "date": "2026-02-12",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.044,
+      "SPY": 0.085,
+      "best_ideas": 0.111,
+      "conviction": 0.126,
+      "pelosi": 0.086,
+      "exp2": 0.389,
+      "exp7": 0.158
+     }
+    },
+    {
+     "date": "2026-02-13",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.046,
+      "SPY": 0.085,
+      "best_ideas": 0.111,
+      "conviction": 0.127,
+      "pelosi": 0.086,
+      "exp2": 0.394,
+      "exp7": 0.15
+     }
+    },
+    {
+     "date": "2026-02-20",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.046,
+      "SPY": 0.084,
+      "best_ideas": 0.111,
+      "conviction": 0.125,
+      "pelosi": 0.086,
+      "exp2": 0.397,
+      "exp7": 0.15
+     }
+    },
+    {
+     "date": "2026-02-25",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.34,
+      "reversal": 0.022,
+      "SPY": 0.093,
+      "best_ideas": 0.062,
+      "conviction": 0.041,
+      "pelosi": 0.033,
+      "exp1": 0.027,
+      "exp2": 0.383
+     }
+    },
+    {
+     "date": "2026-02-26",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.046,
+      "SPY": 0.084,
+      "best_ideas": 0.111,
+      "conviction": 0.125,
+      "pelosi": 0.086,
+      "exp2": 0.397,
+      "exp7": 0.15
+     }
+    },
+    {
+     "date": "2026-02-27",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.045,
+      "SPY": 0.084,
+      "best_ideas": 0.111,
+      "conviction": 0.122,
+      "pelosi": 0.085,
+      "exp2": 0.4,
+      "exp7": 0.152
+     }
+    },
+    {
+     "date": "2026-03-06",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.045,
+      "SPY": 0.084,
+      "best_ideas": 0.115,
+      "conviction": 0.125,
+      "pelosi": 0.085,
+      "exp2": 0.393,
+      "exp7": 0.153
+     }
+    },
+    {
+     "date": "2026-03-13",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.048,
+      "SPY": 0.083,
+      "best_ideas": 0.116,
+      "conviction": 0.124,
+      "pelosi": 0.085,
+      "exp2": 0.383,
+      "exp7": 0.162
+     }
+    },
+    {
+     "date": "2026-03-20",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.049,
+      "SPY": 0.083,
+      "best_ideas": 0.118,
+      "conviction": 0.127,
+      "pelosi": 0.085,
+      "exp2": 0.377,
+      "exp7": 0.161
+     }
+    },
+    {
+     "date": "2026-03-27",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.052,
+      "SPY": 0.081,
+      "best_ideas": 0.119,
+      "conviction": 0.131,
+      "pelosi": 0.085,
+      "exp2": 0.361,
+      "exp7": 0.17
+     }
+    },
+    {
+     "date": "2026-04-02",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.085,
+      "best_ideas": 0.122,
+      "conviction": 0.134,
+      "pelosi": 0.088,
+      "exp2": 0.354,
+      "exp7": 0.163
+     }
+    },
+    {
+     "date": "2026-04-08",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.334,
+      "reversal": 0.021,
+      "SPY": 0.091,
+      "best_ideas": 0.059,
+      "conviction": 0.042,
+      "pelosi": 0.034,
+      "exp1": 0.03,
+      "exp2": 0.389
+     }
+    },
+    {
+     "date": "2026-04-10",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.335,
+      "reversal": 0.02,
+      "SPY": 0.093,
+      "best_ideas": 0.059,
+      "conviction": 0.04,
+      "pelosi": 0.034,
+      "exp1": 0.031,
+      "exp2": 0.389
+     }
+    },
+    {
+     "date": "2026-04-17",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.334,
+      "reversal": 0.024,
+      "SPY": 0.097,
+      "best_ideas": 0.061,
+      "conviction": 0.044,
+      "pelosi": 0.036,
+      "exp1": 0.032,
+      "exp2": 0.372
+     }
+    },
+    {
+     "date": "2026-04-24",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.325,
+      "reversal": 0.026,
+      "SPY": 0.099,
+      "best_ideas": 0.062,
+      "conviction": 0.044,
+      "pelosi": 0.036,
+      "exp1": 0.037,
+      "exp2": 0.371
+     }
+    },
+    {
+     "date": "2026-05-01",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.317,
+      "reversal": 0.025,
+      "SPY": 0.1,
+      "best_ideas": 0.063,
+      "conviction": 0.047,
+      "pelosi": 0.036,
+      "exp1": 0.041,
+      "exp2": 0.371
+     }
+    },
+    {
+     "date": "2026-05-04",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.089,
+      "best_ideas": 0.123,
+      "conviction": 0.134,
+      "pelosi": 0.09,
+      "exp2": 0.363,
+      "exp7": 0.147
+     }
+    },
+    {
+     "date": "2026-05-05",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.317,
+      "reversal": 0.025,
+      "SPY": 0.1,
+      "best_ideas": 0.063,
+      "conviction": 0.047,
+      "pelosi": 0.036,
+      "exp1": 0.041,
+      "exp2": 0.371
+     }
+    },
+    {
+     "date": "2026-05-08",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.315,
+      "reversal": 0.025,
+      "SPY": 0.101,
+      "best_ideas": 0.064,
+      "conviction": 0.046,
+      "pelosi": 0.035,
+      "exp1": 0.046,
+      "exp2": 0.367
+     }
+    },
+    {
+     "date": "2026-05-11",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.089,
+      "best_ideas": 0.122,
+      "conviction": 0.134,
+      "pelosi": 0.089,
+      "exp2": 0.366,
+      "exp7": 0.146
+     }
+    },
+    {
+     "date": "2026-05-14",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.315,
+      "reversal": 0.025,
+      "SPY": 0.101,
+      "best_ideas": 0.064,
+      "conviction": 0.046,
+      "pelosi": 0.035,
+      "exp1": 0.046,
+      "exp2": 0.367
+     }
+    },
+    {
+     "date": "2026-05-15",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.053,
+      "SPY": 0.089,
+      "best_ideas": 0.12,
+      "conviction": 0.132,
+      "pelosi": 0.088,
+      "exp2": 0.37,
+      "exp7": 0.148
+     }
+    },
+    {
+     "date": "2026-05-20",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.313,
+      "reversal": 0.025,
+      "SPY": 0.101,
+      "best_ideas": 0.063,
+      "conviction": 0.045,
+      "pelosi": 0.035,
+      "exp1": 0.048,
+      "exp2": 0.371
+     }
+    },
+    {
+     "date": "2026-05-22",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.315,
+      "reversal": 0.026,
+      "SPY": 0.102,
+      "best_ideas": 0.064,
+      "conviction": 0.044,
+      "pelosi": 0.036,
+      "exp1": 0.037,
+      "exp2": 0.376
+     }
+    },
+    {
+     "date": "2026-05-29",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.32,
+      "reversal": 0.026,
+      "SPY": 0.105,
+      "best_ideas": 0.064,
+      "conviction": 0.046,
+      "pelosi": 0.036,
+      "exp1": 0.023,
+      "exp2": 0.38
+     }
+    },
+    {
+     "date": "2026-06-05",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.089,
+      "best_ideas": 0.119,
+      "conviction": 0.132,
+      "pelosi": 0.086,
+      "exp2": 0.373,
+      "exp7": 0.146
+     }
+    },
+    {
+     "date": "2026-06-12",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.311,
+      "reversal": 0.028,
+      "SPY": 0.104,
+      "best_ideas": 0.063,
+      "conviction": 0.045,
+      "pelosi": 0.036,
+      "exp1": 0.03,
+      "exp2": 0.382
+     }
+    },
+    {
+     "date": "2026-06-18",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.317,
+      "reversal": 0.025,
+      "SPY": 0.104,
+      "best_ideas": 0.064,
+      "conviction": 0.046,
+      "pelosi": 0.037,
+      "exp1": 0.03,
+      "exp2": 0.376
+     }
+    },
+    {
+     "date": "2026-06-26",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.316,
+      "reversal": 0.025,
+      "SPY": 0.1,
+      "best_ideas": 0.062,
+      "conviction": 0.045,
+      "pelosi": 0.037,
+      "exp1": 0.023,
+      "exp2": 0.393
+     }
+    },
+    {
+     "date": "2026-07-02",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.31,
+      "reversal": 0.025,
+      "SPY": 0.104,
+      "best_ideas": 0.065,
+      "conviction": 0.047,
+      "pelosi": 0.036,
+      "exp1": 0.023,
+      "exp2": 0.389
+     }
+    },
+    {
+     "date": "2026-07-10",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.305,
+      "reversal": 0.025,
+      "SPY": 0.107,
+      "best_ideas": 0.065,
+      "conviction": 0.048,
+      "pelosi": 0.037,
+      "exp1": 0.02,
+      "exp2": 0.393
+     }
+    },
+    {
+     "date": "2026-07-17",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.088,
+      "best_ideas": 0.117,
+      "conviction": 0.131,
+      "pelosi": 0.085,
+      "exp2": 0.372,
+      "exp7": 0.152
+     }
+    },
+    {
+     "date": "2026-07-21",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.302,
+      "reversal": 0.025,
+      "SPY": 0.106,
+      "best_ideas": 0.065,
+      "conviction": 0.048,
+      "pelosi": 0.037,
+      "exp1": 0.019,
+      "exp2": 0.399
+     }
+    },
+    {
+     "date": "2026-07-23",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.088,
+      "best_ideas": 0.117,
+      "conviction": 0.131,
+      "pelosi": 0.085,
+      "exp2": 0.372,
+      "exp7": 0.152
+     }
+    },
+    {
+     "date": "2026-07-24",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.054,
+      "SPY": 0.089,
+      "best_ideas": 0.117,
+      "conviction": 0.131,
+      "pelosi": 0.084,
+      "exp2": 0.374,
+      "exp7": 0.152
+     }
+    },
+    {
+     "date": "2026-07-30",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.3,
+      "reversal": 0.025,
+      "SPY": 0.105,
+      "best_ideas": 0.062,
+      "conviction": 0.047,
+      "pelosi": 0.036,
+      "exp1": 0.024,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-07-31",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.295,
+      "reversal": 0.025,
+      "SPY": 0.105,
+      "best_ideas": 0.065,
+      "conviction": 0.045,
+      "pelosi": 0.037,
+      "exp1": 0.028,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-08-07",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.297,
+      "reversal": 0.026,
+      "SPY": 0.106,
+      "best_ideas": 0.064,
+      "conviction": 0.047,
+      "pelosi": 0.037,
+      "exp1": 0.029,
+      "exp2": 0.393
+     }
+    },
+    {
+     "date": "2026-08-14",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.298,
+      "reversal": 0.028,
+      "SPY": 0.106,
+      "best_ideas": 0.062,
+      "conviction": 0.05,
+      "pelosi": 0.036,
+      "exp1": 0.028,
+      "exp2": 0.393
+     }
+    },
+    {
+     "date": "2026-08-21",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.301,
+      "reversal": 0.027,
+      "SPY": 0.103,
+      "best_ideas": 0.061,
+      "conviction": 0.053,
+      "pelosi": 0.037,
+      "exp1": 0.024,
+      "exp2": 0.393
+     }
+    },
+    {
+     "date": "2026-08-28",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.294,
+      "reversal": 0.027,
+      "SPY": 0.103,
+      "best_ideas": 0.063,
+      "conviction": 0.054,
+      "pelosi": 0.034,
+      "exp1": 0.023,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-09-04",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.295,
+      "reversal": 0.027,
+      "SPY": 0.104,
+      "best_ideas": 0.062,
+      "conviction": 0.053,
+      "pelosi": 0.038,
+      "exp1": 0.025,
+      "exp2": 0.396
+     }
+    },
+    {
+     "date": "2026-09-10",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.055,
+      "SPY": 0.089,
+      "best_ideas": 0.118,
+      "conviction": 0.132,
+      "pelosi": 0.083,
+      "exp2": 0.376,
+      "exp7": 0.148
+     }
+    },
+    {
+     "date": "2026-09-11",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.294,
+      "reversal": 0.027,
+      "SPY": 0.104,
+      "best_ideas": 0.065,
+      "conviction": 0.055,
+      "pelosi": 0.036,
+      "exp1": 0.019,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-09-14",
+     "regime": "Normal",
+     "weights": {
+      "reversal": 0.055,
+      "SPY": 0.089,
+      "best_ideas": 0.118,
+      "conviction": 0.131,
+      "pelosi": 0.083,
+      "exp2": 0.377,
+      "exp7": 0.146
+     }
+    },
+    {
+     "date": "2026-09-17",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.294,
+      "reversal": 0.027,
+      "SPY": 0.104,
+      "best_ideas": 0.065,
+      "conviction": 0.055,
+      "pelosi": 0.036,
+      "exp1": 0.019,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-09-18",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.29,
+      "reversal": 0.028,
+      "SPY": 0.106,
+      "best_ideas": 0.064,
+      "conviction": 0.053,
+      "pelosi": 0.039,
+      "exp1": 0.021,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-09-25",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.289,
+      "reversal": 0.027,
+      "SPY": 0.106,
+      "best_ideas": 0.063,
+      "conviction": 0.052,
+      "pelosi": 0.039,
+      "exp1": 0.022,
+      "exp2": 0.4
+     }
+    },
+    {
+     "date": "2026-10-01",
+     "regime": "Calm",
+     "weights": {
+      "trend": 0.284,
+      "reversal": 0.027,
+      "SPY": 0.108,
+      "best_ideas": 0.065,
+      "conviction": 0.053,
+      "pelosi": 0.039,
+      "exp1": 0.023,
+      "exp2": 0.4
+     }
+    }
+   ],
+   "worst_drop_pct": -4.5,
+   "sharpe_cad": 1.79
+  },
+  "Equal weight, all strategies": {
+   "end_cad": 568.84,
+   "made_cad": 68.84,
+   "worst_drop_pct": -6.0,
+   "sharpe_cad": 1.74
+  },
+  "SPY buy and hold": {
+   "end_cad": 586.67,
+   "made_cad": 86.67,
+   "worst_drop_pct": -8.5,
+   "sharpe_cad": 1.64
+  },
+  "only Trend (momentum)": {
+   "end_cad": 528.22,
+   "made_cad": 28.22
+  },
+  "only Weekly reversal": {
+   "end_cad": 693.68,
+   "made_cad": 193.68
+  },
+  "only SPY (buy and hold)": {
+   "end_cad": 586.67,
+   "made_cad": 86.67
+  },
+  "only Best ideas (13F copy)": {
+   "end_cad": 564.04,
+   "made_cad": 64.04
+  },
+  "only Conviction (13F copy)": {
+   "end_cad": 571.56,
+   "made_cad": 71.56
+  },
+  "only Pelosi copy": {
+   "end_cad": 601.66,
+   "made_cad": 101.66
+  },
+  "only Exp1 (pairs divergence)": {
+   "end_cad": 508.49,
+   "made_cad": 8.49
+  },
+  "only Exp2 (vol sleeve + stocks)": {
+   "end_cad": 568.85,
+   "made_cad": 68.85
+  },
+  "only Exp7 (SPY VWAP+EMA)": {
+   "end_cad": 509.16,
+   "made_cad": 9.16
+  }
+ },
+ "fx_usdcad": [
+  1.3706,
+  1.4243
+ ],
+ "test_regime_days": {
+  "Calm": 124,
+  "Normal": 64
+ },
+ "summary": {
+  "trend": {
+   "label": "Trend (momentum)",
+   "best_regime_end_2025": "Calm",
+   "weeks_best_regime_same_as_final_pct": 46.9,
+   "weeks_best_regime_switched": 30,
+   "end_2025": {
+    "Calm": {
+     "days": 705,
+     "ann_pct": 5.3,
+     "sharpe": 1.41,
+     "t": 2.36
+    },
+    "Normal": {
+     "days": 629,
+     "ann_pct": -1.9,
+     "sharpe": -0.35,
+     "t": -0.55
+    },
+    "Stressed": {
+     "days": 170,
+     "ann_pct": 6.1,
+     "sharpe": 1.11,
+     "t": 0.91
+    }
+   },
+   "oos_next_week": {
+    "in_called_good_regimes": {
+     "n": 327,
+     "ann": 5.04,
+     "sharpe": 1.14,
+     "t": 1.3
+    },
+    "in_other_regimes": {
+     "n": 1176,
+     "ann": 1.64,
+     "sharpe": 0.35,
+     "t": 0.75
+    }
+   }
+  },
+  "reversal": {
+   "label": "Weekly reversal",
+   "best_regime_end_2025": "Stressed",
+   "weeks_best_regime_same_as_final_pct": 98.5,
+   "weeks_best_regime_switched": 8,
+   "end_2025": {
+    "Calm": {
+     "days": 705,
+     "ann_pct": 12.0,
+     "sharpe": 0.59,
+     "t": 0.99
+    },
+    "Normal": {
+     "days": 629,
+     "ann_pct": 38.2,
+     "sharpe": 0.9,
+     "t": 1.43
+    },
+    "Stressed": {
+     "days": 170,
+     "ann_pct": 77.1,
+     "sharpe": 1.16,
+     "t": 0.95
+    }
+   },
+   "oos_next_week": {
+    "in_called_good_regimes": {
+     "n": 272,
+     "ann": 6.34,
+     "sharpe": 0.18,
+     "t": 0.19
+    },
+    "in_other_regimes": {
+     "n": 1231,
+     "ann": 35.95,
+     "sharpe": 0.93,
+     "t": 2.06
+    }
+   }
+  },
+  "SPY": {
+   "label": "SPY (buy and hold)",
+   "best_regime_end_2025": "Calm",
+   "weeks_best_regime_same_as_final_pct": 34.2,
+   "weeks_best_regime_switched": 16,
+   "end_2025": {
+    "Calm": {
+     "days": 705,
+     "ann_pct": 15.0,
+     "sharpe": 1.31,
+     "t": 2.2
+    },
+    "Normal": {
+     "days": 629,
+     "ann_pct": 22.2,
+     "sharpe": 0.93,
+     "t": 1.47
+    },
+    "Stressed": {
+     "days": 170,
+     "ann_pct": -0.6,
+     "sharpe": -0.02,
+     "t": -0.01
+    }
+   },
+   "oos_next_week": {
+    "in_called_good_regimes": {
+     "n": 833,
+     "ann": 17.04,
+     "sharpe": 0.98,
+     "t": 1.78
+    },
+    "in_other_regimes": {
+     "n": 670,
+     "ann": 15.59,
+     "sharpe": 0.64,
+     "t": 1.05
+    }
+   }
+  },
+  "best_ideas": {
+   "label": "Best ideas (13F copy)",
+   "best_regime_end_2025": "Normal",
+   "weeks_best_regime_same_as_final_pct": 100.0,
+   "weeks_best_regime_switched": 3,
+   "end_2025": {
+    "Calm": {
+     "days": 705,
+     "ann_pct": 16.7,
+     "sharpe": 1.12,
+     "t": 1.87
+    },
+    "Normal": {
+     "days": 629,
+     "ann_pct": 39.4,
+     "sharpe": 1.45,
+     "t": 2.29
+    },
+    "Stressed": {
+     "days": 170,
+     "ann_pct": 19.6,
+     "sharpe": 0.51,
+     "t": 0.42
+    }
+   },
+   "oos_next_week": {
+    "in_called_good_regimes": {
+     "n": 809,
+     "ann": 30.15,
+     "sharpe": 1.38,
+     "t": 2.48
+    },
+    "in_other_regimes": {
+     "n": 694,
+     "ann": 22.55,
+     "sharpe": 0.85,
+     "t": 1.42
+    }
+   }
+  },
+  "conviction": {
+   "label": "Conviction (13F copy)",
+   "best_regime_end_2025": "Normal",
+   "weeks_best_regime_same_as_final_pct": 100.0,
+   "weeks_best_regime_switched": 3,
+   "end_2025": {
+    "Calm": {
+     "days": 705,
+     "ann_pct": 8.9,
+     "sharpe": 0.69,
+     "t": 1.16
+    },
+    "Normal": {
+     "days": 629,
+     "ann_pct": 36.1,
+     "sharpe": 1.45,
+     "t": 2.29
+    },
+    "Stressed": {
+     "days": 170,
+     "ann_pct": 3.6,
+     "sharpe": 0.09,
+     "t": 0.08
+    }
+   },
+   "oos_next_week": {
+    "in_called_good_regimes": {
+     "n": 574,
+     "ann": 30.13,
+     "sharpe": 1.4,
+     "t": 2.12
+    },
+    "in_other_regimes": {
+     "n": 929,
+     "ann": 13.42,
+     "sharpe": 0.59,
+     "t": 1.13
+    }
+   }
+  },
+  "pelosi": {
+   "label": "Pelosi copy",
+   "best_regime_end_2025": "Normal",
+   "weeks_best_regime_same_as_final_pct": 86.9,
+   "weeks_best_regime_switched": 9,
+   "end_2025": {
+    "Calm": {
+     "days": 705,
+     "ann_pct": 25.2,
+     "sharpe": 0.99,
+     "t": 1.65
+    },
+    "Normal": {
+     "days": 629,
+     "ann_pct": 50.1,
+     "sharpe": 1.43,
+     "t": 2.26
+    },
+    "Stressed": {
+     "days": 170,
+     "ann_pct": 40.2,
+     "sharpe": 0.95,
+     "t": 0.78
+    }
+   },
+   "oos_next_week": {
+    "in_called_good_regimes": {
+     "n": 903,
+     "ann": 31.35,
+     "sharpe": 0.97,
+     "t": 1.84
+    },
+    "in_other_regimes": {
+     "n": 600,
+     "ann": 46.76,
+     "sharpe": 1.49,
+     "t": 2.3
+    }
+   }
+  },
+  "exp1": {
+   "label": "Exp1 (pairs divergence)",
+   "best_regime_end_2025": "Stressed",
+   "weeks_best_regime_same_as_final_pct": 81.9,
+   "weeks_best_regime_switched": 17,
+   "end_2025": {
+    "Calm": {
+     "days": 705,
+     "ann_pct": 2.7,
+     "sharpe": 0.31,
+     "t": 0.52
+    },
+    "Normal": {
+     "days": 629,
+     "ann_pct": -3.2,
+     "sharpe": -0.36,
+     "t": -0.56
+    },
+    "Stressed": {
+     "days": 170,
+     "ann_pct": 5.8,
+     "sharpe": 0.54,
+     "t": 0.44
+    }
+   },
+   "oos_next_week": {
+    "in_called_good_regimes": {
+     "n": 29,
+     "ann": -28.78,
+     "sharpe": -2.39,
+     "t": -0.81
+    },
+    "in_other_regimes": {
+     "n": 1474,
+     "ann": 1.16,
+     "sharpe": 0.13,
+     "t": 0.31
+    }
+   }
+  },
+  "exp2": {
+   "label": "Exp2 (vol sleeve + stocks)",
+   "best_regime_end_2025": "Calm",
+   "weeks_best_regime_same_as_final_pct": 90.8,
+   "weeks_best_regime_switched": 2,
+   "end_2025": {
+    "Calm": {
+     "days": 705,
+     "ann_pct": 23.2,
+     "sharpe": 3.26,
+     "t": 5.44
+    },
+    "Normal": {
+     "days": 629,
+     "ann_pct": 11.2,
+     "sharpe": 1.41,
+     "t": 2.23
+    },
+    "Stressed": {
+     "days": 170,
+     "ann_pct": 6.3,
+     "sharpe": 0.93,
+     "t": 0.76
+    }
+   },
+   "oos_next_week": {
+    "in_called_good_regimes": {
+     "n": 1161,
+     "ann": 17.11,
+     "sharpe": 2.36,
+     "t": 5.06
+    },
+    "in_other_regimes": {
+     "n": 342,
+     "ann": 13.8,
+     "sharpe": 1.71,
+     "t": 1.99
+    }
+   }
+  },
+  "exp7": {
+   "label": "Exp7 (SPY VWAP+EMA)",
+   "best_regime_end_2025": "Stressed",
+   "weeks_best_regime_same_as_final_pct": 100.0,
+   "weeks_best_regime_switched": 3,
+   "end_2025": {
+    "Calm": {
+     "days": 704,
+     "ann_pct": -0.7,
+     "sharpe": -0.09,
+     "t": -0.15
+    },
+    "Normal": {
+     "days": 628,
+     "ann_pct": 11.8,
+     "sharpe": 0.96,
+     "t": 1.51
+    },
+    "Stressed": {
+     "days": 170,
+     "ann_pct": 18.8,
+     "sharpe": 1.31,
+     "t": 1.08
+    }
+   },
+   "oos_next_week": {
+    "in_called_good_regimes": {
+     "n": 378,
+     "ann": 0.02,
+     "sharpe": 0.0,
+     "t": 0.0
+    },
+    "in_other_regimes": {
+     "n": 1123,
+     "ann": 9.01,
+     "sharpe": 0.87,
+     "t": 1.83
+    }
+   }
+  }
+ }
+}
