@@ -18,17 +18,17 @@ def test_implied_vol_inverts_black():
     assert np.isnan(surface.implied_vol([0.5], [100.0], [80.0], [0.5], [1.0], [True])[0])
 
 
-def chain(spot=500.0, day="2026-10-23", skew=0.3):
+def chain(spot=500.0, day="2026-10-23", skew=0.3, step=5.0, nd=4):
     rows = []
     for dte in (14, 30, 60, 120, 250):
         T, D = dte / 365, np.exp(-0.04 * dte / 365)
         F = spot * np.exp(0.03 * T)
-        for K in np.arange(spot * 0.7, spot * 1.25, 5.0):
+        for K in np.arange(spot * 0.7, spot * 1.25, step):
             iv = 0.18 - skew * np.log(K / F) + 0.5 * np.log(K / F) ** 2
             for cp in ("call", "put"):
                 p = float(surface.black(np.array([F]), np.array([K]), np.array([T]), np.array([D]), np.array([iv]), np.array([cp == "call"]))[0])
                 rows.append({"expiration": pd.Timestamp(day) + pd.Timedelta(days=dte), "option_type": cp, "strike": K,
-                             "bid": round(p * 0.99, 4), "ask": round(p * 1.01, 4), "iv": iv, "open_interest": 1, "volume": 1})
+                             "bid": round(p * 0.99, nd), "ask": round(p * 1.01, nd), "iv": iv, "open_interest": 1, "volume": 1})
     return pd.DataFrame(rows)
 
 
@@ -38,6 +38,16 @@ def test_surface_recovers_the_forward_and_the_skew():
     assert abs(e["forward"] - 500 * np.exp(0.03 * 30 / 365)) < 0.05 and abs(e["discount"] - np.exp(-0.04 * 30 / 365)) < 1e-4
     assert abs(s["atm_30d"] - 0.18) < 0.003 and s["skew_30d"] > 0.05           # puts below the market cost more
     assert s["cboe_median_gap"] < 0.003
+
+
+def test_one_dollar_strikes_quoted_in_cents_keep_every_expiry():
+    c = chain(spot=760.0, step=1.0, nd=2)
+    noise = np.random.default_rng(3).normal(0, 0.03, len(c))         # quotes a few cents off fair, as real ones are
+    mid = (c["bid"] + c["ask"]) / 2 + noise
+    c["bid"], c["ask"] = (mid - 0.03).round(2).clip(lower=0.01), (mid + 0.03).round(2)
+    s = surface.surface(c, 760.0, "2026-10-23")
+    assert [x["dte"] for x in s["expiries"]] == [14, 30, 60, 120, 250] and s["dropped_expiries"] == {"no forward": 0, "few quotes": 0}
+    assert abs(s["atm_30d"] - 0.18) < 0.004
 
 
 def test_parse_cboe_reads_occ_symbols():

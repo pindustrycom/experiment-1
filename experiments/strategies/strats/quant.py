@@ -59,7 +59,7 @@ def run(data_dir: Path, options_csv: Path | None, out: Path, fetch: bool = True)
                 surf[t] = s
     hist = surface.options_history(options_csv)
     rv = np.log(spy).diff().iloc[-21:].std() * np.sqrt(252)
-    rep["surface"] = {t: {k: s[k] for k in ("date", "atm_30d", "skew_30d", "contracts", "cboe_median_gap")} for t, s in surf.items()}
+    rep["surface"] = {t: {k: s[k] for k in ("date", "atm_30d", "skew_30d", "contracts", "cboe_median_gap", "dropped_expiries")} for t, s in surf.items()}
 
     # 2. regimes, on every pot that has a replay
     rp = live.replay(px, members, cp=cp)

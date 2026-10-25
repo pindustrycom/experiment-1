@@ -120,20 +120,23 @@ def implied_vol(price, F, K, T, D, call, lo: float = 1e-3, hi: float = 4.0, iter
 
 
 def forward(g: pd.DataFrame, spot: float) -> tuple[float, float] | None:
-    """(F, D) for one expiry from put-call parity on the strikes nearest the spot that have both quotes."""
+    """(F, D) for one expiry from put-call parity on the strikes within 5% of the spot (or the 8 nearest) that have both
+    quotes. Mids move in cents, so on SPY's one-dollar strikes a fit over a few strikes alone can put D above 1: a fit a
+    little above 1 is taken as 1 (rates near zero for the expiry), anything far off drops the expiry."""
     q = g[(g["bid"] > 0) & (g["ask"] > 0)].assign(mid=lambda x: (x["bid"] + x["ask"]) / 2)
     c = q[q["option_type"] == "call"].set_index("strike")["mid"]
     p = q[q["option_type"] == "put"].set_index("strike")["mid"]
     both = c.index.intersection(p.index)
     if len(both) < 3:
         return None
-    k = np.array(sorted(both, key=lambda x: abs(x - spot))[:8], dtype=float)
+    near = sorted(both, key=lambda x: abs(x - spot))
+    k = np.array([x for x in near if abs(x / spot - 1) <= 0.05] if sum(abs(x / spot - 1) <= 0.05 for x in near) >= 8 else near[:8], dtype=float)
     y = (c.loc[k] - p.loc[k]).to_numpy()
-    slope, icpt = np.polyfit(k, y, 1)
-    D = -slope
-    if not 0.8 < D <= 1.0001:
+    slope, _ = np.polyfit(k, y, 1)
+    D = min(-slope, 1.0)
+    if not 0.8 < -slope < 1.02:
         return None
-    return float(icpt / D), float(min(D, 1.0))
+    return float(np.mean(y / D + k)), float(D)
 
 
 def surface(ch: pd.DataFrame, spot: float, day: str) -> dict:
@@ -142,10 +145,11 @@ def surface(ch: pd.DataFrame, spot: float, day: str) -> dict:
     today = pd.Timestamp(day)
     ch = ch.assign(dte=(pd.to_datetime(ch["expiration"]) - today).dt.days)
     ch = ch[(ch["dte"] >= MIN_DTE) & (ch["dte"] <= MAX_DTE)]
-    pts, smiles, term = [], {}, []
+    pts, smiles, term, dropped = [], {}, [], {"no forward": 0, "few quotes": 0}
     for exp, g in ch.groupby("expiration"):
         fd = forward(g, spot)
         if fd is None:
+            dropped["no forward"] += 1
             continue
         F, D = fd
         dte = int(g["dte"].iloc[0])
@@ -156,11 +160,13 @@ def surface(ch: pd.DataFrame, spot: float, day: str) -> dict:
         q = q[((q["option_type"] == "put") & (q["strike"] < F)) | ((q["option_type"] == "call") & (q["strike"] >= F))]
         q = q[(q["strike"] / F > 0.5) & (q["strike"] / F < 1.5)]
         if len(q) < 5:
+            dropped["few quotes"] += 1
             continue
         call = (q["option_type"] == "call").to_numpy()
         q["our_iv"] = implied_vol(q["mid"], np.full(len(q), F), q["strike"], np.full(len(q), T), np.full(len(q), D), call)
         q = q.dropna(subset=["our_iv"])
         if len(q) < 5:
+            dropped["few quotes"] += 1
             continue
         q = q.sort_values("strike")
         m = (q["strike"] / F).to_numpy()
@@ -182,7 +188,7 @@ def surface(ch: pd.DataFrame, spot: float, day: str) -> dict:
             "smiles": {str(k): smiles[k] for k in pick},
             "skew_30d": None if near["iv"][i90] is None or near["iv"][i110] is None else round(near["iv"][i90] - near["iv"][i110], 4),
             "atm_30d": next((t["atm"] for t in term if t["dte"] == near["dte"]), None),
-            "contracts": int(sum(p["n"] for p in pts)), "cboe_median_gap": round(float(np.median(gaps)), 4) if gaps else None}
+            "contracts": int(sum(p["n"] for p in pts)), "dropped_expiries": dropped, "cboe_median_gap": round(float(np.median(gaps)), 4) if gaps else None}
 
 
 def options_history(f: Path | None, tickers: tuple[str, ...] = TICKERS) -> dict:
