@@ -44,12 +44,52 @@ before they were filed, or restated later, looks great and trades badly.
 
 ## How we tested it
 
-- Universe: S&P 500 members at each month end (membership history from Wikipedia's change list, the project's
-  `papers-data` cache), 2010 to 2026-09. Names that left the index stay in the months they were members; names with no
-  Yahoo history (mostly takeovers) are missing, which mainly hides junk losers, so it biases against the signals.
+- Universe: S&P 500 members at each month end, 2010 to 2026-09, from the project's `papers-data` cache. That cache
+  only knows today's members and the date each joined (no removed names), so about 270 names a month in 2010 rising to
+  490 in 2026. Companies that later left the index (failures, takeovers) are missing: long-only books are flattered
+  (the equal-weighted universe beats SPY by 1%/yr) and long-short books lose their worst junk. The published factor
+  series below have no such bias and are the cleaner check.
 - Fundamentals: SEC XBRL company facts. A fiscal year counts from the day its 10-K was first filed; every number is
   the latest value filed by that day.
 - Text: every 10-K's word counts on the Loughran-McDonald and Harvard lists (`text.py`).
 - Monthly rebalance, 10 bp per side, 0.5%/yr borrow on shorts. Stats as in the earlier edge tests.
 
-Results: see `out/README.md` from the workflow run and `sizing_results/`.
+Full tables: the workflow run's step summary (artifact `quantamental-results`) and `sizing_results/`.
+
+## Results
+
+Our backtests, 2010-02 to 2026-09 (SPY: +14.6%/yr, Sharpe 1.02):
+
+| Strategy | Per year | Sharpe | Alpha vs SPY (t) | Fama-French 6 alpha (t) |
+|---|---|---|---|---|
+| F-score, cheap high minus cheap low (Piotroski's test) | -2.6% | -0.22 | -1.8% (-0.6) | -3.3% (-1.2) |
+| F-score 7-9, long only | +15.4% | 1.03 | +1.1% (1.0) | +1.2% (1.2) |
+| QMJ top 30% minus bottom 30%, value weighted (the paper's form) | +3.8% | 0.22 | +5.5% (1.2) | +1.3% (0.4) |
+| QMJ top 30%, long only, equal weighted | +14.8% | 1.08 | +1.8% (1.8) | +1.3% (1.4) |
+| 10-K negativity falling, finance list (LM), long-short | -0.8% | -0.17 | -1.0% (-1.0) | -1.3% (-1.3) |
+| Same with the generic Harvard list | -1.5% | -0.32 | -1.6% (-1.5) | -2.0% (-2.0) |
+| Composite (F + QMJ + LM), top 30% long only | +15.1% | 1.05 | +1.6% (1.5) | +1.3% (1.4) |
+| Every member, equal weighted (the survivorship-flattered baseline) | +15.6% | 1.04 | +1.1% (0.9) | +1.8% (2.3) |
+
+Deflated Sharpe: no book reaches 0.5 even counting only this study's 22 variants; with the project's ~300 earlier
+trials every one is 0.00. Information coefficients are 0.000 to 0.016 a month (only payout has t above 2); the
+fundamental law's naive IR of 0.3 to 1.1 assumes 350 independent bets a month, and the realized IRs are near zero.
+10-K tone and the filing-week reaction: one standard deviation more negative words moves the 4-day return by about
+-0.09% on either list (t about -1), so the finance list is not measurably better on these large companies.
+
+Published factor series (every US stock, no survivorship):
+
+| Factor | Before publication | After publication | 2018-2026 |
+|---|---|---|---|
+| AQR QMJ (USA) | +4.1%/yr, t 3.6 (1957-2013) | +3.1%/yr, t 1.1 | +0.9%/yr, t 0.3 |
+| French RMW profitability | +3.3%/yr, t 2.6 (1963-2013) | +1.8%/yr, t 0.9 | +2.2%/yr, t 0.8 |
+| French HML value | +5.3%/yr, t 2.7 (1963-1992) | +2.1%/yr, t 0.9 | -0.6%/yr, t -0.1 |
+
+Sizing across our pots (2020-01 to 2026-10-15, `sizing_results/`): risk parity, inverse vol and HRP cut the worst drop
+from -23% to -8%/-15% and lift Sharpe from 1.23 to 1.32-1.40, but scaled to the same volatility they earn only
++1 to +2%/yr more than equal money (t 0.5 to 1.1); without Exp2 they do worse. Mean-variance and conviction/vol
+sizing add nothing (t 0.0 and 0.1).
+
+**Verdict:** the ideas are real in the long histories the papers used, but on large US stocks since 2010 none of them
+beats SPY by more than luck allows, the published factors themselves faded after publication, and sizing changes risk,
+not return. Nothing here earns a live pot.
