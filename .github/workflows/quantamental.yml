@@ -3,7 +3,7 @@ name: Quantamental backtests
 # Research only, paper only (research/quantamental): Piotroski F-score, quality minus junk and 10-K tone
 # (Loughran-McDonald vs a generic word list) on point-in-time S&P 500 members, from SEC XBRL company facts and 10-K
 # text with their filing dates. Prices come from the "papers-data" release; membership (with the companies that left the
-index and their prices) from experiments/exp2_sector_ssm/exp2/pit.py. SEC downloads (company
+# index and their prices) from experiments/exp2_sector_ssm/exp2/pit.py. SEC downloads (company
 # facts, the yearly fundamentals table, 10-K word counts) are cached in the "quantamental-data" release.
 # Nothing is deployed and nothing is traded.
 
