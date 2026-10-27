@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Resonance Index Explorer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+html,body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+/* Layout: a five-step pipeline down the page; each step pairs a control/2D view with its 3D view. A slim sticky bar holds the global switches. */
+:root{
+  --bg:#f2f4f7; --panel:#ffffff; --ink:#152033; --muted:#5a6578; --line:#d6dce5; --soft:#e9edf3;
+  --accent:#1f45a8; --neg:#b4522e;
+  --s0:#0d8577; --s1:#c06f12; --s2:#b02f74; --s3:#6247c9;
+  --display:"Newsreader", Georgia, "Times New Roman", serif;
+  --body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1219; --panel:#141b26; --ink:#e3e8f0; --muted:#94a0b2; --line:#283240; --soft:#1b2431;
+  --accent:#86a6ff; --neg:#f08a62;
+  --s0:#3cc4b3; --s1:#f1a749; --s2:#f06bb0; --s3:#a58fff; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0d1219; --panel:#141b26; --ink:#e3e8f0; --muted:#94a0b2; --line:#283240; --soft:#1b2431;
+  --accent:#86a6ff; --neg:#f08a62;
+  --s0:#3cc4b3; --s1:#f1a749; --s2:#f06bb0; --s3:#a58fff; color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+h1{font-family:var(--display);font-weight:600;font-size:clamp(30px,4.4vw,46px);line-height:1.08;margin:0 0 10px;text-wrap:balance;letter-spacing:-.01em}
+h2{font-family:var(--display);font-weight:600;font-size:26px;line-height:1.15;margin:0;text-wrap:balance}
+h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:600}
+p{margin:0;max-width:68ch}
+.lede{color:var(--muted);font-size:17px;max-width:70ch}
+.formula{font-family:var(--display);font-size:22px;margin:18px 0 4px;overflow-x:auto;white-space:nowrap;padding-bottom:4px}
+.formula i{font-style:italic}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(6px);border-bottom:1px solid var(--line);margin:22px 0 8px}
+.bar .in{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;padding:10px 0}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:transparent;color:var(--ink);font:500 13px var(--body);padding:6px 11px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--panel)}
+.lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-right:6px}
+label.chk{display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.step{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:22px 28px;padding:34px 0;border-bottom:1px solid var(--line);align-items:start}
+.step>.head{grid-column:1/-1;display:flex;gap:14px;align-items:baseline}
+.num{font-family:var(--mono);font-size:13px;color:var(--accent);border:1px solid var(--accent);border-radius:999px;padding:1px 9px;flex:none;transform:translateY(-3px)}
+.col{min-width:0;display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+.view3d{position:relative;height:380px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;touch-action:pan-y;cursor:grab}
+.view3d:active{cursor:grabbing}
+.view3d canvas{display:block}
+.hint{position:absolute;left:10px;bottom:8px;font-size:11.5px;color:var(--muted);pointer-events:none}
+.reset{position:absolute;right:8px;top:8px;font:500 12px var(--body);border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:6px;padding:4px 9px;cursor:pointer}
+.note{font-size:13.5px;color:var(--muted)}
+.note b{color:var(--ink);font-weight:600}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--panel);color:var(--ink);font:500 13px var(--body);padding:5px 10px;border-radius:999px;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);color:var(--accent)}
+.chip .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+svg text{fill:var(--muted);font-family:var(--mono);font-size:11px}
+.imgwrap{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+#imgsvg{width:220px;max-width:100%;touch-action:none;cursor:crosshair;border-radius:6px}
+.brush{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.sw{width:26px;height:26px;border-radius:5px;border:1px solid var(--line);cursor:pointer;padding:0}
+.sw[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1px}
+.scroll{overflow-x:auto}
+.range{display:grid;grid-template-columns:70px 1fr 64px;gap:8px;align-items:center;font-size:13px}
+.range input{width:100%;accent-color:var(--accent)}
+#polecv{width:100%;max-width:420px;aspect-ratio:1;touch-action:none;display:block;margin:0 auto;cursor:pointer}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line)}
+th{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+td.num2{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+tr.pruned td{opacity:.42;text-decoration:line-through}
+tr.sel td{background:var(--soft)}
+tbody tr{cursor:pointer}
+.ibar{height:10px;border-radius:3px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.cmp .panel h3{color:var(--ink)}
+.cmp .panel.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.live{font-family:var(--mono);font-size:13px;background:var(--soft);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:nowrap}
+.tabs{display:flex;gap:4px;margin-bottom:22px;border-bottom:1px solid var(--line)}
+.tabs a{font:500 14px var(--body);color:var(--muted);text-decoration:none;padding:8px 14px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+.stage3d{position:relative;height:540px;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden;touch-action:pan-y;cursor:grab;margin-top:22px}
+.stage3d canvas{display:block}
+.cap{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 24px;margin-top:16px;align-items:start}
+.cap h2{font-size:24px}
+.cap p{color:var(--ink)}
+.cap .stepno{font-family:var(--mono);font-size:12px;color:var(--accent);letter-spacing:.06em;text-transform:uppercase}
+.ctrl{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:14px}
+.ctrl input[type=range]{flex:1;min-width:160px;accent-color:var(--accent)}
+.btn{border:1px solid var(--accent);background:var(--accent);color:var(--panel);font:600 13px var(--body);padding:7px 14px;border-radius:7px;cursor:pointer}
+.btn.ghost{background:var(--panel);color:var(--accent)}
+.stagechips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.stagechips .chip{font-size:12px;padding:4px 9px}
+@media (max-width:820px){.stage3d{height:380px}.cap{grid-template-columns:1fr}}
+@media (max-width:820px){.step{grid-template-columns:minmax(0,1fr)}.view3d{height:320px}.cmp{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="tabs"><a href="#explore" id="tabE" aria-current="page">Explore</a><a href="#animation" id="tabA">Animation</a></nav>
+  <div id="explore">
+  <header>
+    <h1>Resonance index, one pixel at a time</h1>
+    <p class="lede">Paint a tiny image, watch it become a sequence, and see how each SSM state scores by how well its pole lines up with the frequencies that actually show up in its input.</p>
+    <div class="formula"><i>I</i><sub><i>h,n</i></sub> = <span style="font-size:.8em">|<i>g</i>|²⁄<i>L</i></span> · Σ<sub><i>j</i></sub> <i>S</i><sub><i>h</i></sub>(<i>ν</i><sub><i>j</i></sub>) ⁄ (1 + <i>r</i>² − 2<i>r</i> cos(<i>ν</i><sub><i>j</i></sub> − <i>θ</i>)),&nbsp; <i>ν</i><sub><i>j</i></sub> = 2π<i>j</i>⁄<i>L</i></div>
+    <p class="note">Spectrum of what the state hears, times how loudly the state rings at each frequency, summed. The denominator is |e<sup><i>iν</i></sup> − <i>λ</i>|², the squared distance from the frequency point on the unit circle to the pole <i>λ</i> = <i>r</i>e<sup><i>iθ</i></sup>.</p>
+  </header>
+
+  <div class="bar"><div class="in">
+    <span><span class="lbl">Image</span><span class="seg" id="sizeSeg"><button data-v="4" aria-pressed="true">4×4 (L=16)</button><button data-v="8" aria-pressed="false">8×8 (L=64)</button></span></span>
+    <span><span class="lbl">Backbone</span><span class="seg" id="modeSeg"><button data-v="s4d" aria-pressed="true">S4D</button><button data-v="s5" aria-pressed="false">S5</button></span></span>
+    <label class="chk"><input type="checkbox" id="deep"> Deeper layer (illustrative)</label>
+    <label class="chk"><input type="checkbox" id="nodc"> Ignore DC bin</label>
+  </div></div>
+
+  <!-- 1 -->
+  <section class="step">
+    <div class="head"><span class="num">1</span><h2>Image to sequence</h2></div>
+    <div class="col">
+      <div class="panel">
+        <h3>Paint the image</h3>
+        <div class="imgwrap">
+          <svg id="imgsvg" viewBox="0 0 100 100" aria-label="Editable image grid"></svg>
+          <div class="col" style="gap:10px">
+            <div class="brush" id="brush"></div>
+            <span class="note">Click or drag to paint.</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3>Presets</h3>
+        <div class="chips" id="presets"></div>
+        <p class="note" id="presetNote" style="margin-top:8px"></p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="panel scroll">
+        <h3>Flattened row by row: <span class="mono" id="Llabel"></span> time steps</h3>
+        <svg id="strip" viewBox="0 0 640 96" style="width:100%;min-width:480px"></svg>
+      </div>
+      <p class="note">The model never sees the image as 2D. It reads pixel <i>x</i>[<i>t</i>] at step <i>t</i>, row after row. A pattern that repeats every <i>p</i> steps in this strip shows up as energy at frequency 2π⁄<i>p</i> in step 3. Vertical stripes repeat every 2 steps (frequency π); horizontal stripes repeat every 2 rows.</p>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="step">
+    <div class="head"><span class="num">2</span><h2>Sequence to channels</h2></div>
+    <div class="col">
+      <p>A <b>channel</b> is one coordinate of the feature vector the model carries at every time step. The encoder is a linear map applied to each pixel separately: <span class="mono">u<sub>h</sub>[t] = w<sub>h</sub>·x[t] + b<sub>h</sub></span>. With <i>H</i> = 4 channels, one number per step becomes four numbers per step, so the sequence becomes a 4 × <i>L</i> sheet (the 3D view). Your real models use 128 channels.</p>
+      <div>
+        <h3>Pick a channel</h3>
+        <div class="chips" id="chanChips"></div>
+      </div>
+      <p class="note" id="deepNote"></p>
+    </div>
+    <div class="view3d" id="v3a"><button class="reset" data-reset="a">Reset view</button><span class="hint">Drag to rotate · time → x, channel → depth, value → height</span></div>
+  </section>
+
+  <!-- 3 -->
+  <section class="step">
+    <div class="head"><span class="num">3</span><h2 id="specTitle">Channel to power spectrum</h2></div>
+    <div class="col">
+      <p id="specText"></p>
+      <p class="note">The spectrum is symmetric because the signal is real, so a pole at angle <i>θ</i> and one at −<i>θ</i> get the same score. The tall bar at 0 is the DC bin: the average pixel value. The code has a "no DC" variant that replaces it with its neighbour; tick <b>Ignore DC bin</b> to try it.</p>
+    </div>
+    <div class="panel scroll">
+      <h3 id="specHead">S(ν) of the selected channel</h3>
+      <svg id="spec" viewBox="0 0 640 230" style="width:100%;min-width:460px"></svg>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="step">
+    <div class="head"><span class="num">4</span><h2>Poles and resonance curves</h2></div>
+    <div class="col">
+      <div class="panel">
+        <h3>Drag the poles</h3>
+        <canvas id="polecv" width="420" height="420" aria-label="Unit circle with draggable poles"></canvas>
+        <p class="note" style="margin-top:8px">Dots on the circle are the frequency bins <i>e</i><sup><i>iν</i><sub><i>j</i></sub></sup>, sized by <i>S</i>(<i>ν</i><sub><i>j</i></sub>). Lines from the selected pole show each bin's contribution: short distance and big dot means a big term. The dashed circle is the cap <i>r</i> ≤ 1 − 1⁄<i>L</i> used in prune_sweep.py.</p>
+      </div>
+      <div class="chips" id="stateChips"></div>
+      <div class="range"><span>r</span><input type="range" id="rr" min="0" max="0.99" step="0.005"><span class="mono" id="rv"></span></div>
+      <div class="range"><span>θ</span><input type="range" id="tt" min="-3.1416" max="3.1416" step="0.01"><span class="mono" id="tv"></span></div>
+    </div>
+    <div class="col">
+      <div class="view3d" id="v3b" style="height:430px"><button class="reset" data-reset="b">Reset view</button><span class="hint">Front row: S(ν). Each row behind: one state's curve and its terms S·response.</span></div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="lbl">Height</span><span class="seg" id="scaleSeg"><button data-v="log" aria-pressed="true">Log</button><button data-v="lin" aria-pressed="false">Linear</button></span>
+        <span class="note">Each state is a damped oscillator: <i>r</i> sets how long it remembers, <i>θ</i> the frequency it rings at.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="step">
+    <div class="head"><span class="num">5</span><h2>The index, and which states get pruned</h2></div>
+    <div class="col">
+      <div class="live" id="live"></div>
+      <p class="note">All gains |<i>g</i>|² are set to 1 here so only the frequency match matters. In the real code the gain is ‖<i>c</i><sub><i>n</i></sub>‖² from the output matrix, and in S4D the |<i>B</i>|² factor sits inside the spectrum.</p>
+      <div class="range" style="grid-template-columns:110px 1fr 40px"><span>Prune lowest</span><input type="range" id="kk" min="0" max="3" step="1" value="1"><span class="mono" id="kv"></span></div>
+    </div>
+    <div class="panel scroll">
+      <table><thead><tr><th>State</th><th>r</th><th>θ</th><th style="width:40%">Index I</th><th style="text-align:right">I</th><th>Rank</th></tr></thead><tbody id="tbl"></tbody></table>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="step" style="border-bottom:0">
+    <div class="head"><span class="num">6</span><h2>S4D versus S5: who listens to what</h2></div>
+    <div class="cmp" style="grid-column:1/-1">
+      <div class="panel" id="cmpS4D">
+        <h3>S4D: one small SSM per channel</h3>
+        <p>Each channel <i>h</i> has its own <i>N</i> states with their own poles. State <i>n</i> of channel <i>h</i> only hears <span class="mono">u<sub>h</sub></span>, so its spectrum is <i>S</i><sub><i>h</i></sub>, the spectrum of that channel. That is why the definition carries the index <i>h</i>. Here you see the 4 states of the selected channel (the same pole positions are reused for every channel to keep things small).</p>
+      </div>
+      <div class="panel" id="cmpS5">
+        <h3>S5: one shared SSM for all channels</h3>
+        <p>There is one set of states per layer, shared by every channel. State <i>n</i> hears a mix of all channels: <span class="mono">z<sub>n</sub>[t] = Σ<sub>h</sub> B<sub>n,h</sub> u<sub>h</sub>[t]</span>, which is <span class="mono">B·u</span>. Its spectrum is the spectrum of that mix, so each state gets its own <i>S</i><sub><i>n</i></sub>. In the code this is the line <span class="mono">z = einsum("ph,blh->blp", B_bar, u)</span> followed by an FFT.</p>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <div id="anim" hidden>
+    <h1>From pixels to pruning</h1>
+    <p class="lede">An 8×8 smiley goes through one S4D layer: read as a sequence, encoded into channels, turned into a spectrum, scored against four states, and pruned. Drag the view to look around.</p>
+    <div class="stage3d" id="av"><span class="hint">Drag to rotate</span></div>
+    <div class="cap"><div><div class="stepno" id="capN"></div><h2 id="capT"></h2></div><div></div><p id="capB" style="grid-column:1/-1"></p></div>
+    <div class="ctrl">
+      <button class="btn" id="aplay">Pause</button>
+      <button class="btn ghost" id="aprev" aria-label="Previous step">‹ Back</button>
+      <button class="btn ghost" id="anext" aria-label="Next step">Next ›</button>
+      <input type="range" id="ascrub" min="0" max="1" step="0.001" value="0" aria-label="Timeline">
+      <span class="mono note" id="aclock"></span>
+    </div>
+    <div class="stagechips" id="achips"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js" integrity="sha384-vV17nr/rMaJqmeZkFUzXLpHdQ+ME5QHKdydaqqN+3Ga39RJlNrTatJxHwGV4ml2C" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+(function(){
+const H=4, N=4;
+const W=[1.0,-0.7,0.5,1.3], Bc=[0.0,0.3,-0.2,0.1];
+const BS5=[[0.9,-0.4,0.2,0.5],[-0.3,0.8,0.6,-0.2],[0.5,0.5,-0.7,0.3],[0.1,-0.6,0.4,0.9]];
+const M=[[0.8,-0.5,0.3,0.0],[0.2,0.6,-0.4,0.5],[-0.3,0.2,0.9,-0.6],[0.5,0.0,-0.2,0.7]];
+const D=[[0.0,0.6,0.0,-0.4],[-0.7,0.0,0.3,0.0],[0.0,-0.5,0.0,0.8],[0.4,0.0,-0.6,0.0]];
+const st={size:4,img:null,mode:'s4d',deep:false,nodc:false,ch:0,sel:3,brush:1,scale:'log',k:1,
+  poles:[{r:0.9,t:0},{r:0.85,t:Math.PI/4},{r:0.9,t:Math.PI/2},{r:0.9,t:Math.PI}]};
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const sc=n=>css('--s'+n);
+const fmt=(v,d=3)=>Math.abs(v)>=1000?v.toExponential(2):v.toFixed(d);
+const piFmt=t=>{const f=t/Math.PI;return (Math.abs(f)<0.005?'0':f.toFixed(2)+'π');};
+
+/* ---------- presets ---------- */
+const PRESETS={
+ 'Vertical stripes':{f:(i,j,n)=>j%2?0:1,note:'Each row reads 1,0,1,0, so the sequence alternates every step: energy at ν = π, plus DC from the mean.'},
+ 'Horizontal stripes':{f:(i,j,n)=>i%2?0:1,note:'Bright row, dark row: the pattern repeats every 2 rows = 2n steps, so energy sits at ν = 2π⁄(2n) and its odd harmonics.'},
+ 'Checkerboard':{f:(i,j,n)=>(i+j)%2?0:1,note:'Alternates within a row and flips each row. Mostly ν = π, with side bands from the row flips.'},
+ 'Diagonal':{f:(i,j,n)=>i===j?1:0,note:'One bright pixel per row, shifted by one each row: a pulse every n+1 steps.'},
+ 'Single dot':{f:(i,j,n)=>(i===1&&j===2)?1:0,note:'A single impulse has a flat spectrum: every frequency gets the same energy, so only the poles decide the ranking (the white-noise case behind AIRE-Prune).'},
+ 'Smooth ramp':{f:(i,j,n)=>(i*n+j)/(n*n-1),note:'Slowly rising brightness: almost everything is low frequency, so slow states near θ = 0 win.'}
+};
+function applyPreset(name){const n=st.size;st.img=new Float32Array(n*n);for(let i=0;i<n;i++)for(let j=0;j<n;j++)st.img[i*n+j]=PRESETS[name].f(i,j,n);
+  $('presetNote').textContent=PRESETS[name].note;st.preset=name;update();}
+
+/* ---------- maths ---------- */
+const gelu=x=>0.5*x*(1+Math.tanh(0.7978845608*(x+0.044715*x*x*x)));
+function dftPower(x){const L=x.length,S=new Float64Array(L);for(let k=0;k<L;k++){let re=0,im=0;for(let t=0;t<L;t++){const a=-2*Math.PI*k*t/L;re+=x[t]*Math.cos(a);im+=x[t]*Math.sin(a);}S[k]=(re*re+im*im)/L;}return S;}
+function compute(){
+  const L=st.size*st.size, x=Array.from(st.img);
+  let u=W.map((w,h)=>x.map(v=>w*v+Bc[h]));
+  if(st.deep){const g=u.map(r=>r.map(gelu));
+    u=[...Array(H)].map((_,h)=>x.map((_,t)=>{let s=0;for(let k=0;k<H;k++){s+=M[h][k]*g[k][t];if(t>0)s+=D[h][k]*g[k][t-1];}return s;}));}
+  // what each state hears
+  let inputs;
+  if(st.mode==='s4d') inputs=[...Array(N)].map(()=>u[st.ch]);
+  else inputs=BS5.map(row=>x.map((_,t)=>row.reduce((s,b,h)=>s+b*u[h][t],0)));
+  const specs=inputs.map(z=>{const S=dftPower(z);if(st.nodc&&L>1)S[0]=S[1];return S;});
+  const cap=1-1/L;
+  const nu=[...Array(L)].map((_,j)=>2*Math.PI*j/L);
+  const res=st.poles.map((p,n)=>{const r=Math.min(p.r,cap);const resp=nu.map(v=>1/(1+r*r-2*r*Math.cos(v-p.t)));
+    const terms=resp.map((q,j)=>specs[n][j]*q/L);return {r,resp,terms,I:terms.reduce((a,b)=>a+b,0)};});
+  const order=res.map((o,i)=>i).sort((a,b)=>res[b].I-res[a].I);
+  const rank=[];order.forEach((n,i)=>rank[n]=i+1);
+  const pruned=new Set(order.slice(N-st.k));
+  return {L,x,u,inputs,specs,res,rank,pruned,cap,nu};
+}
+// map bin j to a centred position in (-π, π]
+const wrapNu=v=>{let w=v;if(w>Math.PI+1e-9)w-=2*Math.PI;return w;};
+
+/* ---------- image editor ---------- */
+let painting=false;
+function drawImg(){const n=st.size,s=100/n,svg=$('imgsvg');let h='';
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){const v=st.img[i*n+j],g=Math.round(18+v*222);
+    h+=`<rect x="${j*s+.4}" y="${i*s+.4}" width="${s-.8}" height="${s-.8}" rx="1.2" fill="rgb(${g},${g},${g+6})" data-k="${i*n+j}"/>`;
+    h+=`<text x="${j*s+s/2}" y="${i*s+s/2+1.4}" text-anchor="middle" style="font-size:${n===4?4.2:2.6}px;fill:${v>0.5?'#152033':'#c9d2e0'}">${i*n+j}</text>`;}
+  svg.innerHTML=h;}
+function paintAt(e){const r=$('imgsvg').getBoundingClientRect(),n=st.size;
+  const j=Math.floor((e.clientX-r.left)/r.width*n),i=Math.floor((e.clientY-r.top)/r.height*n);
+  if(i<0||j<0||i>=n||j>=n)return;const k=i*n+j;if(st.img[k]!==st.brush){st.img[k]=st.brush;st.preset=null;$('presetNote').textContent='';markPresets();update();}}
+$('imgsvg').addEventListener('pointerdown',e=>{painting=true;$('imgsvg').setPointerCapture(e.pointerId);paintAt(e);});
+$('imgsvg').addEventListener('pointermove',e=>{if(painting)paintAt(e);});
+$('imgsvg').addEventListener('pointerup',()=>painting=false);
+[0,0.33,0.67,1].forEach(v=>{const b=document.createElement('button');b.className='sw';const g=Math.round(18+v*222);b.style.background=`rgb(${g},${g},${g+6})`;
+  b.setAttribute('aria-label','Brush '+v);b.setAttribute('aria-pressed',v===1);b.onclick=()=>{st.brush=v;[...$('brush').children].forEach(c=>c.setAttribute('aria-pressed',c===b));};$('brush').appendChild(b);});
+Object.keys(PRESETS).forEach(name=>{const b=document.createElement('button');b.className='chip';b.textContent=name;b.dataset.p=name;b.onclick=()=>{applyPreset(name);markPresets();};$('presets').appendChild(b);});
+function markPresets(){[...$('presets').children].forEach(c=>c.setAttribute('aria-pressed',c.dataset.p===st.preset));}
+
+function drawStrip(c){const L=c.L,n=st.size,w=620/L,svg=$('strip');let h='';
+  for(let t=0;t<L;t++){const v=c.x[t],g=Math.round(18+v*222);h+=`<rect x="${10+t*w}" y="8" width="${w-1}" height="40" rx="1.5" fill="rgb(${g},${g},${g+6})"/>`;
+    if(n===4||t%4===0)h+=`<text x="${10+t*w+w/2}" y="62" text-anchor="middle">${t}</text>`;}
+  for(let i=0;i<n;i++){const x0=10+i*n*w,x1=10+(i+1)*n*w-1;h+=`<path d="M${x0} 72 v6 H${x1} v-6" fill="none" stroke="var(--line)"/><text x="${(x0+x1)/2}" y="92" text-anchor="middle">row ${i}</text>`;}
+  svg.innerHTML=h;$('Llabel').textContent='L = '+L;}
+
+/* ---------- spectrum ---------- */
+function drawSpec(c){const L=c.L,svg=$('spec');const idx=st.mode==='s4d'?0:st.sel;const S=c.specs[idx];
+  const mx=Math.max(...S,1e-9),x0=44,x1=628,y0=190,y1=14;const bins=[...Array(L)].map((_,j)=>({j,v:wrapNu(c.nu[j])})).sort((a,b)=>a.v-b.v);
+  const X=v=>x0+(v+Math.PI)/(2*Math.PI)*(x1-x0);const bw=(x1-x0)/L*0.72;let h='';
+  [0,0.5,1].forEach(f=>{const y=y0-(y0-y1)*f;h+=`<line x1="${x0}" x2="${x1}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${x0-6}" y="${y+4}" text-anchor="end">${fmt(mx*f,2)}</text>`;});
+  const col=st.mode==='s4d'?css('--accent'):sc(st.sel);
+  bins.forEach(b=>{const hgt=(y0-y1)*S[b.j]/mx;h+=`<rect x="${X(b.v)-bw/2}" y="${y0-hgt}" width="${bw}" height="${Math.max(hgt,0.5)}" fill="${col}" opacity="${b.j===0&&st.nodc?0.45:0.9}"><title>j=${b.j}, ν=${piFmt(b.v)}, S=${fmt(S[b.j])}</title></rect>`;});
+  [[-Math.PI,'−π'],[-Math.PI/2,'−π/2'],[0,'0 (DC)'],[Math.PI/2,'π/2'],[Math.PI,'π']].forEach(([v,l])=>h+=`<text x="${X(v)}" y="${y0+18}" text-anchor="middle">${l}</text>`);
+  h+=`<text x="${(x0+x1)/2}" y="${y0+36}" text-anchor="middle">frequency ν</text>`;svg.innerHTML=h;
+  if(st.mode==='s4d'){$('specTitle').textContent='Channel to power spectrum';$('specHead').textContent=`S(ν) of channel ${st.ch}`;
+    $('specText').innerHTML=`In S4D, every state of channel ${st.ch} hears the same signal <span class="mono">u<sub>${st.ch}</sub>[t]</span>. Its power spectrum <i>S</i><sub><i>h</i></sub>(<i>ν</i><sub><i>j</i></sub>) = |FFT(u<sub><i>h</i></sub>)[<i>j</i>]|²⁄<i>L</i> says how much of the signal oscillates at each frequency.`;}
+  else{$('specTitle').textContent='Mixed input to power spectrum';$('specHead').textContent=`S(ν) of state ${st.sel}'s input z${sub(st.sel)} = (B·u)${sub(st.sel)}`;
+    $('specText').innerHTML=`In S5 the states do not belong to a channel. State ${st.sel} hears <span class="mono">z<sub>${st.sel}</sub> = Σ<sub>h</sub> B<sub>${st.sel},h</sub>u<sub>h</sub></span>, so each state has its own spectrum. Pick a state in step 4 to see its spectrum here.`;}}
+const sub=n=>'₀₁₂₃₄₅₆₇₈₉'[n];
+
+/* ---------- pole editor ---------- */
+const pc=$('polecv'),px=pc.getContext('2d');let dragPole=-1;
+function drawPoles(c){const dpr=window.devicePixelRatio||1,sz=pc.clientWidth||400;if(pc.width!==Math.round(sz*dpr)){pc.width=pc.height=Math.round(sz*dpr);}
+  px.setTransform(dpr,0,0,dpr,0,0);px.clearRect(0,0,sz,sz);const cx=sz/2,cy=sz/2,R=sz*0.4;
+  const P=(r,t)=>[cx+R*r*Math.cos(t),cy-R*r*Math.sin(t)];
+  px.strokeStyle=css('--line');px.lineWidth=1;px.beginPath();px.moveTo(cx-R*1.15,cy);px.lineTo(cx+R*1.15,cy);px.moveTo(cx,cy-R*1.15);px.lineTo(cx,cy+R*1.15);px.stroke();
+  px.strokeStyle=css('--muted');px.lineWidth=1.3;px.beginPath();px.arc(cx,cy,R,0,2*Math.PI);px.stroke();
+  px.setLineDash([4,4]);px.strokeStyle=css('--line');px.beginPath();px.arc(cx,cy,R*c.cap,0,2*Math.PI);px.stroke();px.setLineDash([]);
+  px.fillStyle=css('--muted');px.font='11px '+css('--mono');px.fillText('Re',cx+R*1.08,cy-6);px.fillText('Im',cx+6,cy-R*1.1);
+  px.fillText('ν=0',cx+R+6,cy+14);px.fillText('ν=π',cx-R-32,cy+14);
+  const n=st.sel,S=c.specs[st.mode==='s4d'?0:n],mx=Math.max(...S,1e-9),terms=c.res[n].terms,tm=Math.max(...terms,1e-12);
+  // contribution lines
+  const pp=P(c.res[n].r,st.poles[n].t);
+  for(let j=0;j<c.L;j++){const b=P(1,c.nu[j]);px.strokeStyle=sc(n);px.globalAlpha=0.08+0.8*terms[j]/tm;px.lineWidth=0.6+2.4*terms[j]/tm;px.beginPath();px.moveTo(pp[0],pp[1]);px.lineTo(b[0],b[1]);px.stroke();}
+  px.globalAlpha=1;
+  for(let j=0;j<c.L;j++){const b=P(1,c.nu[j]);px.fillStyle=css('--accent');px.beginPath();px.arc(b[0],b[1],2+9*Math.sqrt(S[j]/mx),0,2*Math.PI);px.globalAlpha=0.75;px.fill();px.globalAlpha=1;}
+  st.poles.forEach((p,i)=>{const q=P(c.res[i].r,p.t),g=P(c.res[i].r,-p.t);
+    px.globalAlpha=0.25;px.strokeStyle=sc(i);px.lineWidth=1.5;px.beginPath();px.arc(g[0],g[1],5,0,2*Math.PI);px.stroke();px.globalAlpha=1;
+    px.fillStyle=sc(i);px.beginPath();px.arc(q[0],q[1],i===n?9:7,0,2*Math.PI);px.fill();
+    if(c.pruned.has(i)){px.strokeStyle=css('--panel');px.lineWidth=2;px.beginPath();px.moveTo(q[0]-4,q[1]-4);px.lineTo(q[0]+4,q[1]+4);px.stroke();}
+    if(i===n){px.strokeStyle=css('--ink');px.lineWidth=1.5;px.beginPath();px.arc(q[0],q[1],12,0,2*Math.PI);px.stroke();}
+    px.fillStyle=css('--ink');px.font='600 11px '+css('--mono');px.fillText('λ'+sub(i),q[0]+11,q[1]-9);});
+}
+function poleEvt(e,down){const r=pc.getBoundingClientRect(),sz=r.width,R=sz*0.4,mx=e.clientX-r.left-sz/2,my=-(e.clientY-r.top-sz/2);
+  if(down){let best=-1,bd=22;st.poles.forEach((p,i)=>{const rr=Math.min(p.r,1-1/(st.size*st.size));const d=Math.hypot(mx-R*rr*Math.cos(p.t),my-R*rr*Math.sin(p.t));if(d<bd){bd=d;best=i;}});
+    dragPole=best;if(best>=0){st.sel=best;pc.setPointerCapture(e.pointerId);}return;}
+  if(dragPole<0)return;const cap=1-1/(st.size*st.size);st.poles[dragPole].r=Math.min(Math.hypot(mx,my)/R,cap);st.poles[dragPole].t=Math.atan2(my,mx);update();}
+pc.addEventListener('pointerdown',e=>{poleEvt(e,true);update();});
+pc.addEventListener('pointermove',e=>poleEvt(e,false));
+pc.addEventListener('pointerup',()=>dragPole=-1);
+
+/* ---------- 3D ---------- */
+function make3D(el,init){
+  const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));el.prepend(renderer.domElement);
+  const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(38,1,0.1,200),group=new THREE.Group();scene.add(group);
+  scene.add(new THREE.AmbientLight(0xffffff,0.62));const dl=new THREE.DirectionalLight(0xffffff,0.6);dl.position.set(4,10,6);scene.add(dl);
+  const o={...init},v={scene,group,render,rebuild:null};
+  function place(){cam.position.set(o.tx+o.d*Math.sin(o.phi)*Math.sin(o.th),o.ty+o.d*Math.cos(o.phi),o.tz+o.d*Math.sin(o.phi)*Math.cos(o.th));cam.lookAt(o.tx,o.ty,o.tz);}
+  function render(){scene.background=new THREE.Color(css('--panel'));place();renderer.render(scene,cam);}
+  function size(){const w=el.clientWidth,h=el.clientHeight;renderer.setSize(w,h,false);renderer.domElement.style.width=w+'px';renderer.domElement.style.height=h+'px';cam.aspect=w/h;cam.updateProjectionMatrix();render();}
+  new ResizeObserver(size).observe(el);
+  let drag=null;
+  renderer.domElement.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,th:o.th,phi:o.phi};renderer.domElement.setPointerCapture(e.pointerId);});
+  renderer.domElement.addEventListener('pointermove',e=>{if(!drag)return;o.th=drag.th-(e.clientX-drag.x)*0.008;o.phi=Math.max(0.15,Math.min(1.5,drag.phi-(e.clientY-drag.y)*0.006));render();});
+  renderer.domElement.addEventListener('pointerup',()=>drag=null);renderer.domElement.addEventListener('pointercancel',()=>drag=null);
+  v.reset=()=>{Object.assign(o,init);render();};v.size=size;return v;}
+function clear(g){while(g.children.length){const c=g.children.pop();c.traverse(m=>{if(m.geometry)m.geometry.dispose();if(m.material){if(m.material.map)m.material.map.dispose();m.material.dispose();}});}}
+function label(text,color,s=0.55){const c=document.createElement('canvas'),ctx=c.getContext('2d');c.width=512;c.height=96;ctx.font='500 52px "IBM Plex Mono", monospace';
+  ctx.fillStyle=color;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(text,256,48);const tex=new THREE.CanvasTexture(c);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));sp.scale.set(s*5.3,s,1);return sp;}
+function line(pts,color,opacity=1){const g=new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(...p)));return new THREE.Line(g,new THREE.LineBasicMaterial({color,transparent:opacity<1,opacity}));}
+function box(x,z,w,dpt,h,color,opacity=1){const hh=Math.max(Math.abs(h),0.004);const m=new THREE.Mesh(new THREE.BoxGeometry(w,hh,dpt),new THREE.MeshLambertMaterial({color,transparent:opacity<1,opacity}));m.position.set(x,h>=0?hh/2:-hh/2,z);return m;}
+
+const A=make3D($('v3a'),{th:-0.75,phi:1.02,d:17,tx:0,ty:0.4,tz:2.4});
+const Bv=make3D($('v3b'),{th:-0.62,phi:1.0,d:19,tx:0,ty:0.8,tz:3.0});
+document.querySelectorAll('[data-reset]').forEach(b=>b.onclick=()=>(b.dataset.reset==='a'?A:Bv).reset());
+
+function buildA(c){const g=A.group;clear(g);const L=c.L,X=t=>-5+10*(t+0.5)/L,w=10/L*0.78,mx=Math.max(...c.u.flat().map(Math.abs),1e-9);
+  const mut=css('--muted'),ink=css('--ink'),acc=css('--accent'),neg=css('--neg'),ln=css('--line');
+  for(let h=0;h<H;h++){const z=h*1.6,on=h===st.ch&&st.mode==='s4d';
+    g.add(line([[-5.2,0,z],[5.2,0,z]],ln));
+    for(let t=0;t<L;t++){const v=c.u[h][t];g.add(box(X(t),z,w,0.7,2.6*v/mx,v>=0?(on?acc:mut):neg,on?1:0.55));}
+    const lb=label('ch '+h,on?acc:ink,0.5);lb.position.set(-6.4,0.2,z);g.add(lb);}
+  g.add(line([[-5.2,0,-0.8],[5.6,0,-0.8]],mut));const lt=label('time t →',mut,0.5);lt.position.set(4.6,-0.45,-1.1);g.add(lt);
+  const l0=label('0',mut,0.42);l0.position.set(X(0),-0.4,-0.9);g.add(l0);const l1=label(String(L-1),mut,0.42);l1.position.set(X(L-1),-0.4,-0.9);g.add(l1);
+  A.render();}
+function buildB(c){const g=Bv.group;clear(g);const L=c.L,X=v=>5*v/Math.PI,bw=10/L*0.6;const mut=css('--muted'),ink=css('--ink'),acc=css('--accent'),ln=css('--line');
+  const allResp=c.res.flatMap(o=>o.resp),rmax=Math.max(...allResp),tmax=Math.max(...c.res.flatMap(o=>o.terms),1e-12);
+  const Hs=v=>st.scale==='log'?3*Math.log1p(100*v)/Math.log1p(100):3*v;
+  // front row: spectrum
+  const S=c.specs[st.mode==='s4d'?0:st.sel],smax=Math.max(...S,1e-12),zf=-1.6;
+  g.add(line([[-5.3,0,zf],[5.3,0,zf]],ln));
+  for(let j=0;j<L;j++)g.add(box(X(wrapNu(c.nu[j])),zf,bw,0.5,Hs(S[j]/smax),st.mode==='s4d'?acc:sc(st.sel),0.85));
+  const ls=label(st.mode==='s4d'?'S(ν)':'S'+sub(st.sel)+'(ν)',st.mode==='s4d'?acc:sc(st.sel),0.5);ls.position.set(-6.4,0.25,zf);g.add(ls);
+  for(let n=0;n<N;n++){const z=n*1.6,col=sc(n),dim=c.pruned.has(n)?0.25:1;g.add(line([[-5.3,0,z],[5.3,0,z]],ln));
+    const p=st.poles[n],pts=[];for(let i=0;i<=240;i++){const v=-Math.PI+2*Math.PI*i/240;const q=1/(1+c.res[n].r**2-2*c.res[n].r*Math.cos(v-p.t));pts.push([X(v),Hs(q/rmax),z]);}
+    g.add(line(pts,col,0.9*dim));
+    for(let j=0;j<L;j++){const t=c.res[n].terms[j];g.add(box(X(wrapNu(c.nu[j])),z,bw,0.5,Hs(t/tmax),col,0.8*dim));}
+    const lb=label('state '+n+(c.pruned.has(n)?' ✕':''),col,0.5);lb.position.set(-6.6,0.25,z);g.add(lb);}
+  g.add(line([[-5.3,0,N*1.6-0.4],[5.3,0,N*1.6-0.4]],mut));
+  [[-Math.PI,'−π'],[0,'0'],[Math.PI,'π']].forEach(([v,t])=>{const l=label(t,mut,0.45);l.position.set(X(v),-0.4,N*1.6-0.1);g.add(l);});
+  const lf=label('frequency ν',mut,0.5);lf.position.set(0,-0.45,N*1.6+0.5);g.add(lf);
+  Bv.render();}
+
+/* ---------- table / live ---------- */
+function drawTable(c){const mx=Math.max(...c.res.map(o=>o.I),1e-12);let h='';
+  c.res.forEach((o,n)=>{h+=`<tr data-n="${n}" class="${c.pruned.has(n)?'pruned':''} ${n===st.sel?'sel':''}"><td><span class="dot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${sc(n)};margin-right:6px"></span>state ${n}</td><td class="mono">${o.r.toFixed(3)}</td><td class="mono">${piFmt(st.poles[n].t)}</td><td><div class="ibar" style="width:${Math.max(2,100*o.I/mx)}%;background:${sc(n)}"></div></td><td class="num2">${fmt(o.I)}</td><td class="mono">#${c.rank[n]}</td></tr>`;});
+  $('tbl').innerHTML=h;[...$('tbl').children].forEach(tr=>tr.onclick=()=>{st.sel=+tr.dataset.n;update();});
+  const n=st.sel,o=c.res[n],top=o.terms.map((t,j)=>[t,j]).sort((a,b)=>b[0]-a[0]).slice(0,3),Sn=c.specs[st.mode==='s4d'?0:n];
+  $('live').innerHTML=`I<sub>${n}</sub> = (1/${c.L}) · Σ<sub>j</sub> S(ν<sub>j</sub>) / (1 + ${o.r.toFixed(3)}² − 2·${o.r.toFixed(3)}·cos(ν<sub>j</sub> − ${piFmt(st.poles[n].t)})) = <b>${fmt(o.I)}</b><br>`+
+    `largest terms: `+top.map(([t,j])=>`j=${j} (ν=${piFmt(wrapNu(c.nu[j]))}, S=${fmt(Sn[j],2)}) → ${fmt(t)}`).join(' · ')+
+    `<br>share of I from these 3 bins: ${(100*top.reduce((a,b)=>a+b[0],0)/Math.max(o.I,1e-12)).toFixed(0)}%`;
+  $('kv').textContent=st.k;}
+
+/* ---------- chips & controls ---------- */
+function chips(){$('chanChips').innerHTML=[...Array(H)].map((_,h)=>`<button class="chip" data-h="${h}" aria-pressed="${h===st.ch}">channel ${h} <span class="mono" style="color:var(--muted)">w=${W[h]}, b=${Bc[h]}</span></button>`).join('');
+  [...$('chanChips').children].forEach(b=>{b.onclick=()=>{st.ch=+b.dataset.h;update();};b.disabled=st.mode==='s5';b.style.opacity=st.mode==='s5'?0.5:1;});
+  $('stateChips').innerHTML=st.poles.map((p,n)=>`<button class="chip" data-n="${n}" aria-pressed="${n===st.sel}"><span class="dot" style="background:${sc(n)}"></span>state ${n}</button>`).join('');
+  [...$('stateChips').children].forEach(b=>b.onclick=()=>{st.sel=+b.dataset.n;update();});
+  const p=st.poles[st.sel],cap=1-1/(st.size*st.size);$('rr').max=cap.toFixed(4);$('rr').value=Math.min(p.r,cap);$('tt').value=p.t;$('rv').textContent=Math.min(p.r,cap).toFixed(3);$('tv').textContent=piFmt(p.t);
+  $('deepNote').innerHTML=st.mode==='s5'?'In S5 mode all channels feed every state, so there is no single channel to pick. Step 3 shows the mix each state hears.':
+    (st.deep?'<b>Deeper layer:</b> channels are mixed across neighbouring time steps and passed through a GELU, as happens after a real SSM layer. Now each channel has its own shape and spectrum. The weights are made up for illustration.':
+    '<b>Note:</b> at the first layer each channel is just a scaled and shifted copy of the pixel sequence, so all channels share the same spectrum shape apart from DC. Channels only become different after later layers mix them; tick <b>Deeper layer</b> to see that.');
+  $('cmpS4D').classList.toggle('on',st.mode==='s4d');$('cmpS5').classList.toggle('on',st.mode==='s5');}
+$('rr').oninput=e=>{st.poles[st.sel].r=+e.target.value;update();};
+$('tt').oninput=e=>{st.poles[st.sel].t=+e.target.value;update();};
+$('kk').oninput=e=>{st.k=+e.target.value;update();};
+function seg(id,key,after){const el=$(id);[...el.children].forEach(b=>b.onclick=()=>{st[key]=key==='size'?+b.dataset.v:b.dataset.v;[...el.children].forEach(c=>c.setAttribute('aria-pressed',c===b));after&&after();update();});}
+seg('sizeSeg','size',()=>applyPreset(st.preset||'Vertical stripes'));seg('modeSeg','mode');seg('scaleSeg','scale');
+$('deep').onchange=e=>{st.deep=e.target.checked;update();};$('nodc').onchange=e=>{st.nodc=e.target.checked;update();};
+
+let raf=0;function update(){if(!st.img)return;cancelAnimationFrame(raf);raf=requestAnimationFrame(()=>{const c=compute();drawImg();drawStrip(c);drawSpec(c);drawPoles(c);drawTable(c);chips();buildA(c);buildB(c);});}
+const rerender=()=>update();
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',rerender);
+new MutationObserver(rerender).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+new ResizeObserver(()=>update()).observe(pc);
+applyPreset('Vertical stripes');markPresets();
+})();
+</script>
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const IMG=['00111100','01000010','10100101','10000001','10100101','10011001','01000010','00111100'];
+const n8=8,L=64,H=4,NS=4,x=IMG.join('').split('').map(Number);
+const W=[1.0,-0.7,0.5,1.3],Bc=[0.0,0.3,-0.2,0.1];
+const POLES=[{r:0.9,t:0},{r:0.9,t:Math.PI/4},{r:0.85,t:0.55*Math.PI},{r:0.85,t:Math.PI}];
+const PRUNE=2;
+const u=W.map((w,h)=>x.map(v=>w*v+Bc[h])),umax=Math.max(...u.flat().map(Math.abs));
+const S=(()=>{const z=u[0],o=[];for(let k=0;k<L;k++){let re=0,im=0;for(let t=0;t<L;t++){const a=-2*Math.PI*k*t/L;re+=z[t]*Math.cos(a);im+=z[t]*Math.sin(a);}o.push((re*re+im*im)/L);}return o;})();
+const smax=Math.max(...S),nu=[...Array(L)].map((_,j)=>2*Math.PI*j/L),wrap=v=>v>Math.PI+1e-9?v-2*Math.PI:v;
+const cap=1-1/L;
+const ST=POLES.map(p=>{const r=Math.min(p.r,cap);const resp=nu.map(v=>1/(1+r*r-2*r*Math.cos(v-p.t)));const terms=resp.map((q,j)=>S[j]*q/L);return {r,t:p.t,resp,terms,I:terms.reduce((a,b)=>a+b,0),tmax:Math.max(...terms)};});
+const Imax=Math.max(...ST.map(s=>s.I)),order=ST.map((_,i)=>i).sort((a,b)=>ST[b].I-ST[a].I),pruned=new Set(order.slice(NS-PRUNE));
+const Hs=v=>Math.log1p(100*v)/Math.log1p(100);
+const piF=t=>{const f=t/Math.PI;return Math.abs(f)<0.005?'0':(f===1?'π':f.toFixed(2)+'π');};
+const kept=order.slice(0,NS-PRUNE).sort(),gone=[...pruned].sort();
+
+const STAGES=[
+ {d:3.5,t:'An 8×8 image',b:'64 pixels, each with a brightness between 0 and 1. The height of each tile is its brightness.'},
+ {d:5.5,t:'Read it row by row',b:'The SSM never sees the image in 2D. Row 0 comes first, then row 1, and so on, giving 64 time steps x[0] … x[63]. Anything that repeats from row to row becomes a rhythm with a period of 8 steps.'},
+ {d:5,t:'The encoder makes channels',b:'At every step a linear map turns one pixel into H numbers: u<sub>h</sub>[t] = w<sub>h</sub>·x[t] + b<sub>h</sub>. Each row in depth is one channel. Here H = 4; your models use 128. Orange bars are negative values.'},
+ {d:5,t:'Take one channel’s spectrum',b:'In S4D every channel has its own states, so we follow channel 0. The FFT re-expresses its 64 values by frequency: S(ν<sub>j</sub>) = |FFT(u)[j]|²⁄L. Heights are on a log scale. The tall middle bar is DC, the mean brightness.'},
+ {d:4.5,t:'Frequencies sit on the unit circle',b:'Frequency ν<sub>j</sub> is the point e<sup>iν<sub>j</sub></sup> on the unit circle. Wrapping the spectrum around the circle puts each bar at its angle: ν = 0 on the right, π on the left.'},
+ {d:5.5,t:'Each state is a pole inside the circle',b:'A state is a damped oscillator with eigenvalue λ = r·e<sup>iθ</sup>. Its gain at frequency ν is 1⁄|e<sup>iν</sup> − λ|², which is large when the pole is close to that point on the circle. A brighter line means a bigger term S(ν)⁄|e<sup>iν</sup> − λ|².'},
+ {d:6,t:'Spectrum × resonance',b:'Unrolled again, each row is one state. The thin curve is its resonance curve 1⁄(1 + r² − 2r cos(ν − θ)), and the bars are the terms S(ν<sub>j</sub>) × curve. A state scores high when its peak lands on frequencies the input actually contains.'},
+ {d:5.5,t:'Sum the terms: the resonance index',b:'I<sub>n</sub> = (|g|²⁄L) Σ<sub>j</sub> S(ν<sub>j</sub>)⁄(1 + r² − 2r cos(ν<sub>j</sub> − θ)). All the bars of a row stack into one tower (linear scale, |g|² = 1). '+ST.map((s,i)=>`State ${i}: ${s.I.toFixed(3)}`).join(' · ')+'.'},
+ {d:6,t:'Prune the weakest states',b:`The ${PRUNE} lowest towers, states ${gone.join(' and ')}, are removed: their poles sit where this image has little energy. States ${kept.join(' and ')} stay. In the real method the spectrum is averaged over a calibration set of many images, and states are ranked within each layer.`}
+];
+const starts=[];let T=0;STAGES.forEach(s=>{starts.push(T);T+=s.d;});
+const CAMS=[{th:0,phi:0.3,d:14},{th:0,phi:0.95,d:15},{th:-0.6,phi:1.0,d:15},{th:-0.3,phi:1.05,d:15},{th:0,phi:0.42,d:14},{th:0.0,phi:0.4,d:13.5},{th:-0.55,phi:1.0,d:19},{th:-0.45,phi:1.02,d:20},{th:-0.45,phi:1.02,d:20}];
+
+let renderer,scene,cam,built=false,playing=true,time=0,last=0,dth=0,dphi=0,tok={};
+const ease=p=>p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2,cl=v=>Math.max(0,Math.min(1,v)),lerp=(a,b,e)=>a+(b-a)*e;
+const geo=()=>new THREE.BoxGeometry(1,1,1);
+function readTok(){['--panel','--accent','--muted','--neg','--ink','--line','--s0','--s1','--s2','--s3'].forEach(k=>tok[k]=new THREE.Color(css(k)));}
+const grey=v=>new THREE.Color().setRGB(0.16+0.78*v,0.16+0.78*v,0.18+0.78*v);
+function mk(){const m=new THREE.Mesh(geo(),new THREE.MeshLambertMaterial({transparent:true}));scene.add(m);return m;}
+function setBox(m,o){m.visible=o.op>0.01;if(!m.visible)return;const h=Math.abs(o.h)<0.01?0.01*(o.h<0?-1:1):o.h;m.scale.set(o.w,Math.abs(h),o.d);m.position.set(o.x,(o.y0||0)+h/2,o.z);m.material.color.copy(o.c);m.material.opacity=o.op;}
+const mixB=(a,b,e)=>({x:lerp(a.x,b.x,e),z:lerp(a.z,b.z,e),h:lerp(a.h,b.h,e),w:lerp(a.w,b.w,e),d:lerp(a.d,b.d,e),y0:lerp(a.y0||0,b.y0||0,e),c:a.c.clone().lerp(b.c,e),op:lerp(a.op,b.op,e)});
+function label(text){const c=document.createElement('canvas'),g=c.getContext('2d');c.width=512;c.height=96;const tex=new THREE.CanvasTexture(c);
+  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));sp.scale.set(2.9,0.55,1);sp.userData={c,g,tex,text};scene.add(sp);return sp;}
+function paintLabel(sp,color){const {c,g,tex,text}=sp.userData;g.clearRect(0,0,512,96);g.font='500 50px "IBM Plex Mono", monospace';g.fillStyle=color;g.textAlign='center';g.textBaseline='middle';g.fillText(text,256,48);tex.needsUpdate=true;}
+
+let pix,chan,spec,terms,curves,poles,plines,ring,lblState,lblTower,lblSpec,lblChan;
+const R=4.6,rowZ=n=>1.2-n*1.6,specZ=3.2,TX=7.4;
+const P={
+ img:k=>{const i=Math.floor(k/8),j=k%8;return {x:(j-3.5)*0.95,z:(i-3.5)*0.95,h:0.15+x[k]*0.9,w:0.86,d:0.86,c:grey(x[k]),op:1};},
+ seq:k=>({x:(k-31.5)*0.17,z:0,h:0.1+x[k]*1.6,w:0.13,d:0.55,c:grey(x[k]),op:1}),
+ ch:(h,t)=>({x:(t-31.5)*0.17,z:(h-1.5)*1.4,h:1.8*u[h][t]/umax,w:0.13,d:0.55,c:u[h][t]<0?tok['--neg']:(h===0?tok['--accent']:tok['--muted']),op:1}),
+ front:j=>({x:wrap(nu[j])/Math.PI*5.4,z:0,h:0.05+2.4*Hs(S[j]/smax),w:0.13,d:0.4,c:tok['--accent'],op:1}),
+ ring:j=>({x:R*Math.cos(nu[j]),z:-R*Math.sin(nu[j]),h:0.05+2.4*Hs(S[j]/smax),w:0.16,d:0.16,c:tok['--accent'],op:1}),
+ row:j=>({x:wrap(nu[j])/Math.PI*5.4,z:specZ,h:0.05+1.6*Hs(S[j]/smax),w:0.13,d:0.4,c:tok['--accent'],op:1}),
+ term:(n,j,g)=>({x:wrap(nu[j])/Math.PI*5.4,z:rowZ(n),h:g*(0.02+1.5*Hs(ST[n].terms[j]/ST[n].tmax)),w:0.13,d:0.4,c:tok['--s'+n],op:1}),
+};
+let towerBase=[];
+function build(){
+  renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(2,window.devicePixelRatio||1));$('av').prepend(renderer.domElement);
+  scene=new THREE.Scene();cam=new THREE.PerspectiveCamera(38,1,0.1,200);
+  scene.add(new THREE.AmbientLight(0xffffff,0.62));const dl=new THREE.DirectionalLight(0xffffff,0.6);dl.position.set(4,10,6);scene.add(dl);
+  readTok();
+  pix=x.map(()=>mk());chan=u.map(r=>r.map(()=>mk()));spec=S.map(()=>mk());terms=ST.map(s=>s.terms.map(()=>mk()));
+  towerBase=ST.map(s=>{let acc=0;return s.terms.map(t=>{const b=acc;acc+=t/Imax*3.4;return b;});});
+  curves=ST.map((s,n)=>{const pts=[];for(let i=0;i<=240;i++){const v=-Math.PI+2*Math.PI*i/240;const q=1/(1+s.r*s.r-2*s.r*Math.cos(v-s.t));pts.push(new THREE.Vector3(v/Math.PI*5.4,1.5*Hs(q/Math.max(...ST.map(o=>Math.max(...o.resp)))),rowZ(n)));}
+    const l=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({transparent:true}));scene.add(l);return l;});
+  const rp=[];for(let i=0;i<=128;i++){const a=2*Math.PI*i/128;rp.push(new THREE.Vector3(R*Math.cos(a),0.01,-R*Math.sin(a)));}
+  ring=new THREE.Line(new THREE.BufferGeometry().setFromPoints(rp),new THREE.LineBasicMaterial({transparent:true}));scene.add(ring);
+  poles=ST.map(()=>{const m=new THREE.Mesh(new THREE.SphereGeometry(0.22,20,14),new THREE.MeshLambertMaterial({transparent:true}));scene.add(m);return m;});
+  plines=ST.map(s=>{const pos=[],col=[];s.terms.forEach((t,j)=>{pos.push(R*s.r*Math.cos(s.t),0.05,-R*s.r*Math.sin(s.t),R*Math.cos(nu[j]),0.05,-R*Math.sin(nu[j]));});
+    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(new Array(pos.length).fill(0),3));
+    const l=new THREE.LineSegments(g,new THREE.LineBasicMaterial({vertexColors:true,transparent:true}));scene.add(l);return l;});
+  lblState=ST.map((s,n)=>label('state '+n));lblTower=ST.map(s=>label(s.I.toFixed(2)));lblSpec=label('S(ν)');lblChan=u.map((r,h)=>label('ch '+h));
+  colorize();
+  new ResizeObserver(size).observe($('av'));
+  let drag=null;const el=renderer.domElement;
+  el.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,th:dth,phi:dphi};el.setPointerCapture(e.pointerId);});
+  el.addEventListener('pointermove',e=>{if(!drag)return;dth=drag.th-(e.clientX-drag.x)*0.008;dphi=drag.phi-(e.clientY-drag.y)*0.006;draw();});
+  el.addEventListener('pointerup',()=>drag=null);el.addEventListener('pointercancel',()=>drag=null);
+  $('achips').innerHTML=STAGES.map((s,i)=>`<button class="chip" data-i="${i}">${i+1}. ${s.t}</button>`).join('');
+  [...$('achips').children].forEach(b=>b.onclick=()=>{time=starts[+b.dataset.i]+0.001;draw();});
+  built=true;size();
+}
+function colorize(){readTok();
+  curves.forEach((l,n)=>l.material.color.copy(tok['--s'+n]));ring.material.color.copy(tok['--muted']);poles.forEach((m,n)=>m.material.color.copy(tok['--s'+n]));
+  plines.forEach((l,n)=>{const c=l.geometry.attributes.color,s=ST[n];s.terms.forEach((t,j)=>{const f=Math.pow(t/s.tmax,0.6),col=tok['--panel'].clone().lerp(tok['--s'+n],f);for(const k of [2*j,2*j+1])c.setXYZ(k,col.r,col.g,col.b);});c.needsUpdate=true;});
+  lblState.forEach((s,n)=>paintLabel(s,css('--s'+n)));lblTower.forEach(s=>paintLabel(s,css('--ink')));paintLabel(lblSpec,css('--accent'));lblChan.forEach((s,h)=>paintLabel(s,h===0?css('--accent'):css('--muted')));
+}
+function size(){if(!built)return;const el=$('av'),w=el.clientWidth,h=el.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);renderer.domElement.style.width=w+'px';renderer.domElement.style.height=h+'px';cam.aspect=w/h;cam.updateProjectionMatrix();draw();}
+const hide={op:0};
+function draw(){if(!built)return;
+  let si=STAGES.length-1;for(let i=0;i<STAGES.length;i++)if(time<starts[i]+STAGES[i].d){si=i;break;}
+  const loc=time-starts[si],d=STAGES[si].d,e=ease(cl(loc/(d*0.65)));
+  // camera
+  const c0=CAMS[Math.max(0,si-1)],c1=CAMS[si],th=lerp(c0.th,c1.th,e)+dth,phi=Math.max(0.12,Math.min(1.5,lerp(c0.phi,c1.phi,e)+dphi)),dist=lerp(c0.d,c1.d,e)*Math.max(1,Math.pow(1.25/cam.aspect,0.75)),tx=si>=6?1.2:0;
+  cam.position.set(tx+dist*Math.sin(phi)*Math.sin(th),dist*Math.cos(phi),dist*Math.sin(phi)*Math.cos(th));cam.lookAt(tx,si>=6?0.6:0,0);
+  scene.background=tok['--panel'];
+  // pixels
+  pix.forEach((m,k)=>{const i=Math.floor(k/8);let o;
+    if(si===0)o=P.img(k);
+    else if(si===1){const rp=ease(cl((loc/(d*0.75))*1.7-i*0.1));o=mixB(P.img(k),P.seq(k),rp);}
+    else if(si===2)o={...P.seq(k),op:1-e};else o={...P.seq(k),op:0};
+    setBox(m,o);});
+  // channels
+  chan.forEach((r,h)=>r.forEach((m,t)=>{let o;const s0={...P.seq(t),op:h===0?1:0};
+    if(si<2)o={...s0,op:0};else if(si===2)o=mixB(s0,P.ch(h,t),e);
+    else if(si===3)o=h===0?{...P.ch(h,t),op:0}:{...P.ch(h,t),op:1-e};else o={...P.ch(h,t),op:0};
+    setBox(m,o);}));
+  lblChan.forEach((s,h)=>{s.position.set(-6.9,0.3,(h-1.5)*1.4);s.material.opacity=si===2?e:si===3?(h===0?1-e*0.0:1-e):0;});
+  // spectrum
+  spec.forEach((m,j)=>{let o;
+    if(si<3)o={...P.front(j),op:0};else if(si===3)o=mixB(P.ch(0,j),P.front(j),e);
+    else if(si===4)o=mixB(P.front(j),P.ring(j),e);else if(si===5)o=P.ring(j);
+    else if(si===6)o=mixB(P.ring(j),P.row(j),e);else o=P.row(j);
+    setBox(m,o);});
+  ring.material.opacity=si===4?e:si===5?1:si===6?1-e:0;ring.visible=ring.material.opacity>0.01;
+  lblSpec.position.set(-6.9,0.3,specZ);lblSpec.material.opacity=si===6?e:si>6?1:0;
+  // poles
+  poles.forEach((m,n)=>{const s=ST[n];m.position.set(R*s.r*Math.cos(s.t),0.25,-R*s.r*Math.sin(s.t));const k=si===5?e:si===6?1-e:0;m.scale.setScalar(Math.max(k,0.001));m.material.opacity=k;m.visible=k>0.01;});
+  plines.forEach(l=>{const k=si===5?cl(loc/(d*0.65)*1.4-0.4):si===6?1-e:0;l.material.opacity=k;l.visible=k>0.01;});
+  // terms and towers
+  terms.forEach((r,n)=>r.forEach((m,j)=>{let o;
+    const tw={x:TX,z:rowZ(n),h:ST[n].terms[j]/Imax*3.4,w:0.75,d:0.75,y0:towerBase[n][j],c:tok['--s'+n],op:1};
+    if(si<6)o={...P.term(n,j,0),op:0};else if(si===6)o=P.term(n,j,cl(e*1.4-n*0.13));
+    else if(si===7){const ej=ease(cl((loc/(d*0.7))*1.5-j/L*0.5));o=mixB(P.term(n,j,1),tw,ej);}
+    else{o=tw;if(pruned.has(n)){o={...tw,c:tw.c.clone().lerp(tok['--line'],e),op:1-0.55*e};}}
+    setBox(m,o);}));
+  curves.forEach((l,n)=>{let k=si===6?cl(e*1.4-n*0.13):si===7?1-0.6*e:si===8?(pruned.has(n)?0.4-0.3*e:0.4):0;l.material.opacity=k;l.visible=k>0.01;l.scale.y=si===6?Math.max(k,0.01):1;});
+  lblState.forEach((s,n)=>{s.position.set(-6.9,0.3,rowZ(n));s.material.opacity=si===6?cl(e*1.4-n*0.13):si>6?(si===8&&pruned.has(n)?1-0.6*e:1):0;});
+  lblTower.forEach((s,n)=>{s.position.set(TX,ST[n].I/Imax*3.4+0.5,rowZ(n));s.material.opacity=si===7?cl(loc/(d*0.7)-0.4)*1.7:si===8?(pruned.has(n)?1-0.6*e:1):0;
+    s.material.opacity=Math.min(1,s.material.opacity);});
+  renderer.render(scene,cam);
+  // captions
+  $('capN').textContent=`Step ${si+1} of ${STAGES.length}`;$('capT').textContent=STAGES[si].t;if($('capB').dataset.si!=si){$('capB').innerHTML=STAGES[si].b;$('capB').dataset.si=si;}
+  [...$('achips').children].forEach((b,i)=>b.setAttribute('aria-pressed',i===si));
+  $('ascrub').value=time/T;$('aclock').textContent=`${time.toFixed(1)} / ${T.toFixed(0)} s`;
+}
+function tick(now){if(!playing||$('anim').hidden){last=0;return;}if(last)time=Math.min(T,time+(now-last)/1000);last=now;draw();if(time>=T){playing=false;$('aplay').textContent='Replay';return;}requestAnimationFrame(tick);}
+function play(){if(time>=T)time=0;playing=true;last=0;$('aplay').textContent='Pause';requestAnimationFrame(tick);}
+function pause(){playing=false;$('aplay').textContent='Play';}
+$('aplay').onclick=()=>playing?pause():play();
+$('ascrub').oninput=e=>{pause();time=+e.target.value*T;draw();};
+const curStage=()=>{let si=0;for(let i=0;i<STAGES.length;i++)if(time>=starts[i])si=i;return si;};
+$('anext').onclick=()=>{pause();time=Math.min(T,starts[Math.min(STAGES.length-1,curStage()+1)]+STAGES[Math.min(STAGES.length-1,curStage()+1)].d*0.7);draw();};
+$('aprev').onclick=()=>{pause();time=starts[Math.max(0,curStage()-1)]+STAGES[Math.max(0,curStage()-1)].d*0.7;draw();};
+const retheme=()=>{if(built){colorize();draw();}};
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',retheme);
+new MutationObserver(retheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function route(){const a=location.hash==='#animation';$('explore').hidden=a;$('anim').hidden=!a;
+  $('tabE').setAttribute('aria-current',a?'false':'page');$('tabA').setAttribute('aria-current',a?'page':'false');
+  if(a){if(!built){build();if(reduce){pause();time=starts[1]+0.01;draw();}else play();}else{size();if(playing)play();}}
+  else window.dispatchEvent(new Event('resize'));}
+window.addEventListener('hashchange',route);route();
+})();
+</script>
+
+</body>
+</html>
