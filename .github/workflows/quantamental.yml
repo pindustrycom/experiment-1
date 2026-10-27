@@ -58,6 +58,11 @@ jobs:
           set -o pipefail
           python run.py /tmp/data out | tee -a "$GITHUB_STEP_SUMMARY"
 
+      - name: Edge pipeline (steps 0-6 on companies and markets)
+        run: |
+          set -o pipefail
+          python edge.py /tmp/data out | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Save SEC cache
         if: always()
         run: |

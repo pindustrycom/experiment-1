@@ -136,6 +136,8 @@ def build_panel(data: Path, fund: pd.DataFrame, text: pd.DataFrame | None) -> tu
     last_obs = adj.apply(lambda c: c.last_valid_index())
     last_px = pd.Series({t: adj.at[d, t] for t, d in last_obs.items() if pd.notna(d)})
     nxt = madj.shift(-1) / madj - 1
+    mom = madj.shift(1) / madj.shift(12) - 1     # past year's return, skipping the latest month
+    rev = madj / madj.shift(1) - 1               # latest month's return
     # no price at next month's end: the stock left the data (often a takeover, sometimes a failure). Use its last price,
     # so the move until it left still counts instead of the stock silently dropping out.
     gone = pd.DataFrame({t: [pd.notna(last_obs.get(t)) and last_obs[t] < m + pd.offsets.MonthEnd(1) for m in months] for t in madj.columns},
@@ -153,7 +155,8 @@ def build_panel(data: Path, fund: pd.DataFrame, text: pd.DataFrame | None) -> tu
         if snap.empty:
             continue
         snap = snap.assign(month=m, ret=nxt.loc[m].reindex(snap.index), beta=beta.loc[m].reindex(snap.index),
-                           ivol=ivol.loc[m].reindex(snap.index))
+                           ivol=ivol.loc[m].reindex(snap.index), mom12_1=mom.loc[m].reindex(snap.index),
+                           rev1=rev.loc[m].reindex(snap.index))
         # market value: the public float on the 10-K cover (dollars, so splits cannot distort it) moved with the price since
         c_now = close.loc[:m].iloc[-1].reindex(snap.index)
         c_then = pd.Series({t: _price_on(close, t, d) for t, d in snap["float_date"].items()})
@@ -379,7 +382,7 @@ def evaluate(S: dict[str, pd.Series], spy: pd.Series, F: pd.DataFrame | None, pr
     for k, s in S.items():
         if len(s) < 24:
             continue
-        long_only = "minus" not in k
+        long_only = "minus" not in k and "long-short" not in k
         row = st.summary(s, spy_m.reindex(s.index), ppy=12)
         row["dsr_here"] = st.deflated_sharpe(s, len(srs), var)["dsr"]
         row["dsr_project"] = st.deflated_sharpe(s, len(srs) + prior_trials, var)["dsr"]

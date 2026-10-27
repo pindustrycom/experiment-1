@@ -98,3 +98,30 @@ def test_backtest_end_to_end(tmp_path, monkeypatch):
     # random signals: no long-short book should look like an edge
     assert all(abs(v["alpha_t"]) < 3.5 for k, v in res.items() if "minus" in k)
     assert rep["filing_reaction"]["filings"] > 100
+
+
+def test_edge_pipeline_end_to_end(tmp_path, monkeypatch):
+    import markets
+    import pipeline
+
+    synthetic(tmp_path)
+    fund = pd.read_csv(tmp_path / "fund.csv", parse_dates=["end", "avail", "float_date"])
+    P, spy, _ = backtest.build_panel(tmp_path, fund, pd.read_csv(tmp_path / "text.csv"))
+    res = pipeline.run(P, pipeline.STOCK_SIGNALS, spy, "2013-01-31", 0.001, 0.0004)
+    assert "momentum 12-1" in res["ic"].index
+    assert "long-short, covariance" in res["results"].index
+    # walk-forward weights only use months before each formation month
+    assert all(pipeline.weights_at(pd.DataFrame({"a": [0.5] * 40}, index=pd.date_range("2010-01-31", periods=40, freq="ME")),
+                                   pd.Timestamp("2012-12-31")).empty for _ in [0])
+
+    rng = np.random.default_rng(3)
+    days = pd.bdate_range("2003-01-01", "2026-10-15")
+
+    def fake(t, cache):
+        return pd.Series(100 * np.exp(np.cumsum(rng.normal(0.0002, 0.01, len(days)))), index=days, name="adj_close")
+
+    monkeypatch.setattr(markets, "fetch", fake)
+    Pm, spy_m = markets.panel(tmp_path / "m")
+    rm = pipeline.run(Pm, markets.SIGNALS, spy_m, "2010-01-31", 0.0003, 0.00025)
+    assert Pm["ticker"].nunique() == sum(len(v) for v in markets.UNIVERSE.values())
+    assert "every name, equal weight (baseline)" in rm["results"].index

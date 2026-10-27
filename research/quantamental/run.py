@@ -28,12 +28,13 @@ COLS = [("ann", "Per year", "{:+.1%}"), ("vol", "Vol", "{:.1%}"), ("sharpe", "Sh
         ("dsr_here", "Deflated Sharpe (this study)", "{:.2f}"), ("dsr_project", "Deflated Sharpe (+300 project trials)", "{:.2f}")]
 
 
-def table(res: dict) -> str:
-    head = "| Strategy | " + " | ".join(c[1] for c in COLS) + " |\n|---|" + "---|" * len(COLS) + "\n"
+def table(res: dict, cols: list | None = None) -> str:
+    cols = cols or COLS
+    head = "| Strategy | " + " | ".join(c[1] for c in cols) + " |\n|---|" + "---|" * len(cols) + "\n"
     lines = []
     for k, r in res.items():
         cells = []
-        for key, _, fmt in COLS:
+        for key, _, fmt in cols:
             v = r.get(key)
             cells.append(fmt.format(v) if isinstance(v, (int, float)) and not pd.isna(v) else "")
         lines.append(f"| {k} | " + " | ".join(cells) + " |")
