@@ -2,7 +2,8 @@
 
   python run.py DATA OUT [--max-docs N] [--no-text]
 
-DATA holds the papers-data cache (prices/, sp500_current.csv, sp500_changes.csv). SEC company facts, the yearly
+DATA holds the papers-data cache (prices/, sp500_current.csv, sp500_changes.csv, and pit/ from exp2/pit.py: the
+index as it was on each date, with the companies that later left it). SEC company facts, the yearly
 fundamentals table and the 10-K word counts are cached in DATA/sec/ so a rerun only fetches what is new.
 """
 from __future__ import annotations
@@ -16,6 +17,7 @@ import pandas as pd
 
 import backtest
 import factors
+import former
 import sec
 import text
 
@@ -77,10 +79,20 @@ def main() -> None:
     changes = pd.read_csv(a.data / "sp500_changes.csv", parse_dates=["date"])
     member = backtest.membership(cur, changes, pd.date_range(backtest.START, backtest.END, freq="ME"))
     m = sec.ticker_ciks()
-    ciks = {t: m[t] for t in member.columns if t in m}
-    log.info("universe: %d tickers ever members, %d with a SEC CIK", member.shape[1], len(ciks))
     secdir = a.data / "sec"
     secdir.mkdir(parents=True, exist_ok=True)
+    gone_f = a.data / "pit" / "former.txt"
+    gone = set(gone_f.read_text().split()) if gone_f.exists() else set()
+    ciks = {t: m[t.replace("-", ".")] for t in member.columns if t not in gone and t.replace("-", ".") in m}
+    found = {}
+    if gone:      # companies that left the index (exp2/pit.py): their CIKs, so they count while they were members
+        iv = pd.read_parquet(a.data / "pit" / "membership_intervals.parquet")
+        iv["start"], iv["end"] = pd.to_datetime(iv["start"]), pd.to_datetime(iv["end"])
+        iv = iv[iv["ticker"].isin(gone & set(member.columns)) & (iv["end"] > pd.Timestamp(backtest.START) - pd.DateOffset(years=1))]
+        found, how = former.resolve(iv, m, secdir)
+        ciks |= found
+        log.info("former members: %s", {k: v for k, v in how.items() if k != "unmatched"})
+    log.info("universe: %d tickers ever members, %d with a SEC CIK", member.shape[1], len(ciks))
     sec.fundamentals(ciks, secdir / "facts", secdir / "fundamentals.csv")
     tc = None
     if not a.no_text:
@@ -88,6 +100,8 @@ def main() -> None:
         text.collect(sorted(set(ciks.values())), tc, max_docs=a.max_docs)
     rep = backtest.run(a.data, secdir / "fundamentals.csv", tc, a.out)
     rep["universe"]["tickers_with_cik"] = len(ciks)
+    rep["universe"]["former_members_with_cik"] = len(found)
+    rep["universe"]["former_members_since_start"] = len([t for t in member.columns if t in gone])
     rep["universe"]["tickers_ever_members"] = int(member.shape[1])
     rep["universe"]["membership_changes"] = len(changes)
     rep["universe"]["changes_with_removed_ticker"] = int(changes["removed"].notna().sum()) if "removed" in changes else 0

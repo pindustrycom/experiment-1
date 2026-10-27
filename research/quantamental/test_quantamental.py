@@ -125,3 +125,20 @@ def test_edge_pipeline_end_to_end(tmp_path, monkeypatch):
     rm = pipeline.run(Pm, markets.SIGNALS, spy_m, "2010-01-31", 0.0003, 0.00025)
     assert Pm["ticker"].nunique() == sum(len(v) for v in markets.UNIVERSE.values())
     assert "every name, equal weight (baseline)" in rm["results"].index
+
+
+def test_former_members_get_ciks(tmp_path, monkeypatch):
+    import former
+
+    assert former.norm("SunTrust Banks, Inc.") == former.norm("SUNTRUST BANKS INC") == "SUNTRUST BANKS"
+    iv = pd.DataFrame({"ticker": ["OLD", "STI-201912", "XYZ-201505"], "start": pd.to_datetime(["2001-01-02", "1990-01-02", "2005-01-03"]),
+                       "end": pd.to_datetime(["2018-06-01", "2019-12-09", "2015-05-01"])})
+    tenk = {1: ["2017-02-20"], 2: ["2023-03-01"], 3: ["2019-02-25"], 4: ["2003-02-01"]}
+    monkeypatch.setattr(former, "tenk_years", lambda cik, cache: tenk.get(cik, []))
+    wiki = pd.DataFrame({"date": pd.to_datetime(["2019-12-09", "2015-05-04"]), "ticker": ["STI", "XYZ"], "name": ["SunTrust Banks", "XYZ Corp."]})
+    names = pd.DataFrame({"name": ["SUNTRUST BANKS INC", "XYZ CORP"], "cik": [3, 4]})
+    names["key"] = names["name"].map(former.norm)
+    # OLD still trades and filed while a member; STI now belongs to another firm (CIK 2, 10-Ks only from 2023)
+    found, how = former.resolve(iv, {"OLD": 1, "STI": 2}, tmp_path, wiki, names)
+    assert found == {"OLD": 1, "STI-201912": 3}
+    assert how["unmatched"] == ["XYZ-201505"]        # its only 10-K is from long before it joined

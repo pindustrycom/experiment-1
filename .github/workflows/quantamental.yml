@@ -2,7 +2,8 @@ name: Quantamental backtests
 
 # Research only, paper only (research/quantamental): Piotroski F-score, quality minus junk and 10-K tone
 # (Loughran-McDonald vs a generic word list) on point-in-time S&P 500 members, from SEC XBRL company facts and 10-K
-# text with their filing dates. Prices and membership come from the "papers-data" release. SEC downloads (company
+# text with their filing dates. Prices come from the "papers-data" release; membership (with the companies that left the
+index and their prices) from experiments/exp2_sector_ssm/exp2/pit.py. SEC downloads (company
 # facts, the yearly fundamentals table, 10-K word counts) are cached in the "quantamental-data" release.
 # Nothing is deployed and nothing is traded.
 
@@ -51,6 +52,13 @@ jobs:
             gh release download "$CACHE_TAG" --repo "$GITHUB_REPOSITORY" --pattern sec.tar.gz --dir /tmp/dl && tar xzf /tmp/dl/sec.tar.gz -C /tmp/data || true
           fi
           ls /tmp/data | head; ls /tmp/data/prices | wc -l
+
+      - name: The S&P 500 as it was on each date (experiments/exp2_sector_ssm/exp2/pit.py)
+        run: |
+          PYTHONPATH=../../experiments/exp2_sector_ssm python -c "
+          from pathlib import Path; from exp2 import pit
+          print(pit.refresh(Path('/tmp/data'), '1998-01-01', force=True))
+          print(pit.check(Path('/tmp/pitcheck')))" | tee -a "$GITHUB_STEP_SUMMARY"
 
       - name: Backtest
         timeout-minutes: 270
