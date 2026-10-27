@@ -7,7 +7,7 @@ sleeve gets a tech counterpart:
                   like the SPY one: only when VXN^2 is above our forecast of next month's QQQ variance and a 2-state
                   regime model on QQQ says calm
   regime          QQQ (or XLK) held only while the regime model says calm, else T-bills
-  stock book      long-only books of today's S&P 500 technology members (inverse volatility, minimum variance, HRP,
+  stock book      long-only books of the S&P 500 technology members of each month (inverse volatility, minimum variance, HRP,
                   each also without the 10% most collapse-prone), and a wider "tech and internet" universe that adds
                   communication services and the large internet retailers
   trend           QQQ and XLK trend filters (hold when the past 12 months beat T-bills)
@@ -28,7 +28,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import collapse, papers
+from . import collapse, papers, pit
 from .papers import COST_BP, TRAIN_END
 
 log = logging.getLogger("exp2.tech")
@@ -84,7 +84,7 @@ def run(data: Path, out: Path, train_end: str = TRAIN_END, fetch: bool = True) -
     t0 = time.time()
     out.mkdir(parents=True, exist_ok=True)
     rep = {"built": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"), "train_end": train_end,
-           "warnings": ["Stock books use today's S&P 500 members only, which flatters long-only results."]}
+           "warnings": [] if pit.former(data) else ["Stock books use today's S&P 500 members only, which flatters long-only results."]}
     if fetch:
         rep["fetch"] = papers.update(data, EXTRA, pause=0.3)
     P, C, member, spy, vix, rf, sectors = collapse.load_all(data, out, train_end)

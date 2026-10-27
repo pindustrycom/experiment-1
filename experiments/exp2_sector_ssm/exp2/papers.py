@@ -11,8 +11,8 @@
    volume only (momentum, short-term reversal, industry momentum, volatility, idiosyncratic volatility, beta, max
    daily return, 52-week-high ratio, dollar volume, price), ranked within each month; next month's return predicted
    by OLS on 3 features, ridge, gradient-boosted trees and a neural net, refitted every January on all earlier data.
-   Stocks enter the universe only from the month they joined the S&P 500 (membership rebuilt from Wikipedia's list of
-   changes); companies that left and are no longer on Yahoo are missing, so some survivorship bias remains.
+   The universe is the S&P 500 as it was each month (exp2/pit.py): companies that later left the index, including those
+   taken over or bankrupt, are in it while they were members, so there is no survivorship bias.
 3. Overnight versus intraday momentum (Lou, Polk & Skouras 2019): past-year momentum built from close-to-open returns
    and from open-to-close returns separately, and where next month's long-short return arrives (overnight or intraday).
 Scores: out-of-sample R^2, decile long-short returns with costs, Sharpe, by year; train up to 2018, test from 2019.
@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-from . import openbb_src
+from . import openbb_src, pit
 
 log = logging.getLogger("exp2.papers")
 TRAIN_END = "2018-12-31"
@@ -109,6 +109,24 @@ def sp500_tables(html: str | None = None) -> tuple[pd.DataFrame, pd.DataFrame]:
     return cur, changes
 
 
+def members_refresh(data: Path, fetch: bool = True) -> dict:
+    """The S&P 500 as it was on each date (exp2/pit.py), with today's GICS sectors from Wikipedia when it answers."""
+    if not pit.due(data):
+        return {"status": "fresh"}
+    gics = None
+    if fetch:
+        try:
+            gics, _ = sp500_tables()
+        except Exception as ex:  # noqa: BLE001 - former members get sectors from their returns; today's then do too
+            log.warning("GICS sectors from Wikipedia: %s", ex)
+    return pit.refresh(data, START, gics, fetch)
+
+
+def sectors_all(data: Path) -> dict[str, str]:
+    """Sector of every past or present member (sp500_sectors.csv from exp2/pit.py; today's list in an older cache)."""
+    return pit.sectors(data)
+
+
 def membership(cur: pd.DataFrame, changes: pd.DataFrame, months: pd.DatetimeIndex) -> pd.DataFrame:
     """Boolean month x ticker table of S&P 500 membership, walking the change list backwards from today."""
     members = set(cur["ticker"])
@@ -135,9 +153,10 @@ def update(data: Path, tickers: list[str], pause: float = 0.3, max_age_days: flo
     d = data / "prices"
     d.mkdir(parents=True, exist_ok=True)
     out = {"fetched": 0, "failed": []}
+    gone = pit.former(data)               # former members: prices come from exp2/pit.py, Yahoo no longer has most of them
     for t in tickers:
         f = d / f"{t}.csv"
-        if f.exists() and time.time() - f.stat().st_mtime < max_age_days * 86400:
+        if t in gone or (f.exists() and time.time() - f.stat().st_mtime < max_age_days * 86400):
             continue
         try:
             df = fetch_yahoo(ysym(t))
@@ -470,14 +489,7 @@ def run(data: Path, out: Path, fetch: bool = True, train_end: str = TRAIN_END) -
     rep = {"built": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"), "train_end": train_end, "warnings": []}
     data.mkdir(parents=True, exist_ok=True)
     cur_f, ch_f = data / "sp500_current.csv", data / "sp500_changes.csv"
-    if fetch:
-        try:
-            cur, changes = sp500_tables()
-            cur.to_csv(cur_f, index=False)
-            changes.to_csv(ch_f, index=False)
-        except Exception as ex:  # noqa: BLE001
-            log.exception("S&P 500 list from Wikipedia")
-            rep["warnings"].append(f"S&P 500 list from Wikipedia: {type(ex).__name__}: {str(ex)[:200]}")
+    rep["point_in_time"] = members_refresh(data, fetch)           # an old cache without it is caught by the checks below
     if not cur_f.exists() and fetch:
         # fallback: today's members only (no change history, so the universe has full survivorship bias)
         r = requests.get(FALLBACK, timeout=30)
@@ -517,7 +529,7 @@ def run(data: Path, out: Path, fetch: bool = True, train_end: str = TRAIN_END) -
     rep["universe"]["avg_members_with_prices"] = float(have_mem.sum(axis=1).mean())
     rep["universe"]["members_with_prices_by_year"] = {str(y): int(v) for y, v in have_mem.sum(axis=1).groupby(have_mem.index.year).mean().items()}
     spy = load(data, ["SPY"])["SPY"]["adj_close"]
-    sectors = dict(zip(cur["ticker"], cur["sector"]))
+    sectors = sectors_all(data)
     P = panel(px, spy, sectors, member)
     log.info("panel %d rows (%.0fs)", len(P), time.time() - t0)
     rep["overnight_momentum"] = overnight(P, train_end)

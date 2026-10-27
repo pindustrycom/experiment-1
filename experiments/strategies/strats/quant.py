@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import copy, crypto, data, events, live, regimes, rules, surface
+from . import copy, crypto, data, events, live, regimes, rules, surface, universe
 
 e = html.escape
 
@@ -41,8 +41,9 @@ def run(data_dir: Path, options_csv: Path | None, out: Path, fetch: bool = True)
     if fetch:
         rep["chains"] = surface.fetch(data_dir)
     members = [m.replace(".", "-") for m in (sorted(pd.read_csv(data_dir / "sp500.csv")["ticker"].astype(str)) if (data_dir / "sp500.csv").exists() else [])]
+    then = universe.Members(universe.intervals(data_dir, fetch=False), members)      # the index as it was (cli.run fetched it)
     cp = copy.load(data_dir) if (data_dir / "copy").exists() else None
-    tickers = sorted(set(rules.TREND_ETFS) | set(members) | (copy.tickers(cp) if copy.has_data(cp) else set()))
+    tickers = sorted(set(rules.TREND_ETFS) | set(then.ever(live.REPLAY_FROM)) | (copy.tickers(cp) if copy.has_data(cp) else set()))
     bars = data.load_bars(data_dir, tickers)
     px = bars["close"]
     spy = px["SPY"].dropna()
@@ -62,7 +63,7 @@ def run(data_dir: Path, options_csv: Path | None, out: Path, fetch: bool = True)
     rep["surface"] = {t: {k: s[k] for k in ("date", "atm_30d", "skew_30d", "contracts", "cboe_median_gap", "dropped_expiries")} for t, s in surf.items()}
 
     # 2. regimes, on every pot that has a replay
-    rp = live.replay(px, members, cp=cp)
+    rp = live.replay(px, then, cp=cp)
     b = btc_daily(crypto.load(data_dir), rp.index)
     if b is not None and b.notna().sum() > 100:
         rp = rp.assign(btc_donchian=b)
@@ -72,10 +73,10 @@ def run(data_dir: Path, options_csv: Path | None, out: Path, fetch: bool = True)
 
     # 3. event-driven against the replay
     ev = {}
-    for key, cols in (("trend", rules.TREND_ETFS), ("reversal", members)):
+    for key, cols in (("trend", rules.TREND_ETFS), ("reversal", then.ever(live.REPLAY_FROM))):
         cols = [c for c in cols if c in px.columns]
         c = px[cols]
-        ev |= events.compare(c, opn.reindex(columns=cols) if opn is not None else None, members, live.REPLAY_FROM, rp, keys=(key,))
+        ev |= events.compare(c, opn.reindex(columns=cols) if opn is not None else None, then, live.REPLAY_FROM, rp, keys=(key,))
     rep["events"] = {k: [(r["setting"], r.get("cagr_pct"), r.get("sharpe")) for r in v["rows"]] for k, v in ev.items()}
 
     names = {k: v[0] for k, v in rules.STRATEGIES.items()} | {"SPY": "SPY (holding the market)"}

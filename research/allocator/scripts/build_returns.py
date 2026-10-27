@@ -3,7 +3,7 @@ import shutil, sys, pathlib, json
 import pandas as pd, numpy as np
 S = pathlib.Path(sys.argv[1])
 sys.path[:0] = ["strategies", "exp7_vwap"]
-from strats import data, rules, live, copy
+from strats import data, rules, live, copy, universe
 from exp7 import bars as e7bars, live as e7live
 D = S / "data"
 # copy pots need data/copy with 13f, ptr, cusips and prices of their names
@@ -17,9 +17,12 @@ for t in names:   # prices of copy names not in the S&P cache, from the trader-s
     if not f.exists() and src.exists():
         x = pd.read_csv(src); x.columns = ["date", "adj_close"]; x.to_csv(f, index=False)
 members = sorted(pd.read_csv(D / "sp500.csv").ticker.str.replace(".", "-"))
-px = data.load_prices(D, sorted(set(rules.TREND_ETFS) | set(members) | names))
+iv = universe.intervals(D)                       # the S&P 500 as it was each week, not today's list (survivorship)
+print("former members", universe.former_prices(D, iv, data.START))
+then = universe.Members(iv, members)
+px = data.load_prices(D, sorted(set(rules.TREND_ETFS) | set(then.ever(live.REPLAY_FROM)) | names))
 spy = px["SPY"].dropna(); px = px.loc[spy.index]
-rep = live.replay(px, members, cp=cp)
+rep = live.replay(px, then, cp=cp)
 print("replay", rep.columns.tolist(), rep.index[0].date(), rep.index[-1].date())
 # Exp7: SPY 3-min VWAP/EMA rule on the 1-minute cache
 d1 = e7bars.load(S / "dl/exp7", "SPY")

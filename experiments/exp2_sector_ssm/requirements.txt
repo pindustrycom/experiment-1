@@ -12,6 +12,7 @@ openbb-fixedincome==2.0.0
 openbb-cboe==2.0.0
 openbb-federal-reserve==2.0.0
 pandas==3.0.6
+pyarrow==25.0.1
 pydantic==2.14.1
 pytest==9.1.1
 requests==2.34.2

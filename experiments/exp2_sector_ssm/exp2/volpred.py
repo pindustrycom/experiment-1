@@ -277,7 +277,7 @@ def run(data: Path, out: Path, train_end: str = TRAIN_END, first_years: tuple[in
     px = papers.load(data, tickers)
     base = papers.load(data, ["SPY", "^VIX"])
     spy, vix = base["SPY"]["adj_close"], base["^VIX"]["close"]
-    P = papers.panel(px, spy, dict(zip(cur["ticker"], cur["sector"])), member)
+    P = papers.panel(px, spy, papers.sectors_all(data), member)
     V = vol_features(px, spy, vix)
     P = P.merge(V, on=["month", "ticker"], how="left")
     log.info("panel %d rows (%.0fs)", len(P), time.time() - t0)

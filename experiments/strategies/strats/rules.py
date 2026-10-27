@@ -97,9 +97,11 @@ def trend_weights(px: pd.DataFrame, d: pd.Timestamp) -> dict[str, float]:
     return {k: w for k, w in out.items() if w != 0}
 
 
-def reversal_weights(px: pd.DataFrame, d: pd.Timestamp, members: list[str]) -> dict[str, float]:
-    """The REVERSAL_N members with the worst return over the last REVERSAL_DAYS sessions up to d."""
-    h = px.loc[:d, [m for m in members if m in px.columns]]
+def reversal_weights(px: pd.DataFrame, d: pd.Timestamp, members) -> dict[str, float]:
+    """The REVERSAL_N members with the worst return over the last REVERSAL_DAYS sessions up to d. members: a list, or a
+    function of the date giving the index as it was then (universe.Members), so a replay has no survivorship bias."""
+    ms = members(d) if callable(members) else members
+    h = px.loc[:d, [m for m in ms if m in px.columns]]
     if len(h) <= REVERSAL_DAYS:
         return {}
     r = (h.iloc[-1] / h.iloc[-1 - REVERSAL_DAYS] - 1).dropna()

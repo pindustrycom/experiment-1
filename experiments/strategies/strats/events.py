@@ -132,7 +132,7 @@ class Portfolio:
         self.costs += fee
 
 
-def strategy(key: str, members: list[str], calendar: pd.DatetimeIndex):
+def strategy(key: str, members, calendar: pd.DatetimeIndex):
     """The live pots' rule as an event handler: (history up to this close) -> target weights, or None when not due."""
     due = rules.month_end(calendar) if key == "trend" else rules.week_end(calendar)
 
@@ -143,7 +143,7 @@ def strategy(key: str, members: list[str], calendar: pd.DatetimeIndex):
     return on_close
 
 
-def run(key: str, close: pd.DataFrame, open_: pd.DataFrame | None, members: list[str], start: str,
+def run(key: str, close: pd.DataFrame, open_: pd.DataFrame | None, members, start: str,
         setting: tuple) -> dict:
     """One strategy through the event loop. Returns daily returns and totals."""
     _, fill_at, commission, (slip_stock, slip_etf), borrow, cash = setting
@@ -190,7 +190,7 @@ def run(key: str, close: pd.DataFrame, open_: pd.DataFrame | None, members: list
     return {"returns": r, "cost_pct_per_year": 100 * drag / max(len(r) / 252, 1e-9), "trades": pf.trades, "end": float(v.iloc[-1] / cash0)}
 
 
-def compare(close: pd.DataFrame, open_: pd.DataFrame | None, members: list[str], start: str, vectorized: pd.DataFrame,
+def compare(close: pd.DataFrame, open_: pd.DataFrame | None, members, start: str, vectorized: pd.DataFrame,
             keys: tuple[str, ...] = ("trend", "reversal")) -> dict:
     """Each strategy under each setting, next to the vectorized replay's returns."""
     from .live import stats
