@@ -156,8 +156,11 @@ def annual_table(facts: dict, lags: tuple[int, ...] = (0, 1, 2, 3, 4)) -> pd.Dat
 
 
 def fundamentals(ciks: dict[str, int], cache: Path, out_csv: Path) -> pd.DataFrame:
-    if out_csv.exists():
-        return pd.read_csv(out_csv, parse_dates=["end", "avail", "float_date"])
+    tried = out_csv.with_suffix(".tried.csv")      # the (ticker, CIK) list the table was built for
+    if out_csv.exists() and tried.exists() and set(ciks.items()) <= set(pd.read_csv(tried).itertuples(index=False, name=None)):
+        old = pd.read_csv(out_csv, parse_dates=["end", "avail", "float_date"])
+        want = set(ciks.items())
+        return old[[(t, c) in want for t, c in zip(old["ticker"], old["cik"])]]
     frames, miss = [], []
     for i, (t, cik) in enumerate(sorted(ciks.items())):
         js = company_facts(cik, cache)
@@ -178,5 +181,6 @@ def fundamentals(ciks: dict[str, int], cache: Path, out_csv: Path) -> pd.DataFra
             log.info("fundamentals %d/%d", i, len(ciks))
     df = pd.concat(frames, ignore_index=True)
     df.to_csv(out_csv, index=False)
+    pd.DataFrame(sorted(ciks.items()), columns=["ticker", "cik"]).to_csv(tried, index=False)
     log.info("fundamentals: %d firm-years, %d tickers without facts", len(df), len(miss))
     return df
