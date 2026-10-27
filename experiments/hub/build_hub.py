@@ -81,6 +81,10 @@ CATALOG = [
      "The best reading model so far, frozen: build any COLOUR NUMBER phrase and watch the eye trace each letter in 3D, teach "
      "the model your own word bonds and see how it reads with them, and show it colours it has never seen. By Joaquin Philco.",
      EXPERIMENTS / "exp10_words"),
+    ("resonance_index", RESONANCE, "Resonance index", "Resonance index · from pixels to pruning",
+     "How Joaquin Philco's resonance index scores SSM states: paint a 4 x 4 or 8 x 8 image and follow it through the encoder's "
+     "channels, the FFT and each state's poles to its score, for S4D and S5, or watch an 8 x 8 image animated all the way to pruning.",
+     EXPERIMENTS / "resonance_index"),
     ("resonance_writeup", RESONANCE, "Write-up", "Write-up · resonant sensors, with controls",
      "A short paper on what the resonance experiments showed: as a sensor front end resonance beats fair low-pass controls on "
      "spoken digits, spoken words and eye movements; the learning rules built after it did not beat simple controls. By Joaquin Philco.",
