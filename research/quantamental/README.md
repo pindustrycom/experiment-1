@@ -58,18 +58,20 @@ Full tables: the workflow run's step summary (artifact `quantamental-results`) a
 
 ## Results
 
-Our backtests, 2010-02 to 2026-09 (SPY: +14.6%/yr, Sharpe 1.02):
+Our backtests, 2010-02 to 2026-09 (SPY: +14.6%/yr, Sharpe 1.02), on the S&P 500 as it was each month: companies that
+later left the index count while they were members (experiments/exp2_sector_ssm/exp2/pit.py; SEC filings found for 270
+of the 324 that left since 2010). The first run used today's members only; its numbers are in brackets.
 
 | Strategy | Per year | Sharpe | Alpha vs SPY (t) | Fama-French 6 alpha (t) |
 |---|---|---|---|---|
-| F-score, cheap high minus cheap low (Piotroski's test) | -2.6% | -0.22 | -1.8% (-0.6) | -3.3% (-1.2) |
-| F-score 7-9, long only | +15.4% | 1.03 | +1.1% (1.0) | +1.2% (1.2) |
-| QMJ top 30% minus bottom 30%, value weighted (the paper's form) | +3.8% | 0.22 | +5.5% (1.2) | +1.3% (0.4) |
-| QMJ top 30%, long only, equal weighted | +14.8% | 1.08 | +1.8% (1.8) | +1.3% (1.4) |
-| 10-K negativity falling, finance list (LM), long-short | -0.8% | -0.17 | -1.0% (-1.0) | -1.3% (-1.3) |
-| Same with the generic Harvard list | -1.5% | -0.32 | -1.6% (-1.5) | -2.0% (-2.0) |
-| Composite (F + QMJ + LM), top 30% long only | +15.1% | 1.05 | +1.6% (1.5) | +1.3% (1.4) |
-| Every member, equal weighted (the survivorship-flattered baseline) | +15.6% | 1.04 | +1.1% (0.9) | +1.8% (2.3) |
+| F-score, cheap high minus cheap low (Piotroski's test) | -5.1% [-2.6%] | -0.41 | -3.1% (-1.3) | -5.8% (-2.1) |
+| F-score 7-9, long only | +13.5% [+15.4%] | 0.88 | -1.5% (-1.2) | -1.1% (-1.1) |
+| QMJ top 30% minus bottom 30%, value weighted (the paper's form) | +2.9% [+3.8%] | 0.14 | +5.1% (0.9) | +1.2% (0.3) |
+| QMJ top 30%, long only, equal weighted | +14.0% [+14.8%] | 0.99 | +0.6% (0.6) | +0.1% (0.2) |
+| 10-K negativity falling, finance list (LM), long-short | +0.6% [-0.8%] | 0.13 | +0.1% (0.1) | -0.2% (-0.1) |
+| Same with the generic Harvard list | -1.6% [-1.5%] | -0.32 | -1.5% (-1.4) | -1.9% (-1.6) |
+| Composite (F + QMJ + LM), top 30% long only | +13.9% [+15.1%] | 0.94 | -0.2% (-0.2) | -0.3% (-0.3) |
+| Every member, equal weighted | +13.6% [+15.6%] | 0.87 | -1.5% (-1.1) | -0.6% (-0.7) |
 
 Deflated Sharpe: no book reaches 0.5 even counting only this study's 22 variants; with the project's ~300 earlier
 trials every one is 0.00. Information coefficients are 0.000 to 0.016 a month (only payout has t above 2); the
