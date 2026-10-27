@@ -15,6 +15,7 @@ from pathlib import Path
 import pandas as pd
 
 import backtest
+import factors
 import sec
 import text
 
@@ -56,6 +57,9 @@ def report(rep: dict) -> str:
         for k, v in rep["filing_reaction"].items():
             if isinstance(v, dict):
                 s.append(f"| {k} | {v['slope_pct_per_sd']:+.3f}% | {v['t']:.1f} | {v['months']} |")
+    if rep.get("published_factors"):
+        s.append("\n## Published factor series (every US stock, no survivorship)\n")
+        s.append(factors.table(rep["published_factors"]))
     s.append("\n## Universe\n\n```\n" + json.dumps(u, indent=1) + "\n```\n")
     return "\n".join(s)
 
@@ -83,6 +87,10 @@ def main() -> None:
         text.collect(sorted(set(ciks.values())), tc, max_docs=a.max_docs)
     rep = backtest.run(a.data, secdir / "fundamentals.csv", tc, a.out)
     rep["universe"]["tickers_with_cik"] = len(ciks)
+    rep["universe"]["tickers_ever_members"] = int(member.shape[1])
+    rep["universe"]["membership_changes"] = len(changes)
+    rep["universe"]["changes_with_removed_ticker"] = int(changes["removed"].notna().sum()) if "removed" in changes else 0
+    rep["universe"]["members_per_month_by_year"] = {str(y): float(v) for y, v in member.sum(axis=1).groupby(member.index.year).mean().items()}
     (a.out / "README.md").write_text(report(rep))
     (a.out / "results.json").write_text(json.dumps(rep, indent=1, default=str))
     print(report(rep))

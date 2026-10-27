@@ -20,6 +20,7 @@ import pandas as pd
 import requests
 from scipy.stats import norm
 
+import factors
 import stats as st
 
 log = logging.getLogger("quantamental.backtest")
@@ -341,7 +342,7 @@ def french_factors() -> pd.DataFrame | None:
             return df
         f5 = grab("F-F_Research_Data_5_Factors_2x3_CSV.zip")
         mom = grab("F-F_Momentum_Factor_CSV.zip")
-        return f5.join(mom.rename(columns=lambda c: "MOM"), how="inner")
+        return f5.join(mom.rename(columns=lambda c: "MOM"), how="left")
     except Exception as e:  # noqa: BLE001 - the factor check is optional
         log.warning("French factors: %s", e)
         return None
@@ -413,7 +414,7 @@ def run(data: Path, fund_csv: Path, text_csv: Path | None, out: Path) -> dict:
     react = filing_reaction(text, fund, data) if text is not None and len(text) else {}
     dist = P.groupby("month")["fscore"].apply(lambda s: s.value_counts(normalize=True)).groupby(level=1).mean().sort_index()
     rep = {"universe": info, "ic": ics, "filing_reaction": react, "fscore_distribution": dist.round(3).to_dict(),
-           "french_factors": F is not None, "results": json.loads(R.to_json(orient="index"))}
+           "french_factors": F is not None, "results": json.loads(R.to_json(orient="index")), "published_factors": factors.run(F)}
     pd.DataFrame(S).to_csv(out / "monthly_returns.csv", float_format="%.6g")
     P[["month", "ticker", "ret", "fscore", "quality", "prof", "growth", "safety", "payout", "bm", "mcap"]
       + [c for c in ("lm_neg_sh", "h4_neg_sh", "d_lm_neg_sh", "d_h4_neg_sh", "composite") if c in P]].to_csv(out / "panel.csv.gz", index=False, float_format="%.5g")

@@ -5,3 +5,4 @@ requests
 pysentiment2==0.1.1
 pytest
 ruff
+openpyxl
