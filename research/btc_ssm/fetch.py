@@ -43,7 +43,7 @@ def binance(start: str = "2018-01") -> pd.DataFrame:
     for d in pd.date_range(last_month.to_timestamp(how="end").normalize() + pd.Timedelta(days=1), now.normalize() - pd.Timedelta(days=1)):
         try:
             frames.append(_klines(_get(DAY.format(d=d.strftime("%Y-%m-%d")))))
-        except Exception as e:  # the newest daily file can lag a day
+        except Exception as e:  # noqa: BLE001  (the newest daily file can lag a day)
             print("skip day", d.date(), e)
     d = pd.concat(frames)
     d["t"] = pd.to_datetime(d.t.where(d.t > 1e14, d.t * 1000), unit="us")   # ms before 2025, us after
@@ -89,5 +89,5 @@ if __name__ == "__main__":
             x = fn()
             x.to_csv(f"{out}/{name}.csv")
             print(name, x.index[0], x.index[-1], len(x))
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001  (side channels are optional)
             print(name, "failed:", e)
