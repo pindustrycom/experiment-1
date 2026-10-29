@@ -81,6 +81,10 @@ CATALOG = [
      "The best reading model so far, frozen: build any COLOUR NUMBER phrase and watch the eye trace each letter in 3D, teach "
      "the model your own word bonds and see how it reads with them, and show it colours it has never seen. By Joaquin Philco.",
      EXPERIMENTS / "exp10_words"),
+    ("exp11", RESONANCE, "Exp11 fear", "Exp11 · fear channel",
+     "Joaquin Philco's emotion gate and his fear channel beyond the dendrite bandwidth: a visual search that learns what hurts, "
+     "steers the eye by fear, and keeps fear on a separate electrical-synapse-like channel. A real run replayed in 3D: extinction, "
+     "fear returning after a rest, and fast relearning.", EXPERIMENTS / "exp11_fear"),
     ("resonance_writeup", RESONANCE, "Write-up", "Write-up · resonant sensors, with controls",
      "A short paper on what the resonance experiments showed: as a sensor front end resonance beats fair low-pass controls on "
      "spoken digits, spoken words and eye movements; the learning rules built after it did not beat simple controls. By Joaquin Philco.",
