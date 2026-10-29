@@ -49,7 +49,7 @@ def test_every_page_gets_one_nav_with_the_right_depth(tmp_path):
         assert f'href="../{d}/index.html"' in six
     # redirect pages stay plain
     assert "labnav" not in (tmp_path / "about.html").read_text()
-    assert r["pages_with_nav"] == 3 + 9 + 1
+    assert r["pages_with_nav"] == 3 + 10 + 1
 
 
 def test_nav_links_exp2_and_exp7_once_published(tmp_path):
@@ -82,6 +82,8 @@ def test_static_pages_copied_with_shared_script_inlined(tmp_path):
     assert "<title>Exp9 Reading from Vision</title>" in nine and 'id="data"' in nine and "window.LabGL" in nine
     ten = (tmp_path / "exp10" / "index.html").read_text()
     assert "<title>Exp10 Words Playground</title>" in ten and 'id="data"' in ten and "window.LabGL" in ten
+    eleven = (tmp_path / "exp11" / "index.html").read_text()
+    assert "<title>Exp11 Fear Channel</title>" in eleven and 'id="data"' in eleven and "window.LabGL" in eleven
     paper = tmp_path / "resonance_writeup"
     assert "<title>Resonance Write-up</title>" in (paper / "index.html").read_text()
     assert (paper / "resonant_sensors.pdf").read_bytes().startswith(b"%PDF")
@@ -93,7 +95,7 @@ def test_static_pages_copied_with_shared_script_inlined(tmp_path):
 
 def test_source_pages_load_the_shared_runtime_locally():
     # opened from the repository, ../hub/gl_runtime.js resolves to this folder
-    for d in ("exp4_resonance", "exp6_alphabet", "exp6_live", "exp8_neuron", "exp9_reading", "exp10_words"):
+    for d in ("exp4_resonance", "exp6_alphabet", "exp6_live", "exp8_neuron", "exp9_reading", "exp10_words", "exp11_fear"):
         page = (build_hub.EXPERIMENTS / d / "index.html").read_text()
         assert '<script src="../hub/gl_runtime.js"></script>' in page and "LabGL.start(" in page
         assert "requestAnimationFrame(frame)" not in page
