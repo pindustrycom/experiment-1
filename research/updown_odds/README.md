@@ -11,7 +11,7 @@ walk-forward model gives 50.0% (AUC 0.501).
 ## Data and method
 
 - Point-in-time S&P 500 (members as they were on each day, ~500 a day, 1,138 names 1999-2026, from the public
-  sp500-data set, as in `experiments/strategies/strats/universe.py`). A delisted stock keeps its last price. Sectors and SPY/VIX
+  sp500-data set, the same source as the survivorship fix). A delisted stock keeps its last price. Sectors and SPY/VIX
   from the papers-data cache; SPY/QQQ 1-minute bars 2019-2026 from exp7-data.
 - **Stock signals:** each period, the 5% of members the signal likes most (Sharma ch.3 tails). A hit means the stock
   beats the members' median over the next period, so 50% is a coin flip by construction and the market's drift
