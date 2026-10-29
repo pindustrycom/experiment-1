@@ -39,7 +39,7 @@ Full tables: [results/tables.md](results/tables.md). Raw numbers: `results/resul
   vol targeting worse: it reacts to every hourly vol swing, and the extra turnover costs more than the forecast gains.
 
 **Recommendation:** do not add a live pot. Nothing here beats the Donchian pot or buy-and-hold after costs. The one
-real result is a better hourly risk forecast (likelihood, regimes, jump hours). The obvious use is as a risk/sizing
+real result is a better hourly risk forecast (likelihood in every year and vol regime). The obvious use is as a risk/sizing
 input, but in this test that use made returns worse, not better.
 
 ## What was run
