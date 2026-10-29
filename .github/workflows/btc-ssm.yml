@@ -54,12 +54,15 @@ jobs:
           python fetch.py /tmp/out
           tar czf /tmp/btc-ssm-data.tar.gz -C /tmp/out .
       - name: Fetch Deribit option-chain snapshots (Tardis free 1st-of-month files)
+        timeout-minutes: 90
+        continue-on-error: true   # rate limits: whatever was fetched is still published, the next run resumes
         run: |
           mkdir -p /tmp/opt /tmp/prev
           gh release download btc-ssm-data --repo "$GITHUB_REPOSITORY" --pattern options_1st.csv.gz --dir /tmp/prev || true
           python fetch_options.py /tmp/opt /tmp/prev/options_1st.csv.gz
           ls -la /tmp/opt
       - name: Publish to the data release
+        if: always()
         run: |
           gh release view btc-ssm-data --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create btc-ssm-data --repo "$GITHUB_REPOSITORY" --title "BTC state-space data" \

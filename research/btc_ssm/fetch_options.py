@@ -87,6 +87,7 @@ if __name__ == "__main__":
             s = snapshot_retry(day)
             frames.append(s)
             print(day.date(), len(s), "options", flush=True)
+            pd.concat(frames).to_csv(f"{out}/options_1st.csv.gz", index=False)   # save as we go (rate limits are slow)
             time.sleep(5)
         except Exception as e:  # noqa: BLE001  (a missing month is logged and skipped)
             print(day.date(), "failed:", e, flush=True)

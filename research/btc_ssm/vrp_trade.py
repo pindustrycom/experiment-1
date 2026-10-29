@@ -157,8 +157,9 @@ def summarize(t, d):
     res["corr_straddle_vs_donchian"] = float(np.corrcoef(t.straddle_bid_ret, t.donchian)[0, 1])
     res["donchian_same_windows"] = {"mean": float(np.mean(dm)), "sharpe": float(np.mean(dm) / np.std(dm, ddof=1) * np.sqrt(12))}
     # what share of the synthetic premium survives
-    res["survival_straddle"] = res["straddle_bid"]["mean"] / res["synthetic_atm"]["mean"]
-    res["survival_strip"] = res["strip_bid"]["mean"] / res["synthetic_atm"]["mean"]
+    # the synthetic DVOL swap is what round 2 tested; the strip is its tradeable replication
+    res["strip_bid_share_of_synthetic_dvol"] = res["strip_bid"]["mean"] / res["synthetic_dvol"]["mean"]
+    res["straddle_bid_share_of_synthetic_dvol"] = res["straddle_bid"]["mean"] / res["synthetic_dvol"]["mean"]
     return res
 
 
