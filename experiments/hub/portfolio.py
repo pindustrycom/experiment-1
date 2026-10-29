@@ -201,7 +201,7 @@ def exp7_position(site: Path) -> str:
 
 # ---------------------------------------------------------------- Strategy pots (experiments/strategies)
 
-STRATS = ["trend", "pead", "insider", "best_ideas", "conviction", "pelosi", "reversal", "reversal_stop", "btc_donchian"]
+STRATS = ["trend", "pead", "insider", "best_ideas", "conviction", "pelosi", "reversal", "reversal_stop", "btc_donchian", "btc_donchian_vol"]
 
 
 def strategy_returns(site: Path) -> dict[str, list[tuple[str, float]]]:

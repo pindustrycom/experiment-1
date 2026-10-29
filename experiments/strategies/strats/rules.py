@@ -12,6 +12,7 @@ Long-term (positions held for weeks or months):
   best_ideas, conviction, pelosi  Copying public filings (13Fs, Pelosi's PTRs): see copy.py.
 Short-term (positions held for days):
   btc_donchian  Bitcoin 4-hour breakout: see crypto.py.
+  btc_donchian_vol  The same breakout, sized by BTC's 30-day volatility: see crypto.py.
   reversal Weekly reversal: at each week's last close, buy the 20 S&P 500 stocks that fell the most over the past 5
            sessions, 5% each, and hold them for the week.
 """
@@ -49,6 +50,9 @@ STRATEGIES = {
     "btc_donchian": ("BTC breakout", SHORT_TERM, "Bitcoin on 4-hour bars (Jesse's Donchian example): buys a close above the past "
                      "20 bars' high while above the 200-bar average, sells a close below the past 20 bars' low; trades last "
                      "about 10 days. See crypto.py."),
+    "btc_donchian_vol": ("BTC breakout, vol-sized", SHORT_TERM, "The same Bitcoin breakout signal, but the position is sized "
+                         "to a steady risk: 2.5% of daily volatility over BTC's past 30 days, up to 2x the pot when BTC is "
+                         "calm and less in wild markets. See crypto.py."),
 }
 
 

@@ -97,7 +97,7 @@ def test_replay_and_site(tmp_path):
     out = site.write(tmp_path, st, rp, {})
     assert out["sessions"] == 1
     head = (tmp_path / "data" / "daily.csv").read_text().splitlines()[0]
-    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,reversal_stop,btc_donchian"
+    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,reversal_stop,btc_donchian,btc_donchian_vol"
     s = json.loads((tmp_path / "data" / "summary.json").read_text())
     assert s["strategies"]["pead"]["category"] == rules.LONG_TERM and "cash" in s["strategies"]["pead"]["position"]
     page = (tmp_path / "index.html").read_text()
@@ -233,6 +233,34 @@ def test_btc_pot_steps_with_the_rule_equity():
     st2 = {}
     live.step(st2, px, days[0], [], pd.DataFrame(), pd.DataFrame(), None, None)
     assert "btc_donchian" not in st2["pots"]                 # no bars: the pot waits
+
+
+def test_btc_vol_sized_pot_scales_the_same_signal():
+    d = btc_bars()
+    plain, sized = crypto.run_rule(d, cost=0.0), crypto.run_rule(d, cost=0.0, size=True)
+    assert (plain["after"] == sized["after"]).all()                       # same signal, only the size differs
+    w = crypto.vol_weights(d)
+    assert ((w > 0) & (w <= crypto.VOL_CAP)).all()
+    lr = np.log(d.close).diff()
+    vol = np.sqrt((lr ** 2).rolling(crypto.VOL_DAYS * 6).sum() / crypto.VOL_DAYS)
+    j = int(np.flatnonzero(crypto.us_close_bars(d.index) & vol.notna().to_numpy())[0])
+    assert w[j] == pytest.approx(min(crypto.VOL_TARGET / vol.iloc[j], crypto.VOL_CAP))   # first size: no band yet
+    k = j + 1 + int(np.argmax(sized["held"].to_numpy()[j + 1:]))
+    if sized["held"].iloc[k] and sized["held"].iloc[k + 1] and w[k] == w[k - 1]:
+        g = sized["equity"].iloc[k + 1] / sized["equity"].iloc[k] - 1
+        assert g == pytest.approx(w[k] * (d.close.iloc[k + 1] / d.close.iloc[k] - 1))
+    assert crypto.run_rule(d)["equity"].equals(crypto.run_rule(d, size=False)["equity"])
+    px = prices()
+    st = {}
+    for day in [pd.Timestamp("2026-09-08"), pd.Timestamp("2026-09-09"), pd.Timestamp("2026-09-10")]:
+        live.step(st, px, day, [], pd.DataFrame(), pd.DataFrame(), None, d)
+    rows = st["pots"]["btc_donchian_vol"]
+    eq = crypto.run_rule(d, stop=stops.STOPS["btc_donchian_vol"], size=True)
+    b0, b2 = pd.Timestamp(rows[0]["bar"]), pd.Timestamp(rows[2]["bar"])
+    assert rows[2]["index"] == pytest.approx(eq.equity[b2] / eq.equity[b0])
+    if rows[-1]["w"]:
+        assert rows[-1]["w"]["BTC"] == pytest.approx(eq.w[b2], abs=1e-4)
+        assert "of the pot" in site.position_text("btc_donchian_vol", rows[-1], {}) or rows[-1]["w"]["BTC"] == 1.0
 
 
 def test_pots_added_later_are_replayed_from_the_origin():

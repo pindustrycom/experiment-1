@@ -5,6 +5,11 @@ Rule, checked at every 4-hour close: buy when the close is above the previous 20
 200-bar average; sell when a close is below the previous 20 bars' lowest low. Fills at the next bar's open, the whole
 pot in BTC or in cash, COST per side.
 
+Vol-sized twin (VOL_KEY, research/btc_ssm round 2): the same signal, but while it holds BTC the position is
+VOL_TARGET / (BTC's daily volatility over the past 30 days), capped at VOL_CAP times the pot. The size is reset at each
+US-close bar, and only when the new size differs from the current one by more than VOL_BAND of it (so small vol
+changes do not trade). Calm markets hold more than the pot (paper leverage up to 2x), wild ones less.
+
 Bars: Kraken's public OHLC (XBT/USD, 4 hours, no key), with Coinbase's hourly candles as the fallback. They are cached
 in data/crypto/btc_4h.csv and the cache only grows, so the rule always runs over the same history. The pot's return
 between two US closes is the rule's equity at the last 4-hour bar closed by the second close over the same at the first:
@@ -23,6 +28,9 @@ import requests
 
 log = logging.getLogger(__name__)
 KEY = "btc_donchian"
+VOL_KEY = "btc_donchian_vol"
+KEYS = (KEY, VOL_KEY)
+VOL_TARGET, VOL_CAP, VOL_BAND, VOL_DAYS = 0.025, 2.0, 0.25, 30     # 2.5% daily vol target, as in research/btc_ssm
 CHANNEL, TREND = 20, 200
 COST = 0.0025          # 25 bp a side: a Canadian retail exchange's taker fee and spread (research used 10 bp; still beat holding at 25)
 BAR = pd.Timedelta(hours=4)
@@ -105,34 +113,62 @@ def us_close_bars(idx: pd.DatetimeIndex) -> np.ndarray:
     return np.asarray(by_close & ((nxt.date != c.date) | ((nxt.hour * 60 + nxt.minute) > 16 * 60)))
 
 
-def run_rule(d: pd.DataFrame, cost: float = COST, stop: float | None = None) -> pd.DataFrame:
+def vol_weights(d: pd.DataFrame) -> np.ndarray:
+    """Position size decided at each bar's close for VOL_KEY: VOL_TARGET over the past VOL_DAYS days' daily vol (from the
+    4-hour log returns), capped at VOL_CAP, reset only at US-close bars and only past the VOL_BAND no-trade band.
+    1.0 until there are VOL_DAYS days of bars."""
+    lr = np.log(d["close"].astype(float)).diff()
+    vol = np.sqrt((lr ** 2).rolling(VOL_DAYS * 6).sum() / VOL_DAYS).to_numpy()
+    want = np.minimum(VOL_TARGET / vol, VOL_CAP)
+    mark = us_close_bars(d.index)
+    w, cur = np.ones(len(d)), 1.0
+    seen = False
+    for j in range(len(d)):
+        if mark[j] and np.isfinite(want[j]) and (not seen or abs(want[j] - cur) > VOL_BAND * cur):
+            cur, seen = float(want[j]), True
+        w[j] = cur
+    return w
+
+
+def run_rule(d: pd.DataFrame, cost: float = COST, stop: float | None = None, size: bool = False) -> pd.DataFrame:
     """Per bar: the pot's equity at the bar's close (1 at the start), whether BTC was held through the bar, and whether
     it is held after the decision at the bar's close.
     stop: the daily stop loss (stops.py). Once a bar's low is stop below BTC's price at the last US close (or the entry
     price, if bought since), the pot sells at that level (or the bar's open, if it opened below) and stays in cash until
-    the next US close; then it follows the rule again, buying back at the next bar's open if the rule is still long."""
+    the next US close; then it follows the rule again, buying back at the next bar's open if the rule is still long.
+    size: hold vol_weights() of the pot instead of all of it (VOL_KEY); a size change while holding trades the difference
+    at the next bar's open, at cost. Column w is the size held after each bar's decision (0 in cash)."""
     o, h, lo, c = (d[k].to_numpy(float) for k in ("open", "high", "low", "close"))
     hi = pd.Series(h).rolling(CHANNEL).max().shift().to_numpy()
     low = pd.Series(lo).rolling(CHANNEL).min().shift().to_numpy()
     sma = pd.Series(c).rolling(TREND).mean().to_numpy()
     mark = us_close_bars(d.index) if stop else np.zeros(len(c), bool)
     n = len(c)
-    eq, held, after = np.ones(n), np.zeros(n, bool), np.zeros(n, bool)
-    e, pos, want, out, ref = 1.0, False, False, False, 0.0
+    ws = vol_weights(d) if size else np.ones(n)
+    eq, held, after, wcol = np.ones(n), np.zeros(n, bool), np.zeros(n, bool), np.zeros(n)
+    e, pos, want, out, ref, x = 1.0, False, False, False, 0.0, 0.0
     for j in range(n):
         go = want and not out                 # the position decided at the last bar's close, filled at this open
+        nx = ws[j - 1] if j else ws[0]        # its size, decided at the same close
+        start = o[j]                          # where this bar's held return is measured from
         if go and not pos:
-            e *= (1 - cost) * c[j] / o[j]
-            pos, ref = True, o[j]
+            e *= 1 - nx * cost
+            pos, ref, x = True, o[j], nx
         elif pos and not go:
-            e *= (1 - cost) * o[j] / c[j - 1]
+            e *= (1 + x * (o[j] / c[j - 1] - 1)) * (1 - x * cost)
             pos = False
         elif pos:
-            e *= c[j] / c[j - 1]
+            if nx != x:                       # resize at this open
+                e *= (1 + x * (o[j] / c[j - 1] - 1)) * (1 - abs(nx - x) * cost)
+                x = nx
+            else:
+                start = c[j - 1]
         held[j] = pos
         if pos and stop and lo[j] <= ref * (1 - stop):
-            e *= (1 - cost) * min(o[j], ref * (1 - stop)) / c[j]
+            e *= (1 + x * (min(o[j], ref * (1 - stop)) / start - 1)) * (1 - x * cost)
             pos, out = False, True
+        elif pos:
+            e *= 1 + x * (c[j] / start - 1)
         eq[j] = e
         if not want and c[j] > hi[j] and c[j] > sma[j]:
             want = True
@@ -141,7 +177,8 @@ def run_rule(d: pd.DataFrame, cost: float = COST, stop: float | None = None) -> 
         if mark[j]:
             out, ref = False, c[j]
         after[j] = want and not out
-    return pd.DataFrame({"equity": eq, "held": held, "after": after}, index=d.index)
+        wcol[j] = ws[j] if after[j] else 0.0
+    return pd.DataFrame({"equity": eq, "held": held, "after": after, "w": wcol}, index=d.index)
 
 
 def mark_bar(eq: pd.DataFrame, us_close: pd.Timestamp) -> pd.Timestamp | None:
@@ -218,5 +255,7 @@ def position_text(row: dict | None) -> str:
     if not row:
         return "No position yet: the pot starts at the next close."
     if row.get("w"):
-        return f"Holding BTC (rule checked at the 4-hour bar opening {row.get('bar', '?')} UTC)."
+        x = row["w"].get("BTC", 1.0)
+        size = "" if x == 1.0 else f" at {x:.0%} of the pot"
+        return f"Holding BTC{size} (rule checked at the 4-hour bar opening {row.get('bar', '?')} UTC)."
     return f"In cash: no breakout above the 20-bar high in an uptrend (as of the 4-hour bar opening {row.get('bar', '?')} UTC)."
