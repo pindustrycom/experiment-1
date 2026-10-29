@@ -240,3 +240,23 @@ correction (t 4.4, Holm p 0.006), and it is close to uncorrelated with Donchian.
 It deserves a forward paper pot, not real money: about 5 trades a year means a forward test takes years to confirm
 on its own. Daily entries (collecting Deribit chains every day from GitHub Actions, free going forward) would give
 about 20x the trades.
+
+# Round 5 (Oct 29): the seven next tests from the literature review
+
+`round5.py` (items 1, 3-6), `collect_chains.py` + `.github/workflows/deribit-chains.yml` (item 2), `daily_entries.py`
+(item 7). Results in `results/round5.json` and `results/daily_entries.json`. The review itself is a Claude Doc in the project.
+
+| # | Test | Result | Verdict |
+|---|---|---|---|
+| 1 | Vol-size the other pots (long-run vol / 21-day EWMA vol, cap 2x, 25% band, 5 bp; 2020-2026, point-in-time replays) | Sharpe up on long-stock books: SPY 0.81 -> 0.90, best ideas 1.05 -> 1.17, conviction 0.88 -> 1.00, Pelosi 1.11 -> 1.16; down on reversal 0.63 -> 0.59, Exp2 2.15 -> 2.05, Exp7 0.54 -> 0.51. No gain significant (t 0.1-0.9) | As the literature says: helps risk assets a little, hurts short-horizon and vol books. Not worth a change |
+| 2 | Daily Deribit BTC + ETH chains | Collector built (public API, 2 requests a day at 00:10 UTC, Tardis-compatible columns, release `deribit-chains`) | Starts once merged |
+| 3 | Risk reversal (sell 25-delta call, buy 25-delta put, band 0.1 hedge) | Always +3.4% of gross vega a month, t 0.9; gated +1.3%, t 0.6. The reverse (sell put, buy call) loses -17.1%, t -4.5 | No edge after costs. The skew result is confirmed (calls rich, puts not), but buying the put costs what the call earns |
+| 4 | Whalley-Wilmott band (k 0.5-128) on the call wing | Hedge cost 2.6-6.7% of the strike vs 5.5% for the fixed band. Always-sell t 2.1 -> 2.8 (k 0.5); gated t 4.4 -> 4.3-4.6 | Saves hedge cost, same result once gated. Keep the simple band |
+| 5 | BTC variance premium as a predictor of the next 30 days' return | BTC: t -0.3 (vs trailing RV) / -0.9 (vs rough forecast); Donchian: t 0.4 / -2.4 (monthly -1.6). Holding BTC only when the premium is above its median: Sharpe 0.38 -> 0.55, in the market 24% of days | No usable return signal (the S&P result of Bollerslev et al. does not carry over) |
+| 6 | Half-Kelly leverage on Donchian, 1% daily VaR capped at 8%, cap 3x (2021-2026) | Hist-30 vol: +36.0%/yr, Sharpe 0.90, DD -47%, avg 1.4x when long; the live vol-sized rule +27.3%, 0.89, -36%; plain 1x +16.1%, 0.60, -50%. With the GRU-t forecast: +21.5%, 0.64 (worse) | Kelly only adds leverage at the same Sharpe. The sharper GRU forecast sizes worse than plain 30-day vol, again |
+| 7 | Daily entries | Code reproduces round 4 on the monthly chains (+11.3%, 28 of 66 on). Synthetic DVOL swap entered daily, gated: t 4.0 on 30-day blocks (Newey-West), against t 2.5 from the 1st-of-month entries only | Daily entries roughly double the evidence. The real test waits for about 3 months of item 2's chains |
+
+Bottom line: the only new result that matters is item 7's synthetic. With daily entries, the gated variance premium
+clears t 4 without relying on 28 months. Everything else (sizing other pots, risk reversals, Whalley-Wilmott, the
+premium as a return signal, Kelly with the GRU) adds nothing. The daily chains collector is the next step that can
+change a verdict.
