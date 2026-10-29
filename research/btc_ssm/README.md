@@ -178,3 +178,65 @@ By entry year, tradeable strip (synthetic in brackets): 2021 +19.8% (+18.6%), 20
   after costs. With 66 monthly trades it is not significant (t 0.8 tradeable, 1.5 even synthetic, against the project bar of 3.8). It does not justify a pot.
   Monthly entries are the limit here: daily entries need the paid Tardis data (or a Deribit history export), which
   would give about 30x the trades and settle the question.
+
+# Round 4 (Oct 29): can the tradeable vol trade be made to work?
+
+`vrp_variants.py`, on the same 66 first-of-month chains. Changes from round 3: Deribit's option fees are now charged
+(0.03% of the underlying per contract plus 0.015% delivery on in-the-money options, capped at 12.5% of the option
+price), the hedge runs on the hourly path, and three families of changes are tested, 140 variants at the bid in all,
+Holm-corrected:
+
+- **Hedging:** daily (round 3), every 4 hours, or only when the book's delta drifts past a band of 0.1, 0.2 or 0.3 BTC
+  per straddle of vega (checked hourly).
+- **Strikes:** the full strip 0.6-1.6 F, a narrow strip 0.8-1.25 F, the put wing only, the call wing only, the ATM
+  straddle, a 25-delta strangle, and an iron condor (with 10-delta wings bought as crash insurance).
+- **Timing:** always sell; sell only when ATM implied variance is above the rough-vol 30-day forecast (round 2's best
+  long-horizon model, walk-forward); sell only when it is 20% above; or size each month by the gap.
+
+| variant (sold at bid, all costs) | months traded | mean / month (strike units) | t | Holm p | worst |
+|---|---|---|---|---|---|
+| Round 3 book: strip, daily hedge, always (now with fees) | 66 | +2.8% | 0.4 | 1 | -1.59 |
+| Strip, band 0.1, always | 66 | +4.0% | 0.7 | 1 | -1.27 |
+| Call wing, band 0.1, always | 66 | +11.6% | 2.1 | 1 | -1.40 |
+| Strip, band 0.1, **rough-vol gate** | 28 | +7.9% | 3.4 | 0.16 | -0.54 |
+| 25-delta strangle, band 0.1, rough-vol gate | 28 | +9.9% | 3.7 | 0.06 | -0.53 |
+| **Call wing, band 0.1, rough-vol gate** | 28 | **+11.3%** | **4.4** | **0.006** | -0.21 |
+
+(Means count the months the gate stays out as zero.)
+
+What works and what does not:
+
+1. **The timing is the missing piece, and it is where the volatility models pay.** In the 28 months the rough-vol
+   gate sells, the strip earns +18.6% of the strike a month. In the 38 it skips, -6.7% (the synthetic premium in
+   those months is -22%: implied vol was below what the model expected). The gate stays out of most crash months:
+   May 2021, May 2022, Nov 2022, Mar 2023, Oct 2023, Aug 2024 and Mar 2025. The gap correlates 0.39 with the call-wing P&L.
+   Checks: random gates that trade 28 months beat the rough-vol gate's t only 0.3-0.5% of the time. Other model
+   forecasts help too (HAR t 3.5, GARCH 2.8, Heston+jumps 2.3 on the call wing), while a model-free gate (implied vs
+   trailing 30-day realized) does not (t 1.4). So it is the forward-looking forecast that helps, not just "sell when IV is high".
+2. **Hedging on a band instead of every day** saves part of the hedge cost and drops less of the move: at 0.1-0.2 it
+   adds about 1-4% of the strike a month on every book.
+3. **The premium sits in the call wing.** Short delta-hedged OTM calls are the best book in every hedge scheme; short
+   puts lose (the crash months), the straddle is near zero, and the iron condor is worse (its wings cost 9% of the
+   strike in spread and 7% in fees for little protection).
+
+Capital view (one straddle of vega per BTC of capital, monthly compounding, 2021-04 to 2026-09):
+
+| book | CAGR | Sharpe | max DD | worst month | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Call wing, band 0.1, rough-vol gate | 10.6% | 1.83 | -1.9% | -1.0% | +35.7% | +6.7% | 0 | +17.1% | +1.5% | +1.2% |
+| 25-delta strangle, band 0.1, gate | 9.6% | 1.70 | -3.2% | -2.5% | +29.2% | +10.9% | 0 | +13.0% | +2.3% | 0.0% |
+| Strip, band 0.1, gate | 7.7% | 1.49 | -2.6% | -2.6% | +24.2% | +10.2% | 0 | +9.7% | +0.4% | -0.3% |
+| Round 3 book (strip, daily, always) | 4.6% | 0.48 | -9.2% | -7.5% | | | | | | |
+
+Correlation with the Donchian pot: -0.03 to -0.13.
+
+**Verdict.** The gated call wing is the first BTC result in this study to clear the project's t 3.8 bar after Holm
+correction (t 4.4, Holm p 0.006), and it is close to uncorrelated with Donchian. Reasons for caution:
+- It was picked from 140 variants on only 28 traded months.
+- Most of the money came in 2021 and 2024. 2025-26 earned about 1-2% a year.
+- The gate sat out all of 2023 only because the rough-vol forecast ran high that year.
+- Fills at the bid assume small size, and perpetual funding is ignored.
+
+It deserves a forward paper pot, not real money: about 5 trades a year means a forward test takes years to confirm
+on its own. Daily entries (collecting Deribit chains every day from GitHub Actions, free going forward) would give
+about 20x the trades.
