@@ -9,7 +9,9 @@ from __future__ import annotations
 import csv
 import gzip
 import io
+import os
 import sys
+import time
 
 import pandas as pd
 import requests
@@ -18,6 +20,18 @@ URL = "https://datasets.tardis.dev/v1/deribit/options_chain/{y}/{m:02d}/01/OPTIO
 KEEP = ["symbol", "timestamp", "type", "strike_price", "expiration", "open_interest", "bid_price", "bid_amount", "bid_iv",
         "ask_price", "ask_amount", "ask_iv", "mark_price", "mark_iv", "underlying_index", "underlying_price", "delta",
         "gamma", "vega", "theta"]
+
+
+def snapshot_retry(day: pd.Timestamp) -> pd.DataFrame:
+    """Tardis rate-limits anonymous downloads (HTTP 429): back off and retry."""
+    for attempt in range(6):
+        try:
+            return snapshot(day)
+        except requests.HTTPError as e:
+            if e.response is None or e.response.status_code != 429 or attempt == 5:
+                raise
+            time.sleep(60 * (attempt + 1))
+    raise RuntimeError("unreachable")
 
 
 def snapshot(day: pd.Timestamp, until_min: int = 10) -> pd.DataFrame:
@@ -58,13 +72,22 @@ def delivery() -> pd.DataFrame:
 
 if __name__ == "__main__":
     out = sys.argv[1]
+    prev = sys.argv[2] if len(sys.argv) > 2 else None      # earlier options_1st.csv.gz: months in it are not fetched again
     days = pd.date_range("2021-04-01", pd.Timestamp.now("UTC").tz_localize(None).normalize(), freq="MS")
-    frames = []
+    frames, have = [], set()
+    if prev and os.path.exists(prev):
+        old = pd.read_csv(prev)
+        frames.append(old)
+        have = set(pd.to_datetime(old.date).dt.normalize())
+        print("kept", len(have), "months from the earlier file")
     for day in days:
+        if day in have:
+            continue
         try:
-            s = snapshot(day)
+            s = snapshot_retry(day)
             frames.append(s)
             print(day.date(), len(s), "options", flush=True)
+            time.sleep(5)
         except Exception as e:  # noqa: BLE001  (a missing month is logged and skipped)
             print(day.date(), "failed:", e, flush=True)
     pd.concat(frames).to_csv(f"{out}/options_1st.csv.gz", index=False)
