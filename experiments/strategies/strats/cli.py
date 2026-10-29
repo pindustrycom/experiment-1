@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import copy, copy_data, crypto, data, live, rules, site, stops
+from . import copy, copy_data, crypto, data, live, rules, site, stops, universe
 
 
 def closed(px: pd.DataFrame, now: pd.Timestamp | None = None) -> pd.DataFrame:
@@ -34,7 +34,11 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     if fetch:
         rep["prices"] = data.update_prices(data_dir, tickers)
         rep["prices"]["failed"] = rep["prices"]["failed"][:30]
-    bars = data.load_bars(data_dir, tickers)
+    # The index as it was on each date, for the replays: today's list alone would leave out every company that fell out
+    iv = universe.intervals(data_dir, fetch)
+    rep["former_members"] = universe.former_prices(data_dir, iv, data.START, fetch)
+    then = universe.Members(iv, [m.replace(".", "-") for m in members])
+    bars = data.load_bars(data_dir, sorted(set(tickers) | set(then.ever(live.REPLAY_FROM))))
     px = closed(bars.pop("close"))
     spy = px["SPY"].dropna()
     d = spy.index[-1]
@@ -65,14 +69,14 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     if os.environ.get("STOP_BACKTEST"):       # pull requests: how the stop levels would have done since 2019
         try:
             lv = [0.0, 0.03, 0.05, 0.08, 0.10]
-            rep["stop_backtest"] = stops.backtest(px, bars, members, live.REPLAY_FROM, {"reversal": lv, "trend": [0.0, 0.02, 0.03, 0.04, 0.06]}, live.COST)
+            rep["stop_backtest"] = stops.backtest(px, bars, then, live.REPLAY_FROM, {"reversal": lv, "trend": [0.0, 0.02, 0.03, 0.04, 0.06]}, live.COST)
             rep["stop_backtest"] |= stops.backtest_btc(btc, [0.0, 0.04, 0.06, 0.08, 0.10])
         except Exception as ex:  # noqa: BLE001 - a report, not the run
             rep["stop_backtest"] = f"failed: {type(ex).__name__}: {str(ex)[:300]}"
     live.save_state(state_f, state)
     rp = None
     try:
-        rp = live.replay_summary(live.replay(px, members, cp=cp))
+        rp = live.replay_summary(live.replay(px, then, cp=cp))
         rep["replay"] = {k: {m: round(v, 4) for m, v in rp[k].items() if m != "years"} for k in rp if k in rules.STRATEGIES or k == "SPY"}
     except Exception as ex:  # noqa: BLE001 - the pages still build
         rep["replay"] = f"failed: {type(ex).__name__}: {str(ex)[:200]}"

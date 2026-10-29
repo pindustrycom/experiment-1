@@ -395,3 +395,31 @@ def test_btc_tick_journals_a_trade_only_when_the_rule_flips(tmp_path):
     assert rows[0]["rule_price"] == pytest.approx(d.at[b + crypto.BAR, "open"])
     html = site._btc_live(rows, j)
     assert "123.00" in html and "Rule fill" in html
+
+
+def test_reversal_picks_from_the_index_as_it_was(tmp_path):
+    from strats import universe
+
+    iv = pd.DataFrame({"ticker": ["A", "B", "GONE-202003"], "start": pd.to_datetime(["2000-01-03", "2020-06-01", "2000-01-03"]),
+                       "end": pd.to_datetime([None, None, "2020-03-16"])})
+    m = universe.Members(iv)
+    assert m(pd.Timestamp("2020-01-10")) == ["A", "GONE-202003"]
+    assert m(pd.Timestamp("2020-07-01")) == ["A", "B"]
+    assert m.ever("2019-01-01") == ["A", "B", "GONE-202003"]
+    days = pd.bdate_range("2019-12-02", "2020-08-31")
+    px = pd.DataFrame({"A": 100.0, "B": np.linspace(100, 10, len(days)), "GONE-202003": np.linspace(100, 50, len(days))}, index=days)
+    rules_n = rules.REVERSAL_N
+    try:
+        rules.REVERSAL_N = 1
+        assert rules.reversal_weights(px, pd.Timestamp("2020-01-10"), m) == {"GONE-202003": 1.0}   # B was not a member yet
+        assert rules.reversal_weights(px, pd.Timestamp("2020-07-10"), m) == {"B": 1.0}
+    finally:
+        rules.REVERSAL_N = rules_n
+    # prices of former members are written from the dataset's file, in the cache's format
+    (tmp_path / "pit").mkdir()
+    pd.DataFrame({"date": days, "ticker": "GONE-202003", "open": 10.0, "high": 11.0, "low": 9.0, "close": 10.0, "adj_close": 5.0}).to_parquet(
+        tmp_path / "pit" / "prices.parquet")
+    out = universe.former_prices(tmp_path, iv, "2019-01-01", fetch=False)
+    assert out == {"former_members": 1, "written": 1, "missing": 0}
+    b = data.load_bars(tmp_path, ["GONE-202003"])
+    assert b["close"]["GONE-202003"].iloc[0] == 5.0 and b["high"]["GONE-202003"].iloc[0] == 5.5

@@ -98,7 +98,7 @@ def explain(state: dict, px: pd.DataFrame, d: pd.Timestamp, top: int = 5) -> dic
     return out
 
 
-def backtest(px: pd.DataFrame, bars: dict[str, pd.DataFrame], members: list[str], start: str, levels: dict[str, list[float]],
+def backtest(px: pd.DataFrame, bars: dict[str, pd.DataFrame], members, start: str, levels: dict[str, list[float]],
              cost: float) -> dict:
     """Trend and reversal replayed from start with each stop level (0 = no stop): yearly return, worst day, worst drop, stops."""
     from . import rules

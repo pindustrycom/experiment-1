@@ -90,3 +90,38 @@ def test_membership_from_dates_added():
     cur, ch = papers.sp500_tables(html)
     m = papers.membership(cur, ch, pd.date_range("2019-01-31", "2022-12-31", freq="ME"))
     assert m.loc["2020-01-31", "OLD"] and not m.loc["2020-01-31", "NEW"] and m.loc["2022-01-31", "NEW"]
+
+
+def test_point_in_time_tables(tmp_path):
+    from exp2 import pit
+
+    iv = pd.DataFrame({"ticker": ["A", "B", "OLD-201905", "C"],
+                       "start": pd.to_datetime(["1990-01-02", "2015-03-02", "2001-01-02", "2010-01-04"]),
+                       "end": pd.to_datetime([None, None, "2019-05-20", "2017-01-03"])})
+    (tmp_path / "pit").mkdir()
+    iv.to_parquet(tmp_path / "pit" / "membership_intervals.parquet")
+    days = pd.bdate_range("2000-01-03", "2020-12-31")
+    rng = np.random.default_rng(0)
+    xlk = np.cumsum(rng.normal(0, 0.01, len(days)))
+    rows = []
+    for t, x in (("XLK", xlk), ("XLE", np.cumsum(rng.normal(0, 0.01, len(days)))), ("A", xlk), ("B", xlk), ("C", xlk),
+                 ("OLD-201905", xlk + np.cumsum(rng.normal(0, 0.002, len(days))))):
+        p = 50 * np.exp(x)
+        if t == "OLD-201905":
+            p = p[days < "2019-05-21"]
+        rows.append(pd.DataFrame({"date": days[: len(p)], "ticker": t, "open": p, "close": p, "adj_close": p, "volume": 1e6}))
+    pd.concat(rows).to_parquet(tmp_path / "pit" / "prices.parquet")
+    rep = pit.refresh(tmp_path, "2005-01-01", gics=pd.DataFrame({"ticker": ["A"], "sector": ["Health Care"]}), fetch=False)
+    assert rep["members_today"] == 2 and rep["former_members"] == 2 and rep["former_priced"] == 2
+    assert (tmp_path / "prices" / "OLD-201905.csv").exists() and not (tmp_path / "prices" / "A.csv").exists()
+    sec = pit.sectors(tmp_path)
+    assert sec["A"] == "Health Care" and sec["OLD-201905"] == "Information Technology"
+    cur = pd.read_csv(tmp_path / "sp500_current.csv")
+    ch = pd.read_csv(tmp_path / "sp500_changes.csv", parse_dates=["date"])
+    m = papers.membership(cur, ch, pd.date_range("2008-01-31", "2020-12-31", freq="ME"))
+    assert m.loc["2016-06-30", ["A", "B", "C", "OLD-201905"]].all()
+    assert not m.loc["2018-06-30", "C"] and m.loc["2018-06-30", "OLD-201905"] and not m.loc["2019-05-31", "OLD-201905"]
+    assert not m.loc["2014-12-31", "B"]
+    assert pit.former(tmp_path) == {"C", "OLD-201905"}
+    out = papers.update(tmp_path, ["OLD-201905"], pause=0)
+    assert out == {"fetched": 0, "failed": []}       # former members are never sent to Yahoo

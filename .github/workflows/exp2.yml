@@ -129,6 +129,22 @@ jobs:
               print(f"\nScored: {s['scored'] or 'nothing pending'}")
           PY
 
+      - name: Trial replay by year (the 2019 replay, on the S&P 500 as it was each month)
+        if: env.TRIAL == 'true'
+        run: |
+          python - <<'PY' | grep -v '^EXP2DAILY' | tee -a "$GITHUB_STEP_SUMMARY"
+          import pandas as pd, sys
+          L = pd.read_csv("state/log/predictions.csv")
+          L = L[L["status"] == "scored"].assign(date=lambda x: pd.to_datetime(x["date"])).set_index("date").sort_index()
+          cols = ["real_ret", "real_hrp", "real_regime", "real_varswap", "spy_ret"]
+          y = L[cols].div(100).add(1).groupby(L.index.year).prod().sub(1).mul(100).round(1)
+          print("\n| Year | Exp2 | stock book part | regime part | variance swap part | SPY |\n|---|---|---|---|---|---|")
+          for k, r in y.iterrows():
+              print(f"| {k} | " + " | ".join(f"{v:+.1f}%" for v in r) + " |")
+          for d, r in L[cols].iterrows():     # the daily series, for the project's allocator study (read from the job log)
+              print(f"EXP2DAILY,{d.date()},{r['real_ret']:.5f},{r['real_hrp']:.5f}", file=sys.stderr)
+          PY
+
       - name: Keep the trial run's pages for inspection
         if: env.TRIAL == 'true'
         uses: actions/upload-artifact@v4

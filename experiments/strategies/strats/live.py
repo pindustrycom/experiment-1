@@ -6,9 +6,9 @@ daily rows with the book held, and the event holdings with sessions left) is a J
 Every pot starts at the ORIGIN close; one added later is rebuilt from there with only the data known at each close.
 
 The earnings and insider pots need event histories that the free data does not reach back for, so they are tracked
-forward only. Trend and reversal are also replayed from 2019 with the same functions; the reversal replay uses today's
-S&P 500 members, which flatters it (stocks that fell out of the index are missing). The copy pots are replayed from the
-13F and PTR history in data/copy.
+forward only. Trend and reversal are also replayed from 2019 with the same functions; the reversal replay picks from the
+S&P 500 as it was each week (universe.py), including companies that later left the index. The copy pots are replayed
+from the 13F and PTR history in data/copy.
 """
 from __future__ import annotations
 
@@ -161,7 +161,7 @@ def due_now(rows: list[dict], d: pd.Timestamp, freq: str, due) -> bool:
 
 # ---------------------------------------------------------------- replay
 
-def replay(px: pd.DataFrame, members: list[str], start: str = REPLAY_FROM, cp: dict | None = None) -> pd.DataFrame:
+def replay(px: pd.DataFrame, members, start: str = REPLAY_FROM, cp: dict | None = None) -> pd.DataFrame:
     """Daily returns of trend, reversal and (with their data) the copy pots, after costs, and SPY, from start to the last close."""
     dates = px.index[px.index >= start]
     me, we = rules.month_end(px.index), rules.week_end(px.index)

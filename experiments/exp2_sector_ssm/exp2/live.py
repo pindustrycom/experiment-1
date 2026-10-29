@@ -313,7 +313,8 @@ def _tickers(data: Path) -> list[str]:
 
 
 def refresh(data: Path, today: pd.Timestamp, everything: bool = True) -> dict:
-    """Prices for SPY, VIX, T-bills and every past or present member; the member list itself once a month.
+    """Prices for SPY, VIX, T-bills and every past or present member (former members' from exp2/pit.py); the member
+    tables once a week.
     The morning only needs SPY and VIX, unless a new month's book has to be formed."""
     if not everything:
         out = papers.update(data, ["SPY", "^VIX"], pause=0.2, max_age_days=0.2)
@@ -321,14 +322,10 @@ def refresh(data: Path, today: pd.Timestamp, everything: bool = True) -> dict:
         return out
     out = {}
     cur_f = data / "sp500_current.csv"
-    if not cur_f.exists() or time.time() - cur_f.stat().st_mtime > 25 * 86400:
-        try:
-            cur, changes = papers.sp500_tables()
-            if len(cur) > 400:
-                cur.to_csv(cur_f, index=False)
-                changes.to_csv(data / "sp500_changes.csv", index=False)
-        except Exception as ex:  # noqa: BLE001 - keep last month's list
-            out["members_warning"] = f"{type(ex).__name__}: {str(ex)[:200]}"
+    try:
+        out["members"] = papers.members_refresh(data)          # the index as it was on each date, refreshed weekly
+    except Exception as ex:  # noqa: BLE001 - keep last week's tables
+        out["members_warning"] = f"{type(ex).__name__}: {str(ex)[:200]}"
     cur = pd.read_csv(cur_f)
     tick = sorted(set(cur["ticker"]) | set(_tickers(data)))
     out.update(papers.update(data, ["SPY", "^VIX", "^IRX", *tick], pause=0.2, max_age_days=0.2))

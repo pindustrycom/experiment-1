@@ -18,9 +18,8 @@ The sleeves are then combined into one portfolio. Everything that is chosen (whi
 weights, leverage) is chosen on 2005-2018 only; 2019 to today is the untouched test. Costs: 10 bp per unit traded,
 1% a year to borrow shorted stock, 0.5 vol point to roll the variance swap. Paper research only: nothing is traded.
 
-The cache holds today's S&P 500 members only (from their date added), so firms that actually went bankrupt or were
-taken over are missing. The collapse model therefore learns from deep drawdowns of survivors, which understates
-real collapses.
+The universe is the S&P 500 as it was each month (exp2/pit.py), so firms that went bankrupt or were taken over are in
+it while they were members: the collapse model learns from real collapses, not only from survivors' drawdowns.
 """
 from __future__ import annotations
 
@@ -34,7 +33,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import papers, volpred
+from . import papers, pit, volpred
 from .papers import COST_BP, TRAIN_END, deciles, sstats
 
 log = logging.getLogger("exp2.collapse")
@@ -103,7 +102,7 @@ def load_all(data: Path, out: Path, train_end: str):
     px = papers.load(data, tickers)
     base = papers.load(data, ["SPY", "^VIX", "^IRX"])
     spy, vix = base["SPY"]["adj_close"], base["^VIX"]["close"]
-    sectors = dict(zip(cur["ticker"], cur["sector"]))
+    sectors = papers.sectors_all(data)
     cache = out / "panel_stage1.pkl"
     if cache.exists() and cache.stat().st_mtime > max((data / "prices").stat().st_mtime, Path(volpred.__file__).stat().st_mtime):
         P = pd.read_pickle(cache)
@@ -558,9 +557,10 @@ def combine(sleeves: dict[str, pd.Series], train_end: str, target_vol: float = 1
 def run(data: Path, out: Path, train_end: str = TRAIN_END) -> dict:
     t0 = time.time()
     out.mkdir(parents=True, exist_ok=True)
-    rep = {"built": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"), "train_end": train_end,
-           "warnings": ["The cache holds today's S&P 500 members only: firms that went bankrupt or were taken over are missing, "
-                        "so 'collapse' means a 50% fall of a survivor, and every long-only result is flattered."]}
+    rep = {"built": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"), "train_end": train_end, "warnings": []}
+    if pit.former(data) == set():
+        rep["warnings"].append("No point-in-time membership in the cache: firms that went bankrupt or were taken over are missing, "
+                               "so 'collapse' means a 50% fall of a survivor, and every long-only result is flattered.")
     P, C, member, spy, vix, rf, sectors = load_all(data, out, train_end)
     log.info("data (%.0fs)", time.time() - t0)
     r_spy = np.log(spy).diff()

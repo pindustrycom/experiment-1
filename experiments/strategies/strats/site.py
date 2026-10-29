@@ -93,7 +93,7 @@ def _replay_block(key: str, rp: dict | None) -> str:
     yt = ("<div class=\"scroll\"><table><tr><th>Year</th>" + "".join(f"<th>{y}</th>" for y in years) + "</tr>"
           f"<tr><td>{e(rules.STRATEGIES[key][0])}</td>" + "".join(f"<td>{pct(s['years'][y])}</td>" for y in years) + "</tr>"
           "<tr><td>SPY</td>" + "".join(f"<td>{pct(spy.get('years', {}).get(y))}</td>" for y in years) + "</tr></table></div>")
-    note = {"reversal": " Uses today's S&P 500 members, so it looks better than it really was.",
+    note = {"reversal": " Picks from the S&P 500 as it was each week, including companies that later left it.",
             "best_ideas": " The 23 funds were picked because they are famous today, which flatters it; most of the gain is Scion's GameStop in 2020-21.",
             "conviction": " The funds were picked because they are famous today, which flatters it.",
             "pelosi": " Pelosi was picked because her record is famous today; about 60 buys, mostly big tech, and she trades calls, we copy with shares.",

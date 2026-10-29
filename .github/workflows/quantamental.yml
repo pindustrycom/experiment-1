@@ -1,0 +1,88 @@
+name: Quantamental backtests
+
+# Research only, paper only (research/quantamental): Piotroski F-score, quality minus junk and 10-K tone
+# (Loughran-McDonald vs a generic word list) on point-in-time S&P 500 members, from SEC XBRL company facts and 10-K
+# text with their filing dates. Prices come from the "papers-data" release; membership (with the companies that left the
+# index and their prices) from experiments/exp2_sector_ssm/exp2/pit.py. SEC downloads (company
+# facts, the yearly fundamentals table, 10-K word counts) are cached in the "quantamental-data" release.
+# Nothing is deployed and nothing is traded.
+
+on:
+  pull_request:
+    paths: ["research/quantamental/**", ".github/workflows/quantamental.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the SEC cache release
+
+concurrency:
+  group: quantamental-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CACHE_TAG: quantamental-data
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: research/quantamental
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/quantamental/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Tests
+        run: ruff check . && python -m pytest -q
+
+      - name: Restore data
+        run: |
+          mkdir -p /tmp/data
+          gh release download papers-data --repo "$GITHUB_REPOSITORY" --pattern papers-data.tar.gz --dir /tmp/dl
+          tar xzf /tmp/dl/papers-data.tar.gz -C /tmp/data
+          if gh release view "$CACHE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release download "$CACHE_TAG" --repo "$GITHUB_REPOSITORY" --pattern sec.tar.gz --dir /tmp/dl && tar xzf /tmp/dl/sec.tar.gz -C /tmp/data || true
+          fi
+          ls /tmp/data | head; ls /tmp/data/prices | wc -l
+
+      - name: The S&P 500 as it was on each date (experiments/exp2_sector_ssm/exp2/pit.py)
+        run: |
+          PYTHONPATH=../../experiments/exp2_sector_ssm python -c "
+          from pathlib import Path; from exp2 import pit
+          print(pit.refresh(Path('/tmp/data'), '1998-01-01', force=True))
+          print(pit.check(Path('/tmp/pitcheck')))" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Backtest
+        timeout-minutes: 270
+        run: |
+          set -o pipefail
+          python run.py /tmp/data out | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Edge pipeline (steps 0-6 on companies and markets)
+        run: |
+          set -o pipefail
+          python edge.py /tmp/data out | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Save SEC cache
+        if: always()
+        run: |
+          [ -d /tmp/data/sec ] || exit 0
+          tar czf /tmp/sec.tar.gz -C /tmp/data sec
+          gh release view "$CACHE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$CACHE_TAG" --repo "$GITHUB_REPOSITORY" --title "Quantamental SEC cache" \
+              --notes "SEC company facts, yearly fundamentals and 10-K word counts for research/quantamental. Not a software release."
+          gh release upload "$CACHE_TAG" /tmp/sec.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quantamental-results
+          path: research/quantamental/out
