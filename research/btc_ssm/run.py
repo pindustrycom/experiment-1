@@ -53,7 +53,8 @@ def vol_baselines(d, tr0, te0):
 
 
 def job(args):
-    name, kind, inputs, year, start, seed = args
+    name, kind, inputs, year, start, seed = args[:6]
+    dist = args[6] if len(args) > 6 else "gauss"
     d, f = _G["d"], _G["f"]
     out = _G["out"]
     path = f"{out}/preds/{name}.pkl"
@@ -69,12 +70,18 @@ def job(args):
     ok = (~d.gap).to_numpy() & np.isfinite(r)
     t = time.time()
     mu, var, info = models.fit_predict(kind, r, z.to_numpy(np.float32), np.nan_to_num(lv), ok, tr0, va0, te0, te1,
-                                       seed=seed, max_epochs=_G["epochs"])
+                                       seed=seed, max_epochs=_G["epochs"], dist=dist)
     p = pd.DataFrame({"mu": mu, "var": var}, index=d.index[te0:te1])
-    p.attrs = dict(info, name=name, kind=kind, inputs=inputs, year=year, start=start or "", seed=seed)
+    p.attrs = dict(info, name=name, kind=kind, inputs=inputs, year=year, start=start or "", seed=seed, dist=dist)
     os.makedirs(f"{out}/preds", exist_ok=True)
     p.to_pickle(path)
     return name, f"{time.time() - t:.0f}s epochs {info['epochs']} val {info['best_val']:.4f}"
+
+
+def tdist_jobs():
+    """Follow-up 3: the same GRU and hybrid with a fat-tailed (Student-t) predictive distribution."""
+    return [(f"tdist_{kind}_{y}_s{s}", kind, "price+rv", y, None, s, "t")
+            for y in YEARS for kind in ("hyb_unc", "gru") for s in SEEDS]
 
 
 def jobs(quick=False):
@@ -105,13 +112,15 @@ if __name__ == "__main__":
     folder, out = sys.argv[1], sys.argv[2]
     quick = "--quick" in sys.argv
     os.makedirs(f"{out}/preds", exist_ok=True)
-    js = jobs(quick)
+    js = tdist_jobs() if "--tdist" in sys.argv else jobs(quick)
     # longest jobs first so the pool stays busy
     js.sort(key=lambda j: (j[1] == "kf_fixed" or j[1] == "gru", j[4] is not None, -j[3]))
     with Pool(int(os.environ.get("WORKERS", os.cpu_count())), initializer=init,
               initargs=(folder, out, 6 if quick else 40)) as pool:
         for i, (name, msg) in enumerate(pool.imap_unordered(job, js), 1):
             print(f"[{i}/{len(js)}] {name}: {msg}", flush=True)
+    if "--tdist" in sys.argv:
+        sys.exit(0)
     d, _ = prepare(folder)
     params = {}
     for y in YEARS:
