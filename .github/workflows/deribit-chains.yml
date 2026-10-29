@@ -1,0 +1,58 @@
+name: Deribit option chains
+
+# Research only, paper only (research/btc_ssm): one snapshot a day of Deribit's BTC and ETH option chains with bid/ask,
+# from Deribit's free public API (two requests per run), kept as monthly CSVs in the public "deribit-chains" release.
+# This builds the daily history the daily-entry volatility trade needs (the free Tardis files are first-of-month only).
+# Nothing traded, nothing deployed.
+
+on:
+  schedule:
+    - cron: "10 0 * * *"     # 00:10 UTC, the vol trade's entry time
+  pull_request:              # trial: fetch and print, publish nothing
+    paths: ["research/btc_ssm/collect_chains.py", ".github/workflows/deribit-chains.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the data release
+
+concurrency:
+  group: deribit-chains-${{ github.event_name == 'pull_request' && github.ref || 'live' }}
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: deribit-chains
+    defaults:
+      run:
+        working-directory: research/btc_ssm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install numpy pandas requests scipy
+      - name: This month's files so far
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p /tmp/prev
+          m=$(date -u +%Y-%m)
+          for c in BTC ETH; do
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "chains_${c}_${m}.csv.gz" --dir /tmp/prev 2>/dev/null || true
+          done
+          ls -la /tmp/prev
+      - name: Snapshot
+        run: |
+          mkdir -p /tmp/out /tmp/prev
+          python collect_chains.py /tmp/out /tmp/prev/*.csv.gz
+          ls -la /tmp/out
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Deribit option chains (daily)" \
+              --notes "Daily 00:10 UTC snapshots of Deribit BTC and ETH option chains (public API). Research only."
+          gh release upload "$TAG" /tmp/out/*.csv.gz --repo "$GITHUB_REPOSITORY" --clobber

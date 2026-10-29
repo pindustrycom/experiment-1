@@ -89,6 +89,12 @@ def legs(e, book):
         return b.assign(w=np.gradient(ks) / ks ** 2 * S0 ** 2 / 2)
     if book == "straddle":
         return ch[ch.strike_price == e["atm_k"]].assign(w=1.0)
+    if book in ("rr25", "rr25_rev"):            # risk reversal: sell the 25-delta call, buy the 25-delta put (or the reverse)
+        c25, p25 = _nearest(otm, "call", 0.25), _nearest(otm, "put", -0.25)
+        if len(c25) != 1 or len(p25) != 1:
+            return None
+        sgn = 1.0 if book == "rr25" else -1.0
+        return pd.concat([c25.assign(w=sgn), p25.assign(w=-sgn)])
     sold = pd.concat([_nearest(otm, "put", -0.25), _nearest(otm, "call", 0.25)]).assign(w=1.0)
     if book == "strangle25":
         return sold if len(sold) == 2 else None
@@ -98,12 +104,15 @@ def legs(e, book):
     return pd.concat([sold, wings])
 
 
-def book_pnl(e, b, hedge, fill="bid"):
+def book_pnl(e, b, hedge, fill="bid", scale_by="net"):
+    """scale_by: "net" vega (short-vol books) or "gross" vega (books near vega-neutral, like a risk reversal).
+    Hedge "ww...": Whalley-Wilmott (1997) band, rebalance when the delta leaves +-(1.5 * cost * F * Gamma^2 / g)^(1/3)
+    around its target, g = k / (book notional in USD); the band narrows as gamma falls and widens near expiry."""
     K, kind, w = b.strike_price.to_numpy(), b.type.to_numpy(), b.w.to_numpy()
     sig = b.mark_iv.to_numpy() / 100
     S0, T, ST, path, times, exp = e["S0"], e["T"], e["ST"], e["path"], e["times"], e["exp"]
     _, _, vega = bs(S0, K, T, sig, kind)
-    nv = float((w * vega).sum())
+    nv = float((w * vega).sum()) if scale_by == "net" else float((np.abs(w) * vega).sum())
     if nv <= 0:
         return None
     unit = nv / (2 * S0 * norm.pdf(0.5 * e["sig_atm"] * np.sqrt(T)) * np.sqrt(T))    # straddle-equivalents of vega
@@ -121,10 +130,16 @@ def book_pnl(e, b, hedge, fill="bid"):
     _, dl, _ = bs(path[:-1, None], K[None, :], tau[:, None], sig[None, :], kind[None, :])
     target = (dl * w[None, :]).sum(1)
     mode, x = HEDGES[hedge]
+    if mode == "ww":
+        F = path[:-1, None]
+        sq = sig[None, :] * np.sqrt(tau[:, None])
+        d1 = (np.log(F / K[None, :]) + 0.5 * sq ** 2) / sq
+        gam = np.abs((w[None, :] * norm.pdf(d1) / (F * sq)).sum(1))
+        band = (1.5 * HEDGE_BP / 1e4 * path[:-1] * gam ** 2 / (x / (S0 * unit))) ** (1 / 3)
     cur, held = 0.0, np.empty(len(target))
     traded = 0.0
     for i, h in enumerate(target):
-        if i == 0 or (mode == "step" and i % x == 0) or (mode == "band" and abs(h - cur) > x * unit):
+        if i == 0 or (mode == "step" and i % x == 0) or (mode == "band" and abs(h - cur) > x * unit) or (mode == "ww" and abs(h - cur) > band[i]):
             traded += abs(h - cur) * path[i]
             cur = h
         held[i] = cur

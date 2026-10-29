@@ -1,0 +1,21 @@
+{
+ "synthetic_daily": {
+  "always": {
+   "mean": 0.16503595701235788,
+   "first_of_month_t": 1.9218935215031,
+   "first_of_month_n": 66,
+   "daily_blocks_t": 4.01133152342241,
+   "blocks": 67,
+   "daily_blocks_nw1_t": 3.7567160151628256
+  },
+  "gated": {
+   "mean": 0.1424211194724797,
+   "first_of_month_t": 2.4791529311789993,
+   "first_of_month_n": 66,
+   "daily_blocks_t": 4.547045525654524,
+   "blocks": 67,
+   "daily_blocks_nw1_t": 3.9771576836411735
+  },
+  "share_on": 0.6379052369077307
+ }
+}
