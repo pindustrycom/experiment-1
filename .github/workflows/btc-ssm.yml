@@ -1,0 +1,44 @@
+name: BTC state-space data
+
+# Research only, paper only (research/btc_ssm): collect public Bitcoin data for the hybrid state-space study (Binance
+# hourly BTCUSDT klines, the Crypto Fear & Greed index, Deribit's DVOL implied-vol index) and keep it as plain CSVs in
+# the "btc-ssm-data" release, so the models can be run anywhere. No keys, nothing traded, nothing deployed.
+
+on:
+  pull_request:
+    paths: ["research/btc_ssm/fetch.py", ".github/workflows/btc-ssm.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the data release
+
+concurrency:
+  group: btc-ssm-data
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: research/btc_ssm
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install numpy pandas requests
+      - name: Fetch
+        run: |
+          mkdir -p /tmp/out
+          python fetch.py /tmp/out
+          tar czf /tmp/btc-ssm-data.tar.gz -C /tmp/out .
+      - name: Publish to the data release
+        run: |
+          gh release view btc-ssm-data --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create btc-ssm-data --repo "$GITHUB_REPOSITORY" --title "BTC state-space data" \
+              --notes "Public Bitcoin data for research/btc_ssm (Binance 1h, Fear & Greed, DVOL). Research only."
+          gh release upload btc-ssm-data /tmp/btc-ssm-data.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
