@@ -149,3 +149,29 @@ variance against DVOL). It is the same kind of edge as Exp2's vol sleeve, the on
 edge tests, it is uncorrelated with Donchian, and it is t 3.1 here. Before any paper pot it needs a tradeable version:
 Deribit option strips or ATM straddles with real bid/ask from Deribit's history. Rough vol + jumps is the forecast to
 use for its 30-day sizing. A small variant worth paper-tracking cheaply is Donchian scaled by 30-day historical vol.
+
+# Round 3 (Oct 29): the volatility trade with real Deribit prices
+
+`vrp_trade.py`. On the 1st of each month at 00:10 UTC, sell the Deribit BTC expiry closest to 30 days at the real bid,
+delta-hedge daily in perpetuals (5 bp), and settle at Deribit's delivery price. The option chains with bid/ask come
+from Tardis.dev's free first-of-month files (`fetch_options.py`, `btc-ssm.yml`). Tardis rate-limits free downloads,
+so the data currently covers **45 months, 2021-04 to 2024-12**. The fetch resumes on each workflow run and adds the
+2025-26 months as the limits allow. P&L is in variance-swap strike units, comparable with round 2's (K - RV)/K.
+
+| version, 45 months | mean / month | t | winning months | worst |
+|---|---|---|---|---|
+| Synthetic swap at DVOL (round 2's trade, same dates) | +13.9% | 1.7 | 78% | -1.87 |
+| Strip (dK/K^2 OTM options, the variance-swap replication), at mid | +12.3% | 1.6 | 73% | -1.12 |
+| **Strip sold at bid + hedge costs (tradeable)** | **+9.3%** | **1.2** | **71%** | -1.16 |
+| ATM straddle sold at bid + hedge costs | +2.9% | 0.3 | 58% | -1.35 |
+
+- The tradeable strip keeps about 67% of the synthetic premium. The bid/ask spread costs about 2.9% of the strike a
+  month and hedging about 2.7%. The straddle keeps little: ATM vol is priced closer to fair, and the premium is in
+  the wings.
+- Capital view (one straddle per BTC of capital): 5.4%/yr, Sharpe 0.49, max DD -13.5%. The monthly correlation with
+  Donchian is -0.24 (Donchian Sharpe over the same windows: 0.74).
+- Losing months are the crash months: May 2021, May-Jun 2022, Nov 2022 (FTX), Mar 2023, Mar 2024, Aug 2024.
+- **Verdict:** the premium is real and survives real prices in sign, but with 45 monthly trades it is not
+  significant (t 1.2 tradeable, 1.7 even synthetic, against the project bar of 3.8). It does not justify a pot yet.
+  Monthly entries are the limit here: daily entries need the paid Tardis data (or a Deribit history export), which
+  would give about 30x the trades and settle the question.
