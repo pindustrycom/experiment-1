@@ -83,8 +83,8 @@ def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, 
     last = _last(rows)
     if last and last["date"] >= ds:
         return f"already at {last['date']}"
-    if key == crypto.KEY:
-        out = step_btc(rows, last, btc, d, ds)
+    if key in crypto.KEYS:
+        out = step_btc(rows, last, btc, d, ds, key)
         if not rows:
             pots.pop(key, None)
         return out
@@ -132,9 +132,11 @@ def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, 
     return f"{ds}: {ret:+.4%}, {len(new_w)} positions" + (f", stopped out: {' '.join(hit)}" if hit else "")
 
 
-def step_btc(rows: list[dict], last: dict | None, btc: pd.DataFrame | None, d: pd.Timestamp, ds: str) -> str:
-    """The BTC pot earns the 4-hour rule's equity change between the bars marked at the last and this US close."""
-    eq = crypto.run_rule(btc, stop=stops.STOPS.get(crypto.KEY)) if btc is not None and len(btc) > crypto.TREND else None
+def step_btc(rows: list[dict], last: dict | None, btc: pd.DataFrame | None, d: pd.Timestamp, ds: str, key: str = crypto.KEY) -> str:
+    """A BTC pot earns the 4-hour rule's equity change between the bars marked at the last and this US close (the
+    vol-sized pot with its sizes, crypto.VOL_KEY)."""
+    ok = btc is not None and len(btc) > crypto.TREND
+    eq = crypto.run_rule(btc, stop=stops.STOPS.get(key), size=key == crypto.VOL_KEY) if ok else None
     b = crypto.mark_bar(eq, d) if eq is not None else None
     if b is None:
         if not last:
@@ -143,7 +145,7 @@ def step_btc(rows: list[dict], last: dict | None, btc: pd.DataFrame | None, d: p
     else:
         prev = pd.Timestamp(last["bar"]) if last and last.get("bar") else None
         ret = float(eq.at[b, "equity"] / eq.at[prev, "equity"] - 1) if prev is not None and prev in eq.index else 0.0
-        w, bar = ({"BTC": 1.0} if eq.at[b, "after"] else {}), str(b)
+        w, bar = ({"BTC": round(float(eq.at[b, "w"]), 4)} if eq.at[b, "after"] else {}), str(b)
     idx = (last["index"] if last else 1.0) * (1 + ret)
     rows.append({"date": ds, "ret": ret, "index": idx, "w": w, "reb": False, "bar": bar})
     return f"{ds}: {ret:+.4%}, {'BTC' if w else 'cash'} after the bar opening {bar} UTC"

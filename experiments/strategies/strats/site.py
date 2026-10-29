@@ -32,7 +32,7 @@ def pct(v: float | None, sign: bool = True) -> str:
 
 
 def position_text(key: str, row: dict | None, events: dict) -> str:
-    if key == crypto.KEY:
+    if key in crypto.KEYS:
         return crypto.position_text(row)
     if not row:
         return "No positions yet: the first book is formed after the next close."
@@ -76,6 +76,11 @@ def _replay_block(key: str, rp: dict | None) -> str:
         return ('<p class="small muted">Backtest January 2019 to September 2026 (research/github_bots, Binance 4-hour bars): '
                 '+52.2% a year, Sharpe 1.28, worst drop -50%, against holding BTC +49.5%, 0.97, -77% at 10 bp a side; '
                 '+45.2% and Sharpe 1.15 at the 25 bp this pot pays. In BTC about 44% of the time.</p>')
+    if key == crypto.VOL_KEY:
+        return ('<p class="small muted">Backtest January 2019 to October 2026 with this pot\'s rules (Binance 4-hour bars, 25 bp a side, '
+                '6% daily stop): +53.8% a year, Sharpe 1.31, worst drop -40%, against the plain breakout pot +36.2%, 1.00, -50%. '
+                'From 2021: +18.7% a year against +7.6% (research/btc_ssm, round 2). Average size while in BTC is about 1x; '
+                'it holds up to 2x in calm stretches and as little as a third in wild ones.</p>')
     if key == "reversal_stop":
         return ('<p class="small muted">Replay 2019 to October 2026 with the 5% stop (research/stop_losses): +22.4% a year '
                 'against +28.1% without it; days below -5% fell from 23 to 11, worst day -17% (overnight gaps) against -24%.</p>')

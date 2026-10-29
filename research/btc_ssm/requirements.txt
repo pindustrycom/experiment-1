@@ -1,0 +1,7 @@
+numpy
+pandas
+requests
+scipy
+numba
+pytest
+ruff
