@@ -214,7 +214,7 @@ color:var(--text);background:linear-gradient(0deg,rgba(0,0,0,.8),rgba(0,0,0,0) 6
 .split.sub{min-height:440px;margin:26px 0 8px;border:1px solid var(--glass-line);border-radius:20px;overflow:hidden}
 .split.sub:has(>.half:target){min-height:0;margin:0;border:0;border-radius:0;overflow:visible}
 .sub .door h2{font-size:clamp(36px,5vw,64px)}.open .open .wrap{padding:0}
-.mk-pots td,.mk-pots th{padding:7px 8px;text-align:right;white-space:nowrap}.mk-pots td:first-child,.mk-pots th:first-child,.mk-pots td:nth-child(2),.mk-pots th:nth-child(2),.mk-pots td:nth-child(3),.mk-pots th:nth-child(3){text-align:left}
+.mk-pots td,.mk-pots th{padding:7px 8px;text-align:right;white-space:nowrap}.mk-pots td:first-child,.mk-pots th:first-child,.mk-pots td:nth-child(2),.mk-pots th:nth-child(2),.mk-pots .cat{text-align:left}
 .mk-pots{width:100%;border-collapse:collapse;font-size:14px}.mk-pots th{font-size:12px;color:var(--muted);font-weight:500}
 .mk-pots tr+tr td{border-top:1px solid var(--line)}.mk-pots tr.lead td{font-weight:650}.mk-pots td:first-child{color:var(--muted)}
 .big.best .name{font-size:clamp(20px,3vw,26px);font-weight:650;margin:2px 0 6px}.big.best .name a{color:var(--text)}.big.minor .v{font-size:28px}.big.best .d+.d{margin-top:4px}.door .lead{font-size:14px;color:var(--text)}.big.top3 .v{font-size:40px}.big.top3 .d+.d{margin-top:6px}.big.top3 .d a{color:var(--text)}.tag3{font-size:11px;font-weight:600;color:#a593d4;border:1px solid rgba(165,147,212,.5);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:1px}.mk-pots .cat{font-size:12px;color:var(--muted)}.tw{overflow-x:auto}
@@ -255,7 +255,7 @@ BANNER_CSS = """
 .pf .big{border:0;padding:0;margin:0 0 8px;background:none}
 .big .k{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .big .v{font-size:52px;font-weight:750;line-height:1.1;font-variant-numeric:tabular-nums}
-.big .d{color:var(--muted);font-size:14px}.big .d b{color:var(--text)}
+.big .d{color:var(--muted);font-size:14px}.big .d b{color:var(--text)}.big .d b.pos{color:var(--lo,#2e7d4f)}.big .d b.neg{color:var(--hi,#c0392b)}
 .big .pos,.card .pos{color:var(--lo,#2e7d4f)}.big .neg,.card .neg{color:var(--hi,#c0392b)}.pf .small{font-size:13px}
 .pos-line{font-size:14px;margin:6px 0}
 @media (max-width:520px){.big .v{font-size:40px}}
@@ -280,6 +280,11 @@ def cad(v: float, sign: bool = False) -> str:
 
 def pl_class(v: float) -> str:
     return "pos" if v > 0.005 else "neg" if v < -0.005 else ""
+
+
+def total_return(v: float) -> str:
+    """A pot's total return since it started, as a % of its CAPITAL."""
+    return f"{100 * (v - CAPITAL) / CAPITAL:+.2f}%"
 
 
 def value_chart(rows: list[dict], keys: list[tuple[str, str]], w: int = 760, h: int = 200) -> str:
@@ -310,7 +315,7 @@ def big_number(rows: list[dict], key: str, label: str, start: str | None = None)
     day = v - rows[-2][key] if len(rows) > 1 else 0.0
     since = start or rows[0]["date"]
     return (f'<div class="big"><div class="k">{e(label)}</div><div class="v {pl_class(pl)}">{cad(pl, True)}</div>'
-            f'<div class="d">Worth <b>{cad(v)}</b> ({100 * pl / CAPITAL:+.2f}%) · today <span class="{pl_class(day)}">{cad(day, True)}</span>'
+            f'<div class="d">Total return <b class="{pl_class(pl)}">{total_return(v)}</b> · worth <b>{cad(v)}</b> · today <span class="{pl_class(day)}">{cad(day, True)}</span>'
             f' · fake {CAPITAL:,.0f} CAD from {e(since)} · last update {e(rows[-1]["date"])}</div></div>')
 
 
@@ -367,8 +372,10 @@ def sleeve_card(t: dict, key: str, title: str, href: str, what: str, pos: str) -
     rows = t["rows"]
     v = rows[-1][key]
     pl = v - CAPITAL
+    since, _ = pot_since(rows, key)
     return (f'<div class="card"><div class="tag">{e(title)}</div><div class="v {pl_class(pl)}">{cad(pl, True)}</div>'
-            f'<div class="muted small">worth {cad(v)} ({100 * pl / CAPITAL:+.2f}%)</div><p>{what}</p><p class="small">{pos}</p>'
+            f'<div class="small">Total return <b class="{pl_class(pl)}">{total_return(v)}</b>'
+            f'<span class="muted"> since {e(since or rows[0]["date"])} · worth {cad(v)}</span></div><p>{what}</p><p class="small">{pos}</p>'
             f'<a class="go" href="{href}">Open →</a></div>')
 
 
@@ -451,7 +458,7 @@ def total_number(rows: list[dict], keys: list[str], label: str, since: str | Non
     day = v - sum(rows[-2][k] for k in keys) if len(rows) > 1 else 0.0
     pl = v - cap
     return (f'<div class="big{" minor" * minor}"><div class="k">{e(label)}</div><div class="v {pl_class(pl)}">{cad(pl, True)}</div>'
-            f'<div class="d">Worth <b>{cad(v)}</b> of {len(keys)} × {CAPITAL:,.0f} CAD ({100 * pl / cap:+.2f}%) · today '
+            f'<div class="d">Total return <b class="{pl_class(pl)}">{100 * pl / cap:+.2f}%</b> · worth <b>{cad(v)}</b> of {len(keys)} × {CAPITAL:,.0f} CAD · today '
             f'<span class="{pl_class(day)}">{cad(day, True)}</span> · since {e(since or rows[0]["date"])} · last update {e(rows[-1]["date"])}</div></div>')
 
 
@@ -490,14 +497,14 @@ def best_pot(rows: list[dict], pots: list[tuple]) -> str:
     if len(order) > 1:
         k2, label2, _, href2, *_ = order[1]
         pl2 = rows[-1][k2] - CAPITAL
-        nxt = f' · runner-up <a href="{href2}">{e(label2)}</a> <span class="{pl_class(pl2)}">{100 * pl2 / CAPITAL:+.2f}%</span>'
+        nxt = f' · runner-up <a href="{href2}">{e(label2)}</a> <span class="{pl_class(pl2)}">{total_return(rows[-1][k2])}</span>'
     notes = []
     if days < 60:
         notes.append(f'Only {days} trading day{"s" * (days != 1)} so far: a lead this young is mostly luck.')
     return (f'<div class="big best"><div class="k">Best strategy so far · {e(cat)}</div>'
             f'<div class="v {pl_class(pl)}">{cad(pl, True)}</div>'
-            f'<div class="name"><a href="{href}">{e(label)}</a> <span class="{pl_class(pl)}">{100 * pl / CAPITAL:+.2f}%</span></div>'
-            f'<div class="d">Worth <b>{cad(v)}</b> from {CAPITAL:,.0f} CAD on {e(since or rows[0]["date"])} · today '
+            f'<div class="name"><a href="{href}">{e(label)}</a> <span class="{pl_class(pl)}">{total_return(v)}</span></div>'
+            f'<div class="d">Total return <b class="{pl_class(pl)}">{total_return(v)}</b> · worth <b>{cad(v)}</b> from {CAPITAL:,.0f} CAD on {e(since or rows[0]["date"])} · today '
             f'<span class="{pl_class(day)}">{cad(day, True)}</span>{nxt} · last update {e(rows[-1]["date"])}</div>'
             + "".join(f'<div class="d small">{n}</div>' for n in notes) + "</div>")
 
@@ -516,10 +523,10 @@ def top3_box(rows: list[dict], pots: list[tuple], keys: list[str]) -> str:
             continue
         _, label, _, href, *_ = info[k]
         p = rows[-1][k] - CAPITAL
-        each.append(f'<a href="{href}">{e(label)}</a> <span class="mono {pl_class(p)}">{cad(rows[-1][k])} ({100 * p / CAPITAL:+.2f}%)</span>')
+        each.append(f'<a href="{href}">{e(label)}</a> <span class="mono {pl_class(p)}">{total_return(rows[-1][k])} ({cad(rows[-1][k])})</span>')
     return (f'<div class="big top3"><div class="k">Top 3 strategies together · concentrated pot</div>'
             f'<div class="v {pl_class(pl)}">{cad(pl, True)}</div>'
-            f'<div class="d">Worth <b>{cad(v)}</b> from {CAPITAL:,.0f} CAD ({100 * pl / CAPITAL:+.2f}%) · today '
+            f'<div class="d">Total return <b class="{pl_class(pl)}">{total_return(v)}</b> · worth <b>{cad(v)}</b> from {CAPITAL:,.0f} CAD · today '
             f'<span class="{pl_class(day)}">{cad(day, True)}</span> · last update {e(rows[-1]["date"])}</div>'
             f'<div class="d">Equal money in {e(", ".join(names[:-1]))} and {e(names[-1])}, evened out every Friday. '
             f'Each one on its own 1,000 CAD: {" · ".join(each)}</div>'
@@ -528,15 +535,16 @@ def top3_box(rows: list[dict], pots: list[tuple], keys: list[str]) -> str:
 
 
 def pots_table(rows: list[dict], pots: list[tuple], top: list[str] | None = None) -> str:
-    out = ['<div class="panel"><div class="tw"><table class="mk-pots"><tr><th>#</th><th>Pot</th><th class="cat">Holds for</th><th>Worth</th>'
-           '<th>Profit / loss</th><th>Today</th></tr>']
+    out = ['<div class="panel"><div class="tw"><table class="mk-pots"><tr><th>#</th><th>Pot</th><th>Total return</th><th class="cat">Holds for</th>'
+           '<th>Worth</th><th>Profit / loss</th><th>Today</th></tr>']
     for n, (k, label, cat, href, *_) in enumerate(ranked(rows, pots), 1):
         v = rows[-1][k]
         pl, day = v - CAPITAL, v - rows[-2][k] if len(rows) > 1 else 0.0
         tag = ' <span class="tag3">Top 3</span>' if k in (top or []) else ""
         out.append(f'<tr{" class=lead" * (n == 1 and pl_class(pl) == "pos")}><td class="mono">{n}</td><td><a href="{href}">{e(label)}</a>{tag}</td>'
+                   f'<td class="mono {pl_class(pl)}">{total_return(v)}</td>'
                    f'<td class="cat">{e(cat)}</td><td class="mono">{cad(v)}</td>'
-                   f'<td class="mono {pl_class(pl)}">{cad(pl, True)} ({100 * pl / CAPITAL:+.2f}%)</td>'
+                   f'<td class="mono {pl_class(pl)}">{cad(pl, True)}</td>'
                    f'<td class="mono {pl_class(day)}">{cad(day, True)}</td></tr>')
     return "".join(out) + "</table></div></div>"
 
@@ -568,7 +576,7 @@ def markets_body(t: dict) -> tuple[str, str]:
     for k, label, *_ in ranked(rows, pots)[:1]:
         pl = rows[-1][k] - CAPITAL
         stat = (f'<span class="k mono">Best strategy</span><span class="v mono {pl_class(pl)}">{cad(pl, True)}</span>'
-                f'<span class="lead"><b>{e(label)}</b> <span class="mono {pl_class(pl)}">{100 * pl / CAPITAL:+.2f}%</span>'
+                f'<span class="lead"><b>{e(label)}</b> <span class="mono {pl_class(pl)}">{total_return(rows[-1][k])}</span>'
                 + (f' · top 3 together <span class="mono {pl_class(t3)}">{cad(t3, True)}</span>' if top else
                    f' · all pots together <span class="mono {pl_class(total)}">{cad(total, True)}</span>') + '</span>')
     return head + f'<div class="split sub">{"".join(halves)}</div>', stat

@@ -170,6 +170,9 @@ def test_strategy_pots_split_long_and_short(tmp_path, fx):
     table = hub[hub.index("<table class=\"mk-pots\">"):]
     assert '<tr class=lead><td class="mono">1</td><td><a href="strategies/index.html#trend">' in table
     assert table.index("Trend following") < table.index("Weekly reversal")
+    # every pot's total return since it started, in its own column next to the name
+    assert "<th>Total return</th>" in table and 'Trend following</a></td><td class="mono pos">+2.01%</td>' in table
+    assert 'Total return <b class="pos">+2.01%</b><span class="muted"> since 2026-10-19' in hub
     door = hub[hub.index('id="markets"'):hub.index('class="open"')]
     assert 'Best strategy</span><span class="v mono pos">+20.10 CAD</span>' in door and "<b>Trend following</b>" in door
     assert "all pots together" in door

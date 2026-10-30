@@ -24,11 +24,11 @@ th:first-child,td:first-child{text-align:left}.scroll{overflow-x:auto}
 """
 
 
-def pct(v: float | None, sign: bool = True) -> str:
+def pct(v: float | None, sign: bool = True, digits: int = 1) -> str:
     if v is None:
         return "–"
     cls = "pos" if v > 0.00005 else "neg" if v < -0.00005 else ""
-    return f'<span class="{cls}">{v:+.1%}</span>' if sign else f"{v:.1%}"
+    return f'<span class="{cls}">{v:+.{digits}%}</span>' if sign else f"{v:.{digits}%}"
 
 
 def position_text(key: str, row: dict | None, events: dict) -> str:
@@ -138,7 +138,8 @@ def page(summary: dict, pots: dict, btc_live: str = "") -> str:
             since = (f' (replayed with the same rule up to the {e(rp_rows[-1]["date"])} close, using only what was known each day; '
                      f'traded live after that)') if rp_rows else ""
             parts.append(f'<section class="panel" id="{k}"><h3>{e(s["name"])}</h3><p class="muted">{e(s["what"])}</p>'
-                         f'<p class="small">Paper pot since {e(rows[0]["date"]) if rows else "the next close"}{since}: {pct(live)} in USD (the Markets page shows it in CAD)</p>'
+                         f'<p class="small">Total return since the {e(rows[0]["date"]) if rows else "next"} close: <b>{pct(live, digits=2)}</b> in USD{since} '
+                         f'(the Markets page shows it in CAD)</p>'
                          f'<p class="small">{e(s["position"])}</p>{btc_live if k == crypto.KEY else ""}{_replay_block(k, rp)}</section>')
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Strategy pots</title><style>{CSS}</style></head><body>
