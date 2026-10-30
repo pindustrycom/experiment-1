@@ -314,3 +314,42 @@ and fees. Rules are checked daily at 00:00 UTC.
 forecast picks, sold in the call wing (puts carry the crash gamma). Hold to expiry, keep size small, and let the gate
 handle vega risk. The deciding test is still the daily-chain rerun (`daily_entries.py`) once about three months of the
 `deribit-chains` release exist.
+
+# Round 7 (Oct 30): the call wing entered every day
+
+`daily_greeks.py`. Only one day of the daily Deribit chains exists so far (collection started 2026-10-30), so each
+day from 2021-04-01 to 2026-09 gets a rebuilt book: strikes, smile and bid spreads from the latest real first-of-month
+chain, IV level moved daily with DVOL (ATM IV = DVOL x that chain's ATM/DVOL ratio), real hourly BTC path, band-0.1
+hedge, Deribit fees, 30-day expiry. Rough-vol and HAR forecasts were regenerated with `sv_run.py` and match round 4's
+exactly. 2006 entries, scored on 67 non-overlapping 30-day blocks. Results in `results/daily_greeks.json`.
+
+**Check against the real chains.** On the 66 first-of-month days the rebuilt book's P&L correlates 0.92 with the
+real-chain P&L (theta 0.98, gamma 0.98), mean +12.6% vs +11.6% of the strike (gated +11.9% vs +11.3%). It is close,
+and about 1 point a month optimistic.
+
+| call wing, band 0.1, hold to expiry | days on | mean / entry | t (30-day blocks) | t, NW | first-of-month-only t |
+|---|---|---|---|---|---|
+| Always | 100% | +17.1% | 5.1 | 4.7 | 2.5 |
+| **Rough-vol gate** | 47% | +12.2% (+26.1% when on) | **5.7** | 4.9 | 4.5 |
+| HAR gate | 20% | +6.3% | 3.7 | 3.0 | 3.2 |
+
+- Daily entries settle the evidence question: both always-sell and gated clear the project's t 3.8 bar on their own,
+  without hanging on 28 monthly trades. Random gates with the same 47% of days beat the rough gate's t 1.2% of the time.
+- The 1st of the month was an unlucky entry day: always-sell earns +17.1% a trade across all days against +11.6% on
+  the 1st alone.
+- Greeks per entry: theta +1.08, gamma -0.83 always; gate on theta +1.07, gamma -0.76; gate off theta +1.09, gamma -0.89.
+  Same story as round 6, with 30x the entries.
+- By year, mean per entry (always / gated): 2021 +28% / +30%, 2022 +16% / +11%, 2023 +18% / +2%, 2024 +24% / +23%,
+  2025 +17% / +7%, 2026 -4% / +3%. 2026 is the first year always-sell loses; the gate keeps it slightly positive.
+- Capital (1/30 of one straddle-vega per BTC sold each day, P&L booked at expiry, monthly): always 16.3%/yr, Sharpe
+  2.4, max DD -3.0%; gated 12.3%/yr, Sharpe 2.3, max DD -1.0%. Booking at expiry hides mid-month marks, so the real
+  drawdowns are deeper (worst interim mark: -5.7x the strike always, -2.7x gated).
+
+**Exit rules, daily entries.** Every rule now loses to holding with significance: DVOL +10 stop (vs hold t -4.3
+always, -3.1 gated), 3-day realized-vol breach (-3.0 / -3.2), 2x loss stop (-2.3 / -1.0), and even 50% profit taking
+(-2.8 / -3.2). Hold to expiry.
+
+**Verdict.** The gated call wing passes on daily entries (t 5.7), but this is a rebuilt book on real data, not real
+daily quotes, and it runs about 1 point a month optimistic. The edge has shrunk to near zero in 2026. A paper pot
+is now reasonable. The real-quote rerun (`daily_entries.py` with the `deribit-chains` release) is still the final check
+once about 3 months exist.
