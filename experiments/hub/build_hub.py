@@ -53,6 +53,9 @@ CATALOG = [
      "Three quant studies run each night on the pots' own data: SPY, QQQ and IWM implied volatility surfaces worked back "
      "from option prices, market regimes found by K-Means and how every pot does in each, and the pots re-run through an "
      "event-driven backtest with next-open fills and real costs. Research only, no pot.", None),
+    ("btc_vol", MARKETS, "BTC volatility", "BTC volatility study · Kalman, GRU, Heston, rough vol, Deribit options",
+     "Can modelling Bitcoin's volatility make money? Five rounds of walk-forward tests: forecasts help size the BTC "
+     "breakout pot (now a live vol-sized pot) and time option selling, never predict direction.", EXPERIMENTS / "btc_vol"),
     ("trader_skill", MARKETS, "Copy-trading test", "trader-skill test · copying funds and Congress",
      "A backtest of the trader-skill Claude skills: copying 23 famous funds' 13F filings and every stock buy the House "
      "discloses, against SPY. Research only, no pot.", EXPERIMENTS / "trader_skill"),
