@@ -146,6 +146,7 @@ def main(panel: str, btc_csv: str, qqq_csv: str, out: Path) -> None:
     res = pd.DataFrame(rows)
     out.mkdir(parents=True, exist_ok=True)
     res.to_csv(out / "results.csv", index=False)
+    pd.DataFrame(curves).to_pickle(out / "daily_returns.pkl")
     eq = pd.DataFrame({k: 20 * (1 + v[v.index >= "2019-01-02"]).cumprod() for k, v in curves.items()})
     eq.to_csv(out / "equity_20usd_2019.csv", float_format="%.4f")
 

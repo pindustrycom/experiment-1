@@ -92,3 +92,39 @@ Rerun: download `prices.parquet`, `membership_intervals.parquet`, `no_trade_days
 github.com/Johnbrick123/sp500-data release `data`, and `papers-data.tar.gz` from this repo's `papers-data` release;
 `python panel.py SP500_DIR panel.pkl`; `python study.py panel.pkl BTC_DAILY.csv PAPERS/prices/QQQ.csv OUT_DIR`
 (BTC_DAILY = research/btc_ssm daily_returns.csv in project files). About 1 minute.
+
+## Parametrizing the randomness (`params.py`, `results/params.csv`)
+
+Joaquin's follow-up: luck is random, but a random process has parameters. Each rule's daily account return fitted
+as a random process (2000-2026, 5 bp a side): mean m, volatility s, growth after volatility drag g = m - s^2/2,
+Kelly bet f* = m/s^2 (best share of the account to put in; 0 or below means do not play), Student-t tail index
+(lower = fatter tails), and the lognormal odds of outcomes in one year.
+
+| Rule | Mean/day | Vol/day | Drag/day | Growth/day | Kelly bet | P(profit, 1 yr) | P(double, 1 yr) |
+|---|---|---|---|---|---|---|---|
+| Chase yesterday's #1 gainer | -14 bp | 4.4% | 10 bp | -24 bp | -0.74 | 19% | 3.1% |
+| Buy yesterday's #1 loser | -21 bp | 5.3% | 14 bp | -35 bp | -0.77 | 16% | 4.5% |
+| Most volatile stock | -6 bp | 5.7% | 16 bp | -23 bp | -0.19 | 27% | 8.9% |
+| Gap-and-go | -46 bp | 4.1% | 8 bp | -55 bp | -2.81 | 2% | 0.06% |
+| Gap down, +8% target, -4% stop | +8 bp | 3.5% | 6 bp | +1 bp | 0.62 | 53% | 11.7% |
+| Random stock (control) | -7 bp | 2.4% | 3 bp | -10 bp | -1.32 | 25% | 0.6% |
+| SPY hold | +4 bp | 1.2% | 1 bp | +3 bp | 2.66 | 66% | 0.07% |
+| QQQ hold | +5 bp | 1.7% | 1 bp | +3 bp | 1.65 | 62% | 1.1% |
+| 3x QQQ hold | +12 bp | 5.1% | 13 bp | -1 bp | 0.47 | 49% | 18.8% |
+| 3x QQQ above 200-day | +9 bp | 3.2% | 5 bp | +4 bp | 0.89 | 58% | 12.4% |
+
+What the parameters say:
+- **The 8% dream needs growth of 770 bp per trade** (ln 1.08). The best rule here grows 4 bp a day. The gap is
+  about 200x, not a tuning problem.
+- **Volatility is what makes winners visible.** The most volatile stock rule has the worst growth but a 9% chance
+  of doubling in a year, 15 times the random-stock control. Higher vol buys more lottery tickets and more losers;
+  it does not move the mean. This is how the lucky screenshots are produced.
+- **Kelly says no bet** on every stock-picking rule (f* < 0). For QQQ the parameters say about 1.6x leverage
+  maximises growth (model ~9.7%/yr log vs 8.2% at 1x and 3.1% at 3x before fees): 3x is past the Kelly point,
+  which is why plain 3x QQQ went to $12 from $20 since 2000. Kelly assumes the parameters are known and stable.
+- **Tails are fat** (t index 1.6-3.5; 2-3 means extreme days are far more common than a bell curve says), so the
+  lognormal odds understate both jackpots and wipe-outs. The simulation in `lucky.py` gives 0.9% doubling for
+  the random-stock trader against 0.6% from the lognormal.
+- **Parameters drift.** The same rules had positive means in 2025-26 and negative over 26 years. An estimate of
+  m from one year has a standard error of about s/sqrt(252) per day (~28 bp for a single stock), larger than the
+  edge being looked for, so a year of data cannot tell a +10 bp rule from a -10 bp one.
