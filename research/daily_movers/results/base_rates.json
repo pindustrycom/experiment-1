@@ -1,0 +1,15 @@
+{
+  "base": {
+    "member-days": 3302176,
+    "P(a member rises >= 8% next day)_%": 0.59,
+    "P(a member falls >= 8% next day)_%": 0.54,
+    "days with at least one member up >= 8%_%": 54.3,
+    "median #1 gainer move_%": 8.5
+  },
+  "breakeven_hit_rate_%_for_8%_wins": {
+    "loss 2%": 20.8,
+    "loss 4%": 34.7,
+    "loss 8%": 52.0
+  },
+  "100_wins_of_8%_compounded_x": 2200.0
+}
