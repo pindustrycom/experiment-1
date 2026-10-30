@@ -1,0 +1,7 @@
+251 days, 100000 no-skill traders starting with $20
+  ended above $  20: 31.74%  (31744 traders)
+  ended above $  40:  0.88%  (884 traders)
+  ended above $  60:  0.07%  (68 traders)
+  ended above $ 100:  0.01%  (5 traders)
+  ended above $ 200:  0.00%  (0 traders)
+  median $16.94, best $134.08, worst $3.81
