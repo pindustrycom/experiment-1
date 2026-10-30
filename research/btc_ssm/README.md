@@ -300,7 +300,7 @@ and fees. Rules are checked daily at 00:00 UTC.
 | Stop at 1x / 2x premium lost | +8.3% / +5.3% | never fires | | |
 | Exit when 3-day realized vol > 1.5x entry IV | +10.4% / 2.1 | +7.7% / 2.8 | -3.6% (t -2.3) | |
 
-- **No exit rule beats holding to expiry**, on any book, gated or not (every paired t is zero or negative). IV
+- **No exit rule beats holding to expiry**, on any book, gated or not (every paired t is negative except ungated 50% profit taking on the call wing, +0.7%, t 0.3). IV
   jumps in BTC mean-revert within the month, so a vega stop sells the spike and gives up the recovery. Worst case:
   the full strip in Feb 2026 (DVOL 48 -> 89) was marked at -3.0x the strike mid-month and finished at -0.54x; a 1x
   premium stop would have closed it at -3.09x.
