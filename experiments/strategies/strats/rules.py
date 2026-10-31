@@ -53,6 +53,9 @@ STRATEGIES = {
     "btc_donchian_vol": ("BTC breakout, vol-sized", SHORT_TERM, "The same Bitcoin breakout signal, but the position is sized "
                          "to a steady risk: 2.5% of daily volatility over BTC's past 30 days, up to 2x the pot when BTC is "
                          "calm and less in wild markets. See crypto.py."),
+    "straddle8": ("8% day straddles", SHORT_TERM, "Each close, buys at-the-money option straddles (a call and a put) on the 5 "
+                  "S&P 500 stocks the time-scale ladder rates most likely to move 8% the next day, either way, and sells them "
+                  "at the next close. 20% of the pot goes in, bought at the ask and sold at the bid. See straddle.py."),
 }
 
 

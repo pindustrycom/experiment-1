@@ -97,7 +97,7 @@ def test_replay_and_site(tmp_path):
     out = site.write(tmp_path, st, rp, {})
     assert out["sessions"] == 1
     head = (tmp_path / "data" / "daily.csv").read_text().splitlines()[0]
-    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,reversal_stop,btc_donchian,btc_donchian_vol"
+    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,reversal_stop,btc_donchian,btc_donchian_vol,straddle8"
     s = json.loads((tmp_path / "data" / "summary.json").read_text())
     assert s["strategies"]["pead"]["category"] == rules.LONG_TERM and "cash" in s["strategies"]["pead"]["position"]
     page = (tmp_path / "index.html").read_text()
@@ -395,3 +395,47 @@ def test_btc_tick_journals_a_trade_only_when_the_rule_flips(tmp_path):
     assert rows[0]["rule_price"] == pytest.approx(d.at[b + crypto.BAR, "open"])
     html = site._btc_live(rows, j)
     assert "123.00" in html and "Rule fill" in html
+
+
+def chain(d, spot, legs):
+    """A Cboe-like chain: legs = {(expiry, strike, type): (bid, ask)}."""
+    return pd.DataFrame([{"expiration": pd.Timestamp(x), "option_type": t, "strike": k, "bid": b, "ask": a, "iv": 0.5,
+                          "open_interest": 1, "volume": 1} for (x, k, t), (b, a) in legs.items()])
+
+
+def test_straddle_picks_atm_in_first_usable_expiry_and_sells_at_bid():
+    from strats import straddle
+    d = pd.Timestamp("2026-11-02")
+    legs = {("2026-11-03", 100, "call"): (2.0, 2.1), ("2026-11-03", 100, "put"): (2.0, 2.1),     # expires tomorrow: skipped
+            ("2026-11-06", 95, "call"): (6.0, 6.2), ("2026-11-06", 95, "put"): (1.0, 1.1),
+            ("2026-11-06", 100, "call"): (3.0, 3.2), ("2026-11-06", 100, "put"): (2.9, 3.1)}
+    s = straddle.pick_straddle(chain(d, 101, legs), 101.0, d)
+    assert s["expiry"] == "2026-11-06" and s["strike"] == 100 and abs(s["ask"] - 6.3) < 1e-9
+    wide = {k: (0.1, 3.0) for k in legs}
+    assert straddle.pick_straddle(chain(d, 101, wide), 101.0, d) is None           # spread too wide to trade
+    v, how = straddle.value_at_bid(s, chain(d, 110, {("2026-11-06", 100, "call"): (10.5, 10.7), ("2026-11-06", 100, "put"): (0.2, 0.3)}), 110.0)
+    assert how == "bid" and abs(v - 10.7) < 1e-9
+    v, how = straddle.value_at_bid(s, None, 92.0)
+    assert how == "exercise value" and v == 8.0
+
+
+def test_straddle_pot_steps_forward_only():
+    from strats import straddle
+    px = prices()
+    members = [c for c in px.columns if c.startswith("S")]
+    d0, d1 = px.index[-2], px.index[-1]
+    ranked = pd.Series([0.3, 0.2], index=["S01", "S02"])
+    exp = str((d1 + pd.Timedelta(days=7)).date())
+    c0 = {t: (chain(d0, 100, {(exp, 100, "call"): (2.9, 3.0), (exp, 100, "put"): (2.9, 3.0)}), 100.0, "x") for t in ranked.index}
+    st = {}
+    live.step(st, px.loc[:d0], d0, members, pd.DataFrame(), pd.DataFrame(), straddle_in={"ranked": ranked, "chains": c0})
+    row = st["pots"][straddle.KEY][0]
+    assert set(row["straddles"]) == {"S01", "S02"} and abs(sum(row["w"].values()) - straddle.ALLOC) < 1e-9
+    c1 = {"S01": (chain(d1, 108, {(exp, 100, "call"): (8.4, 8.6), (exp, 100, "put"): (0.0, 0.1)}), 108.0, "x"),
+          "S02": (chain(d1, 100, {(exp, 100, "call"): (1.4, 1.5), (exp, 100, "put"): (1.4, 1.5)}), 100.0, "x")}
+    live.step(st, px, d1, members, pd.DataFrame(), pd.DataFrame(), straddle_in={"ranked": ranked.iloc[:0], "chains": c1})
+    rows = st["pots"][straddle.KEY]
+    assert len(rows) == 2 and not rows[0].get("replayed")                         # never rebuilt from the origin
+    want = straddle.ALLOC / 2 * (8.4 / 6.0 - 1) + straddle.ALLOC / 2 * (2.8 / 6.0 - 1)
+    assert abs(rows[1]["ret"] - want) < 1e-9 and rows[1]["w"] == {}
+    assert "straddles sold" in site._straddle_log(rows)

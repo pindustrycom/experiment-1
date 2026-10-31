@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import copy, crypto, rules, stops
+from . import copy, crypto, rules, stops, straddle
 
 COST = 0.0001          # 1 bp of the traded amount, each side
 REPLAY_FROM = "2019-01-01"
@@ -27,6 +27,7 @@ EVENT_FRESH_DAYS = 7   # an earnings beat older than this when first seen is not
 # Every pot forms its first book at this close, the last one before the paper portfolios' start (experiments/hub/portfolio.py
 # START, 2026-10-19, when Exp1 began), so all pots are compared over the same days. A pot added later is replayed from here.
 ORIGIN = "2026-10-16"
+FORWARD_ONLY = {straddle.KEY}   # no history to replay (no free option price history): starts at its first live close
 
 
 def _last(rows: list[dict]) -> dict | None:
@@ -35,10 +36,11 @@ def _last(rows: list[dict]) -> dict | None:
 
 def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], earnings: pd.DataFrame, insiders: pd.DataFrame,
          cp: dict | None = None, btc: pd.DataFrame | None = None, origin: str = ORIGIN,
-         bars: dict[str, pd.DataFrame] | None = None) -> dict:
+         bars: dict[str, pd.DataFrame] | None = None, straddle_in: dict | None = None) -> dict:
     """Move every pot to the close of d. Safe to repeat: a pot already at d is left alone. A pot that does not reach back to
     the origin close (a new pot, or one added after the first) is first rebuilt from there, session by session, with only
-    what was known at each close; those rows are marked as replayed. bars: the day's open/low/high for the stop losses."""
+    what was known at each close; those rows are marked as replayed (except FORWARD_ONLY pots). bars: the day's
+    open/low/high for the stop losses. straddle_in: today's flags and option chains for the straddle pot (cli.py)."""
     pots = state.setdefault("pots", {k: [] for k in rules.STRATEGIES})
     state.setdefault("events", {"pead": {}, "insider": {}})
     state.setdefault("seen", {"pead": []})
@@ -48,10 +50,10 @@ def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], ear
     rep = {}
     for key in rules.STRATEGIES:
         rows = pots.get(key) or []
-        if o is not None and (not rows or rows[0]["date"] > o.strftime("%Y-%m-%d")):
+        if key not in FORWARD_ONLY and o is not None and (not rows or rows[0]["date"] > o.strftime("%Y-%m-%d")):
             if (done := catch_up(state, key, px, after, members, earnings, insiders, cp, btc, bars)):
                 rep[f"{key}_replayed"] = done
-        rep[key] = step_pot(state, key, px, d, ds, members, earnings, insiders, cp, btc, bars)
+        rep[key] = step_pot(state, key, px, d, ds, members, earnings, insiders, cp, btc, bars, straddle_in)
     state["seen"]["pead"] = state["seen"]["pead"][-3000:]
     firsts = [r[0]["date"] for r in pots.values() if r]
     if firsts:
@@ -76,7 +78,8 @@ def catch_up(state: dict, key: str, px: pd.DataFrame, sessions: pd.DatetimeIndex
 
 
 def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, members: list[str], earnings: pd.DataFrame,
-             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None, bars: dict | None = None) -> str:
+             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None, bars: dict | None = None,
+             straddle_in: dict | None = None) -> str:
     """Move one pot to the close of d."""
     pots, events, seen = state["pots"], state["events"], state["seen"]
     rows = pots.setdefault(key, [])
@@ -88,6 +91,12 @@ def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, 
         if not rows:
             pots.pop(key, None)
         return out
+    if key == straddle.KEY:
+        if straddle_in is None:
+            if not rows:
+                pots.pop(key, None)
+            return "no flags or option chains this run"
+        return straddle.step(rows, last, d, ds, straddle_in.get("ranked"), straddle_in.get("chains") or {})
     old_w = last["w"] if last else {}
     hold, hit = stops.held_return(old_w, px, bars, pd.Timestamp(last["date"]), d, stops.STOPS.get(key), COST) if last else (0.0, [])
     if key in copy.KEYS:

@@ -10,7 +10,7 @@ import html
 import json
 from pathlib import Path
 
-from . import crypto, rules
+from . import crypto, rules, straddle
 
 e = html.escape
 CSS = """
@@ -34,6 +34,8 @@ def pct(v: float | None, sign: bool = True, digits: int = 1) -> str:
 def position_text(key: str, row: dict | None, events: dict) -> str:
     if key in crypto.KEYS:
         return crypto.position_text(row)
+    if key == straddle.KEY:
+        return straddle.position_text(row)
     if not row:
         return "No positions yet: the first book is formed after the next close."
     w = row["w"]
@@ -124,6 +126,23 @@ def _btc_live(trades: list[dict], journal: dict | None) -> str:
             '<p class="small muted">The pot is valued on the rule\'s fills; the difference column shows what placing the trade at the live run cost or saved.</p>')
 
 
+def _straddle_log(rows: list[dict]) -> str:
+    """Every straddle sold so far: what it cost against the stock's price, how far the stock moved, and the result."""
+    done = [dict(t, sold=r["date"]) for r in rows for t in r.get("closed") or []]
+    if not done:
+        return '<p class="small muted">No straddles sold yet: the first ones are sold at the close after they are bought.</p>'
+    wins = sum(t["ret"] > 0 for t in done)
+    avg = sum(t["ret"] for t in done) / len(done)
+    body = "".join(f'<tr><td>{e(t["sold"])}</td><td>{e(t["ticker"])}</td><td>{t["strike"]:g} ({e(t["expiry"])})</td>'
+                   f'<td>{t["implied_move"]:.1%}</td><td>{"–" if t.get("stock_move") is None else f"{t['stock_move']:+.1%}"}</td>'
+                   f'<td>{t["p8"]:.0%}</td><td>{t["ret"]:+.0%}</td></tr>' for t in reversed(done[-60:]))
+    return (f'<p class="small">{len(done)} straddles sold, {wins} at a profit; average {avg:+.1%} each on its cost.</p>'
+            '<div class="scroll"><table><tr><th>Sold</th><th>Stock</th><th>Strike (expiry)</th><th>Cost, % of stock</th>'
+            '<th>Stock move</th><th>Flag P(8%)</th><th>Straddle</th></tr>' + body + "</table></div>"
+            '<p class="small muted">A straddle wins when the stock moves more than its cost in either direction. Bought at the '
+            'ask after the close, sold at the bid the next close (Cboe delayed quotes); a leg with no bid counts at its exercise value.</p>')
+
+
 def page(summary: dict, pots: dict, btc_live: str = "") -> str:
     rp = summary.get("replay")
     parts = []
@@ -140,7 +159,8 @@ def page(summary: dict, pots: dict, btc_live: str = "") -> str:
             parts.append(f'<section class="panel" id="{k}"><h3>{e(s["name"])}</h3><p class="muted">{e(s["what"])}</p>'
                          f'<p class="small">Total return since the {e(rows[0]["date"]) if rows else "next"} close: <b>{pct(live, digits=2)}</b> in USD{since} '
                          f'(the Markets page shows it in CAD)</p>'
-                         f'<p class="small">{e(s["position"])}</p>{btc_live if k == crypto.KEY else ""}{_replay_block(k, rp)}</section>')
+                         f'<p class="small">{e(s["position"])}</p>{btc_live if k == crypto.KEY else ""}'
+                         f'{_straddle_log(rows) if k == straddle.KEY else ""}{_replay_block(k, rp)}</section>')
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Strategy pots</title><style>{CSS}</style></head><body>
 <main class="wrap"><h1>Strategy pots</h1><p class="muted">{len(summary["strategies"])} rules, each traded every day on paper with its own
