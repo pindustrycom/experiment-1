@@ -30,15 +30,16 @@ def parse_yahoo_chart(payload: dict) -> pd.Series:
 
 
 def parse_yahoo_bars(payload: dict) -> pd.DataFrame:
-    """adj_close plus the day's open, low and high, adjusted by the same factor (for the stop losses, stops.py)."""
+    """adj_close plus the day's open, low and high, adjusted by the same factor (for the stop losses, stops.py), and the
+    volume (for the straddle pot's flags, straddle.py)."""
     adj = parse_yahoo_chart(payload)
     res = payload["chart"]["result"][0]
     q = res["indicators"]["quote"][0]
     dates = pd.to_datetime(res["timestamp"], unit="s", utc=True).tz_convert("America/New_York").normalize().tz_localize(None)
-    raw = pd.DataFrame({k: pd.Series(q.get(k), index=dates, dtype=float) for k in ("open", "low", "high", "close")})
+    raw = pd.DataFrame({k: pd.Series(q.get(k), index=dates, dtype=float) for k in ("open", "low", "high", "close", "volume")})
     raw = raw[~raw.index.duplicated(keep="last")].reindex(adj.index)
     f = adj / raw["close"]
-    return pd.DataFrame({"adj_close": adj, **{f"adj_{k}": raw[k] * f for k in ("open", "low", "high")}})
+    return pd.DataFrame({"adj_close": adj, **{f"adj_{k}": raw[k] * f for k in ("open", "low", "high")}, "volume": raw["volume"]})
 
 
 def fetch_yahoo(ticker: str, start: str = START) -> pd.DataFrame:
@@ -81,6 +82,18 @@ def load_bars(data: Path, tickers: list[str]) -> dict[str, pd.DataFrame]:
                 if f"adj_{k}" in df.columns:
                     cols[k][t] = df[f"adj_{k}"]
     return {k: pd.DataFrame(v).sort_index() for k, v in cols.items()}
+
+
+def load_volume(data: Path, tickers: list[str]) -> pd.DataFrame:
+    """Daily share volume, one column per ticker (empty for a cache written before it was kept)."""
+    cols = {}
+    for t in tickers:
+        f = data / "prices" / f"{t}.csv"
+        if f.exists():
+            df = pd.read_csv(f, index_col="date", parse_dates=["date"])
+            if "volume" in df.columns:
+                cols[t] = df["volume"][~df.index.duplicated(keep="last")]
+    return pd.DataFrame(cols).sort_index()
 
 
 def load_prices(data: Path, tickers: list[str]) -> pd.DataFrame:

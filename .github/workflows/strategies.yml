@@ -10,6 +10,7 @@ name: Strategy pots
 # trader-skill-data release and read with the trader-skill pack at the commit research/trader_skill reviewed.
 # The state and the price cache are saved to the "strategies-state" release (encrypted with state_crypt.sh, as the other
 # experiments), and the pages as strategies-site.tar.gz, which pages.yml puts under /strategies/ and into the Markets dashboard.
+# The 8% day straddles pot (straddle.py) also reads Cboe delayed option chains for the flagged stocks each close.
 # Then the Quant lab (strats/quant.py): today's SPY, QQQ and IWM option chains from Cboe (kept 30 days in the state), the
 # implied vol surfaces worked back from them, K-Means market regimes with every replayed pot scored by regime, and the trend
 # and reversal pots through an event-driven backtest. Its page is saved as quant-site.tar.gz, which pages.yml puts under /quant/.

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import copy, copy_data, crypto, data, live, rules, site, stops
+from . import copy, copy_data, crypto, data, live, rules, site, stops, straddle
 
 
 def closed(px: pd.DataFrame, now: pd.Timestamp | None = None) -> pd.DataFrame:
@@ -60,7 +60,21 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
         rep["btc"] = crypto.update(data_dir)
     state = live.load_state(state_f)
     btc = crypto.load(data_dir)
-    rep["step"] = live.step(state, px, d, members, earnings, insiders, cp, btc, bars=bars)
+    straddle_in = None
+    try:
+        ranked = straddle.flags(bars, data.load_volume(data_dir, tickers), px, d, members)
+        last = (state.get("pots", {}).get(straddle.KEY) or [None])[-1]
+        if last and last["date"] >= str(d.date()):
+            names = []
+        else:
+            names = straddle.tickers_needed(last, ranked)
+        chains = straddle.fetch_chains(names) if fetch else {}
+        straddle_in = {"ranked": ranked, "chains": chains}
+        rep["straddle_flags"] = {t: round(float(p), 4) for t, p in ranked.head(straddle.SCAN).items()}
+        rep["straddle_chains"] = {t: (f"{c[2]}: {len(c[0])} contracts" if c else "none") for t, c in chains.items()}
+    except Exception as ex:  # noqa: BLE001 - the other pots still trade
+        rep["straddle_flags"] = f"failed: {type(ex).__name__}: {str(ex)[:300]}"
+    rep["step"] = live.step(state, px, d, members, earnings, insiders, cp, btc, bars=bars, straddle_in=straddle_in)
     rep["what_moved"] = {str(x.date()): stops.explain(state, px, x) for x in px.index[-2:]}
     if os.environ.get("STOP_BACKTEST"):       # pull requests: how the stop levels would have done since 2019
         try:
