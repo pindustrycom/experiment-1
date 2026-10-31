@@ -88,3 +88,33 @@ call-wing gate, which already earn from volatility forecasts.
 
 Rerun: `python bars.py EXP7_DIR SPY bars.pkl; python ladder.py bars.pkl OUT; python gru.py OUT; python trade.py OUT`
 (EXP7_DIR = exp7-data.tar.gz from this repo's exp7-data release; numba, scipy, torch; ~4 min on 4 cores).
+
+## Can the ladder flag the 8% days? (`big8.py`, `sign_check.py`, `results/big8.json`)
+
+Joaquin's follow-up: there must be something in the month-to-minute idea that can point at the 8% days. Test on
+every point-in-time S&P 500 stock-day (daily OHLC 2000-2026; intraday high-low range as the finest layer),
+train 2000-2015, test 2016-2026 (1.36 million stock-days, 0.97% of which move 8%+ either way).
+
+**1. Size: yes, strongly.** The volatility ladder (day, week, month, quarter variance of the stock, the
+intraday range, volume, the earnings cycle ~63 days back, the market's own volatility) ranks the 8% days with
+AUC 0.89 (vol alone 0.82). The weekly and monthly layers carry most of it (30% and 28% of the model's gain).
+
+| Flag | P(moves 8%+ either way) | P(up 8%+) | P(down 8%+) | Up share |
+|---|---|---|---|---|
+| Any stock-day | 0.97% | ~0.5% | ~0.5% | ~51% |
+| Top 10% of stock-days by forecast | 6.8% | | | |
+| The #1 flagged stock each day | **14.6%** (15x the base rate) | 6.7% | 7.9% | 48% |
+| Top 5 flagged each day | 10.0% | 4.9% | 5.1% | 50% |
+
+**2. Sign: no.** The flagged stock is as likely to fall 8% as to rise 8%. Given that a flagged move *did*
+happen, a little is predictable (AUC 0.56; after a down day for the market or the stock, the big move is more
+often up, a rebound), but you do not know in advance which flagged day will be the big one. Turned into a trade,
+buying the flagged stock with the best up-score each day: 2,299 trades 2016-2026, 49% winners, -5 bp a trade
+(t -0.4); the full model version took $20 to $0 vs $91 for SPY.
+
+**3. Where it could pay: options, untested.** A ladder that knows *when* a big move is likely but not *which way*
+is exactly what an option straddle (a call plus a put) bets on, and the size-given-big-move tilt is what a
+call bets on. The #1 flagged stock moves 4.5% on average (absolute) against 1.4% for a typical stock-day. Whether
+that beats the option prices depends on implied volatility, which already includes known earnings dates and
+usually sits above realized volatility. No free history of stock option prices exists, so this can only be tested
+going forward, by recording option chains for the flagged names each evening.
