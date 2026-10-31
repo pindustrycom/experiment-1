@@ -1,0 +1,99 @@
+{
+ "stock_days": 2858,
+ "with_headlines": 2111,
+ "big_days": 273,
+ "median_headlines": 3.0,
+ "all": {
+  "n": 2858,
+  "big": 273,
+  "sentiment": {
+   "auc_up_vs_down_on_big_days": 0.604,
+   "n_big": 224,
+   "corr_next_ret_all": 0.054,
+   "t_corr": 2.46,
+   "right_side_on_big_days_%": 54.9,
+   "nonzero_%": 94.2
+  },
+  "lean": {
+   "auc_up_vs_down_on_big_days": 0.614,
+   "n_big": 224,
+   "corr_next_ret_all": 0.068,
+   "t_corr": 3.11,
+   "right_side_on_big_days_%": 44.2,
+   "nonzero_%": 73.7
+  },
+  "words": {
+   "auc_up_vs_down_on_big_days": 0.608,
+   "n_big": 118,
+   "corr_next_ret_all": 0.026,
+   "t_corr": 0.87,
+   "right_side_on_big_days_%": 55.9,
+   "nonzero_%": 92.4
+  },
+  "P(8%)_if_earnings_soon_%": 50.0,
+  "P(8%)_otherwise_%": 9.5,
+  "earnings_soon_share_%": 0.2
+ },
+ "2019-2023": {
+  "n": 2039,
+  "big": 181,
+  "sentiment": {
+   "auc_up_vs_down_on_big_days": 0.588,
+   "n_big": 136,
+   "corr_next_ret_all": 0.045,
+   "t_corr": 1.67,
+   "right_side_on_big_days_%": 51.5,
+   "nonzero_%": 92.6
+  },
+  "lean": {
+   "auc_up_vs_down_on_big_days": 0.609,
+   "n_big": 136,
+   "corr_next_ret_all": 0.067,
+   "t_corr": 2.47,
+   "right_side_on_big_days_%": 38.2,
+   "nonzero_%": 64.7
+  },
+  "words": {
+   "auc_up_vs_down_on_big_days": 0.611,
+   "n_big": 53,
+   "corr_next_ret_all": 0.021,
+   "t_corr": 0.51,
+   "right_side_on_big_days_%": 56.6,
+   "nonzero_%": 90.6
+  },
+  "P(8%)_if_earnings_soon_%": null,
+  "P(8%)_otherwise_%": 8.9,
+  "earnings_soon_share_%": 0.0
+ },
+ "2024+": {
+  "n": 819,
+  "big": 92,
+  "sentiment": {
+   "auc_up_vs_down_on_big_days": 0.617,
+   "n_big": 88,
+   "corr_next_ret_all": 0.064,
+   "t_corr": 1.75,
+   "right_side_on_big_days_%": 60.2,
+   "nonzero_%": 96.6
+  },
+  "lean": {
+   "auc_up_vs_down_on_big_days": 0.602,
+   "n_big": 88,
+   "corr_next_ret_all": 0.069,
+   "t_corr": 1.88,
+   "right_side_on_big_days_%": 53.4,
+   "nonzero_%": 87.5
+  },
+  "words": {
+   "auc_up_vs_down_on_big_days": 0.61,
+   "n_big": 65,
+   "corr_next_ret_all": 0.024,
+   "t_corr": 0.55,
+   "right_side_on_big_days_%": 55.4,
+   "nonzero_%": 93.8
+  },
+  "P(8%)_if_earnings_soon_%": 50.0,
+  "P(8%)_otherwise_%": 10.9,
+  "earnings_soon_share_%": 0.7
+ }
+}

@@ -27,7 +27,7 @@ EVENT_FRESH_DAYS = 7   # an earnings beat older than this when first seen is not
 # Every pot forms its first book at this close, the last one before the paper portfolios' start (experiments/hub/portfolio.py
 # START, 2026-10-19, when Exp1 began), so all pots are compared over the same days. A pot added later is replayed from here.
 ORIGIN = "2026-10-16"
-FORWARD_ONLY = {straddle.KEY}   # no history to replay (no free option price history): starts at its first live close
+FORWARD_ONLY = set(straddle.KEYS)   # no history to replay (no free option price history): starts at its first live close
 
 
 def _last(rows: list[dict]) -> dict | None:
@@ -91,12 +91,13 @@ def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, 
         if not rows:
             pots.pop(key, None)
         return out
-    if key == straddle.KEY:
+    if key in straddle.KEYS:
         if straddle_in is None:
             if not rows:
                 pots.pop(key, None)
             return "no flags or option chains this run"
-        return straddle.step(rows, last, d, ds, straddle_in.get("ranked"), straddle_in.get("chains") or {})
+        leans = (straddle_in.get("leans") or {}) if key == straddle.NEWS_KEY else None
+        return straddle.step(rows, last, d, ds, straddle_in.get("ranked"), straddle_in.get("chains") or {}, leans)
     old_w = last["w"] if last else {}
     hold, hit = stops.held_return(old_w, px, bars, pd.Timestamp(last["date"]), d, stops.STOPS.get(key), COST) if last else (0.0, [])
     if key in copy.KEYS:

@@ -1,0 +1,54 @@
+name: News on flagged days
+
+# Research only, paper only (research/timescale_ladder/news): for each stock-day the 8% flag model ranked top 2
+# (flagged.csv, 2019+), fetch the Google News headlines from the 3 days before that day's close, score them with
+# Claude Haiku and a word list, and test whether the news tells an 8% rise from an 8% fall. Results are kept in the
+# "news-flags-data" release (resumable: each run continues where the last stopped). Nothing is traded or deployed.
+
+on:
+  pull_request:
+    paths: ["research/timescale_ladder/news/**", ".github/workflows/news-flags.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the data release
+
+concurrency:
+  group: news-flags-data
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+    defaults:
+      run:
+        working-directory: research/timescale_ladder/news
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install pandas numpy requests anthropic
+      - name: Restore earlier scores
+        run: |
+          mkdir -p /tmp/out
+          gh release download news-flags-data -p scores.jsonl -D /tmp/out || echo "no earlier scores"
+      - name: Collect and score headlines
+        timeout-minutes: 280
+        continue-on-error: true   # whatever was scored is still saved; the next run resumes
+        run: python collect.py flagged.csv /tmp/out --max-minutes 260 --budget-usd 3
+      - name: Evaluate
+        if: always()
+        run: |
+          python evaluate.py flagged.csv /tmp/out/scores.jsonl /tmp/out/results.json
+          { echo '```json'; cat /tmp/out/results.json; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - name: Save to release
+        if: always()
+        run: |
+          gh release view news-flags-data >/dev/null 2>&1 || gh release create news-flags-data --title "News on flagged days (research data)" --notes "Headlines and scores for research/timescale_ladder/news. Paper research only."
+          gh release upload news-flags-data /tmp/out/scores.jsonl /tmp/out/results.json --clobber

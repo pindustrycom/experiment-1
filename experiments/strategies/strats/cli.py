@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import copy, copy_data, crypto, data, live, rules, site, stops, straddle
+from . import copy, copy_data, crypto, data, live, news, rules, site, stops, straddle
 
 
 def closed(px: pd.DataFrame, now: pd.Timestamp | None = None) -> pd.DataFrame:
@@ -63,13 +63,15 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     straddle_in = None
     try:
         ranked = straddle.flags(bars, data.load_volume(data_dir, tickers), px, d, members)
-        last = (state.get("pots", {}).get(straddle.KEY) or [None])[-1]
-        if last and last["date"] >= str(d.date()):
-            names = []
-        else:
-            names = straddle.tickers_needed(last, ranked)
+        names = []
+        for k in straddle.KEYS:
+            last = (state.get("pots", {}).get(k) or [None])[-1]
+            if not (last and last["date"] >= str(d.date())):
+                names += [t for t in straddle.tickers_needed(last, ranked) if t not in names]
         chains = straddle.fetch_chains(names) if fetch else {}
-        straddle_in = {"ranked": ranked, "chains": chains}
+        leans = news.leans(straddle.book_names(ranked, chains, d), d) if fetch and names else {}
+        straddle_in = {"ranked": ranked, "chains": chains, "leans": leans}
+        rep["straddle_news"] = leans or "no news leans (no ANTHROPIC_API_KEY, or nothing to buy)"
         rep["straddle_flags"] = {t: round(float(p), 4) for t, p in ranked.head(straddle.SCAN).items()}
         rep["straddle_chains"] = {t: (f"{c[2]}: {len(c[0])} contracts" if c else "none") for t, c in chains.items()}
     except Exception as ex:  # noqa: BLE001 - the other pots still trade
