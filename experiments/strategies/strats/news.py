@@ -2,8 +2,7 @@
 the company's name and ticker replaced by "the company", read by Claude Haiku for which way a big move is more likely.
 
 The same reading as the study in research/timescale_ladder/news (collect.py), where on 2019-2026 flagged days that moved
-8%+ it told rises from falls with AUC ~0.6, holding after the stock's own recent returns. Calls the Messages API with
-requests (no SDK). Any failure gives no lean, and that name is bought as a plain straddle.
+8%+ it told rises from falls with AUC ~0.6, holding after the stock's own recent returns. Uses the anthropic SDK. Any failure gives no lean, and that name is bought as a plain straddle.
 """
 from __future__ import annotations
 
@@ -73,21 +72,22 @@ def headlines(name: str, ticker: str, d: pd.Timestamp) -> list[str]:
     return [mask(t, name, ticker) for _, t in sorted(items, reverse=True)[:25]]
 
 
-def read(titles: list[str], key: str) -> dict:
+def read(titles: list[str], client) -> dict:
+    """Haiku's reading of the headlines (the same call as the study's collect.py, through the SDK)."""
     msg = "<headlines>\n" + "\n".join(f"- {t}" for t in titles) + "\n</headlines>"
-    r = requests.post("https://api.anthropic.com/v1/messages", timeout=60,
-                      headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-                      json={"model": MODEL, "max_tokens": 200, "system": SYSTEM, "messages": [{"role": "user", "content": msg}]})
-    r.raise_for_status()
-    txt = "".join(b.get("text", "") for b in r.json().get("content", []))
+    resp = client.messages.create(model=MODEL, max_tokens=300, system=SYSTEM, messages=[{"role": "user", "content": msg}])
+    txt = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
+    if "{" not in txt:
+        raise ValueError(f"no JSON in the answer (stop {resp.stop_reason}): {txt[:200]!r}")
     return json.loads(txt[txt.find("{"): txt.rfind("}") + 1])
 
 
 def leans(tickers: list[str], d: pd.Timestamp) -> dict[str, dict]:
     """ticker -> {"lean", "sentiment", "n"} for each name; {} without ANTHROPIC_API_KEY."""
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    if not key or not tickers:
+    if not os.environ.get("ANTHROPIC_API_KEY") or not tickers:
         return {}
+    import anthropic
+    client = anthropic.Anthropic(timeout=60, max_retries=3)
     try:
         nm = company_names(os.environ.get("SEC_USER_AGENT") or "experiment-1 research admin@example.com")
     except Exception as ex:  # noqa: BLE001 - fall back to tickers
@@ -97,11 +97,11 @@ def leans(tickers: list[str], d: pd.Timestamp) -> dict[str, dict]:
     for t in tickers:
         try:
             titles = headlines(nm.get(t, t), t, d)
-            js = read(titles, key) if titles else {}
+            js = read(titles, client) if titles else {}
             out[t] = {"lean": _num(js.get("lean")), "sentiment": _num(js.get("sentiment")), "n": len(titles)}
         except Exception as ex:  # noqa: BLE001 - one name without news is bought as a plain straddle
             log.warning("news %s: %s", t, ex)
-            out[t] = {"lean": None, "sentiment": None, "n": 0}
+            out[t] = {"lean": None, "sentiment": None, "n": 0, "error": f"{type(ex).__name__}: {str(ex)[:200]}"}
         time.sleep(1.0)
     return out
 
