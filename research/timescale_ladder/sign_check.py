@@ -7,7 +7,7 @@ import numpy as np, pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 import big8, lightgbm as lgb
-D = big8.build(pd.read_pickle("sys.argv[1]"))
+D = big8.build(pd.read_pickle(sys.argv[1]))
 cols = sorted(set(big8.SIZE + big8.SIGN[:-1])); D[cols] = D[cols].replace([np.inf, -np.inf], np.nan); D = D.dropna(subset=cols)
 tr, te = D.date < big8.TEST, D.date >= big8.TEST
 gb = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.05, num_leaves=31, min_child_samples=500, subsample=0.5, subsample_freq=1, colsample_bytree=0.8, verbose=-1).fit(D.loc[tr, big8.SIZE], D.loc[tr, "big"])

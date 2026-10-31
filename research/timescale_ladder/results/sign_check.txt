@@ -1,17 +1,16 @@
-Traceback (most recent call last):
-  File "/home/claude/experiment-1/research/timescale_ladder/sign_check.py", line 10, in <module>
-    D = big8.build(pd.read_pickle("sys.argv[1]"))
-                   ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.13/dist-packages/pandas/io/pickle.py", line 220, in read_pickle
-    with get_handle(
-         ~~~~~~~~~~^
-        filepath_or_buffer,
-        ^^^^^^^^^^^^^^^^^^^
-    ...<3 lines>...
-        storage_options=storage_options,
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    ) as handles:
-    ^
-  File "/usr/local/lib/python3.13/dist-packages/pandas/io/common.py", line 939, in get_handle
-    handle = open(handle, ioargs.mode)
-FileNotFoundError: [Errno 2] No such file or directory: 'sys.argv[1]'
+coef {'r_d': np.float64(-0.034), 'r_w': np.float64(0.022), 'r_m': np.float64(0.06), 'r_y': np.float64(-0.073), 'gap': np.float64(0.005), 'dist_hi': np.float64(-0.149), 'spy_r_d': np.float64(-0.064), 'spy_r_w': np.float64(-0.364), 'vrel_d': np.float64(0.128), 'lrv_d': np.float64(-0.078), 'lrv_m': np.float64(0.093), 'abs_r_q': np.float64(-0.037)}
+AUC sign|big logit 0.564
+r_d 0.404
+r_w 0.482
+r_m 0.46
+r_y 0.467
+gap 0.426
+dist_hi 0.405
+spy_r_d 0.348
+spy_r_w 0.499
+vrel_d 0.417
+lrv_d 0.514
+lrv_m 0.582
+abs_r_q 0.483
+buy flagged with best up-score: 2299 avg bp -5.1 t -0.37 win 49.3
+short flagged with worst up-score: -9.6 t -0.95
