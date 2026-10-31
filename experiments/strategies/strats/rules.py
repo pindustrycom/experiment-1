@@ -56,6 +56,10 @@ STRATEGIES = {
     "straddle8": ("8% day straddles", SHORT_TERM, "Each close, buys at-the-money option straddles (a call and a put) on the 5 "
                   "S&P 500 stocks the time-scale ladder rates most likely to move 8% the next day, either way, and sells them "
                   "at the next close. 20% of the pot goes in, bought at the ask and sold at the bid. See straddle.py."),
+    "straddle8_news": ("8% day straddles, news-tilted", SHORT_TERM, "The same 5 flagged stocks and terms as the 8% day "
+                       "straddles, but where the day's headlines (read by Claude Haiku before the close) lean one way it holds "
+                       "2 options on that side and 1 on the other (2 calls + 1 put on good news, 1 call + 2 puts on bad). "
+                       "Tests whether news, which told 8% rises from falls about 60% of the time since 2019, pays. See straddle.py."),
 }
 
 

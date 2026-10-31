@@ -11,6 +11,11 @@ layers, fitted on the point-in-time S&P 500 2000-2026; train_flag.py in the stud
 chain on Cboe's delayed quotes, and buy one at-the-money straddle on each in the nearest expiry at least MIN_DTE days
 out, at the ask. At the next close, sell at the bid (a missing or zero bid is valued at what the options are worth if
 exercised). ALLOC of the pot goes into the straddles each day, split equally; the rest stays in cash.
+
+The news-tilted twin (NEWS_KEY) buys the same names on the same terms, but where today's headlines lean one way
+(news.py, |lean| >= TILT_AT) it holds two of that side's option and one of the other: 2 calls + 1 put on a lean up,
+1 call + 2 puts on a lean down. The news study (research/timescale_ladder/news) found headlines tell an 8% rise from
+an 8% fall with AUC ~0.6; this pot tests whether that pays after option prices.
 """
 from __future__ import annotations
 
@@ -27,6 +32,9 @@ from . import surface
 
 log = logging.getLogger(__name__)
 KEY = "straddle8"
+NEWS_KEY = "straddle8_news"
+KEYS = (KEY, NEWS_KEY)
+TILT_AT = 0.2            # |news lean| from which the news pot doubles one side
 TOP_N = 5                # straddles bought each close
 SCAN = 15                # flagged names tried, best first, until TOP_N have a usable chain
 ALLOC = 0.20             # share of the pot in straddles each day
@@ -117,18 +125,21 @@ def pick_straddle(ch: pd.DataFrame, spot: float, d: pd.Timestamp) -> dict | None
         if mid <= 0 or (ask - bid) / mid > MAX_SPREAD:
             return None
         return {"expiry": str(pd.Timestamp(exp).date()), "strike": k, "spot": round(spot, 4), "ask": round(ask, 4),
-                "bid": round(bid, 4), "implied_move": round(ask / spot, 4)}
+                "bid": round(bid, 4), "implied_move": round(ask / spot, 4),
+                "call_ask": round(float(both.at[k, ("ask", "call")]), 4), "put_ask": round(float(both.at[k, ("ask", "put")]), 4)}
     return None
 
 
 def value_at_bid(pos: dict, ch: pd.DataFrame | None, spot: float | None) -> tuple[float, str]:
-    """What the held straddle sells for now: both legs at the bid, or what they are worth if exercised if a bid is missing."""
-    intrinsic = abs(spot - pos["strike"]) if spot is not None else None
+    """What the held straddle sells for now: both legs at the bid, or what they are worth if exercised if a bid is missing.
+    A tilted position holds pos["calls"] calls and pos["puts"] puts (1 and 1 when absent)."""
+    nc, npu = pos.get("calls", 1), pos.get("puts", 1)
+    intrinsic = (nc * max(spot - pos["strike"], 0) + npu * max(pos["strike"] - spot, 0)) if spot is not None else None
     if ch is not None:
         g = ch[(ch["expiration"] == pd.Timestamp(pos["expiry"])) & (np.isclose(ch["strike"], pos["strike"]))]
         bids = {t: g.loc[g["option_type"] == t, "bid"] for t in ("call", "put")}
         if all(len(b) and pd.notna(b.iloc[0]) for b in bids.values()):
-            v = float(bids["call"].iloc[0] + bids["put"].iloc[0])
+            v = float(nc * bids["call"].iloc[0] + npu * bids["put"].iloc[0])
             if v > 0 or intrinsic is None:
                 return max(v, intrinsic or 0.0), "bid"
     if intrinsic is not None:
@@ -136,10 +147,31 @@ def value_at_bid(pos: dict, ch: pd.DataFrame | None, spot: float | None) -> tupl
     return pos["ask"], "no quote: carried at cost"
 
 
+def tilt(s: dict, lean: dict | None) -> dict:
+    """The news pot's version of straddle s: two of the side the news leans to, one of the other; cost at the asks."""
+    x = (lean or {}).get("lean")
+    nc, npu = (2, 1) if x is not None and x >= TILT_AT else (1, 2) if x is not None and x <= -TILT_AT else (1, 1)
+    ask = nc * s["call_ask"] + npu * s["put_ask"] if "call_ask" in s else s["ask"]
+    return {**s, "calls": nc, "puts": npu, "ask": round(ask, 4), "implied_move": round(ask / s["spot"], 4),
+            "lean": x, "headlines": (lean or {}).get("n", 0)}
+
+
+def book_names(ranked: pd.Series | None, chains: dict[str, tuple | None], d: pd.Timestamp) -> list[str]:
+    """The TOP_N names bought this close (best flagged first, with a usable straddle)."""
+    out = []
+    for t in (ranked.index[:SCAN] if ranked is not None else []):
+        c = chains.get(t)
+        if c and pick_straddle(c[0], c[1], d):
+            out.append(t)
+        if len(out) >= TOP_N:
+            break
+    return out
+
+
 def step(rows: list[dict], last: dict | None, d: pd.Timestamp, ds: str, ranked: pd.Series | None,
-         chains: dict[str, tuple | None]) -> str:
+         chains: dict[str, tuple | None], leans: dict[str, dict] | None = None) -> str:
     """Sell yesterday's straddles at the bid, then buy today's. chains: ticker -> fetch_chain() result for every name
-    held or scanned this close."""
+    held or scanned this close. leans (news pot only): ticker -> news.leans() entry; the book is tilted by it."""
     trades, ret = [], 0.0
     for t, pos in (last or {}).get("straddles", {}).items():
         c = chains.get(t)
@@ -156,6 +188,8 @@ def step(rows: list[dict], last: dict | None, d: pd.Timestamp, ds: str, ranked: 
         s = pick_straddle(c[0], c[1], d) if c else None
         if s:
             book[t] = {**s, "p8": round(float(ranked[t]), 4)}
+            if leans is not None:
+                book[t] = tilt(book[t], leans.get(t))
     for s in book.values():
         s["alloc"] = round(ALLOC / len(book), 6)
     idx = (last["index"] if last else 1.0) * (1 + ret)
@@ -184,6 +218,13 @@ def position_text(row: dict | None) -> str:
     b = row.get("straddles") or {}
     if not b:
         return f"In cash after the {row['date']} close: no flagged stock had a usable option chain."
-    legs = ", ".join(f"{t} {s['strike']:g} ({s['expiry']}, costs {s['implied_move']:.1%} of the stock, P(8% move) {s['p8']:.0%})"
-                     for t, s in b.items())
+    legs = ", ".join(f"{t} {s['strike']:g} ({s['expiry']}, {_legs(s)}costs {s['implied_move']:.1%} of the stock, "
+                     f"P(8% move) {s['p8']:.0%})" for t, s in b.items())
     return f"From the {row['date']} close: {sum(s['alloc'] for s in b.values()):.0%} of the pot in straddles on " + legs
+
+
+def _legs(s: dict) -> str:
+    if "calls" not in s:
+        return ""
+    lean = "no news lean" if s.get("lean") is None else f"news lean {s['lean']:+.1f}"
+    return f"{s['calls']} call{'s' * (s['calls'] > 1)} + {s['puts']} put{'s' * (s['puts'] > 1)}, {lean}, "

@@ -113,7 +113,8 @@ POTS = [("exp2", "Exp2 volatility", LONG, "exp2/index.html"), ("trend", "Trend f
         ("reversal_stop", "Weekly reversal, 5% stop", SHORT, "strategies/index.html#reversal_stop"),
         ("btc_donchian", "BTC breakout", SHORT, "strategies/index.html#btc_donchian"),
         ("btc_donchian_vol", "BTC breakout, vol-sized", SHORT, "strategies/index.html#btc_donchian_vol"),
-        ("straddle8", "8% day straddles", SHORT, "strategies/index.html#straddle8")]
+        ("straddle8", "8% day straddles", SHORT, "strategies/index.html#straddle8"),
+        ("straddle8_news", "8% day straddles, news-tilted", SHORT, "strategies/index.html#straddle8_news")]
 # (category, anchor, colour, moving background, description)
 HORIZONS = [(LONG, "long", "#8fc1ad", "price", "Positions kept for weeks or months: monthly books, year-long trends, copied fund and Pelosi filings, and events held for a season."),
             (SHORT, "short", "#d9a15b", "candles", "Positions kept for a day or a week: daily pair bets, intraday SPY trades and weekly bounces.")]

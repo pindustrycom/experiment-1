@@ -97,7 +97,7 @@ def test_replay_and_site(tmp_path):
     out = site.write(tmp_path, st, rp, {})
     assert out["sessions"] == 1
     head = (tmp_path / "data" / "daily.csv").read_text().splitlines()[0]
-    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,reversal_stop,btc_donchian,btc_donchian_vol,straddle8"
+    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,reversal_stop,btc_donchian,btc_donchian_vol,straddle8,straddle8_news"
     s = json.loads((tmp_path / "data" / "summary.json").read_text())
     assert s["strategies"]["pead"]["category"] == rules.LONG_TERM and "cash" in s["strategies"]["pead"]["position"]
     page = (tmp_path / "index.html").read_text()
@@ -439,3 +439,34 @@ def test_straddle_pot_steps_forward_only():
     want = straddle.ALLOC / 2 * (8.4 / 6.0 - 1) + straddle.ALLOC / 2 * (2.8 / 6.0 - 1)
     assert abs(rows[1]["ret"] - want) < 1e-9 and rows[1]["w"] == {}
     assert "straddles sold" in site._straddle_log(rows)
+
+
+def test_news_pot_tilts_by_lean_and_sells_both_legs():
+    from strats import straddle
+    px = prices()
+    members = [c for c in px.columns if c.startswith("S")]
+    d0, d1 = px.index[-2], px.index[-1]
+    ranked = pd.Series([0.3, 0.2], index=["S01", "S02"])
+    exp = str((d1 + pd.Timedelta(days=7)).date())
+    c0 = {t: (chain(d0, 100, {(exp, 100, "call"): (2.9, 3.0), (exp, 100, "put"): (2.9, 3.0)}), 100.0, "x") for t in ranked.index}
+    leans = {"S01": {"lean": 0.6, "n": 9}, "S02": {"lean": 0.1, "n": 4}}
+    st = {}
+    live.step(st, px.loc[:d0], d0, members, pd.DataFrame(), pd.DataFrame(),
+              straddle_in={"ranked": ranked, "chains": c0, "leans": leans})
+    b = st["pots"][straddle.NEWS_KEY][0]["straddles"]
+    assert (b["S01"]["calls"], b["S01"]["puts"], b["S01"]["ask"]) == (2, 1, 9.0)  # good news: 2 calls + 1 put
+    assert (b["S02"]["calls"], b["S02"]["puts"]) == (1, 1)                          # weak lean: plain straddle
+    assert "calls" not in st["pots"][straddle.KEY][0]["straddles"]["S01"]           # the plain pot is untouched
+    c1 = {"S01": (chain(d1, 108, {(exp, 100, "call"): (8.4, 8.6), (exp, 100, "put"): (0.0, 0.1)}), 108.0, "x"),
+          "S02": (chain(d1, 100, {(exp, 100, "call"): (1.4, 1.5), (exp, 100, "put"): (1.4, 1.5)}), 100.0, "x")}
+    live.step(st, px, d1, members, pd.DataFrame(), pd.DataFrame(), straddle_in={"ranked": ranked.iloc[:0], "chains": c1, "leans": {}})
+    rows = st["pots"][straddle.NEWS_KEY]
+    want = straddle.ALLOC / 2 * (16.8 / 9.0 - 1) + straddle.ALLOC / 2 * (2.8 / 6.0 - 1)
+    assert abs(rows[1]["ret"] - want) < 1e-9
+    assert "2 + 1 (+0.6)" in site._straddle_log(rows)
+
+
+def test_news_mask_hides_name_and_ticker():
+    from strats import news
+    assert news.mask("Intel's (INTC) shares jump as Intel beats; $INTC", "Intel", "INTC") == \
+        "the company (the company) shares jump as the company beats; the company"
