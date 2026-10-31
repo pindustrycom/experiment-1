@@ -75,7 +75,7 @@ def headlines(name: str, ticker: str, d: pd.Timestamp) -> list[str]:
 def read(titles: list[str], client) -> dict:
     """Haiku's reading of the headlines (the same call as the study's collect.py, through the SDK)."""
     msg = "<headlines>\n" + "\n".join(f"- {t}" for t in titles) + "\n</headlines>"
-    resp = client.messages.create(model=MODEL, max_tokens=300, system=SYSTEM, messages=[{"role": "user", "content": msg}])
+    resp = client.messages.create(model=MODEL, max_tokens=1000, system=SYSTEM, messages=[{"role": "user", "content": msg}])
     txt = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
     if "{" not in txt:
         raise ValueError(f"no JSON in the answer (stop {resp.stop_reason}): {txt[:200]!r}")
