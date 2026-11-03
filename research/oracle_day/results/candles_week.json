@@ -1,0 +1,242 @@
+{
+ "mode": "week",
+ "bars": 50050,
+ "days": 5,
+ "tickers": 26,
+ "base_spike_rate_%": 5.04,
+ "all_bars_next5m_bp": -0.69,
+ "signals": [
+  {
+   "signal": "rsi_below_30",
+   "n": 3589,
+   "spike_rate_%": 12.32,
+   "lift": 2.44,
+   "drop_rate_%": 8.36,
+   "up_share_of_big_%": 59.6,
+   "next5m_bp": 4.79,
+   "vs_all_bp": 5.48,
+   "t_days": 2.25
+  },
+  {
+   "signal": "vwap_reclaim",
+   "n": 1195,
+   "spike_rate_%": 9.46,
+   "lift": 1.88,
+   "drop_rate_%": 8.03,
+   "up_share_of_big_%": 54.1,
+   "next5m_bp": -0.1,
+   "vs_all_bp": 0.59,
+   "t_days": 0.72
+  },
+  {
+   "signal": "rsi_above_70",
+   "n": 2355,
+   "spike_rate_%": 9.38,
+   "lift": 1.86,
+   "drop_rate_%": 13.12,
+   "up_share_of_big_%": 41.7,
+   "next5m_bp": -4.44,
+   "vs_all_bp": -3.75,
+   "t_days": -1.78
+  },
+  {
+   "signal": "rsi_cross_up_30",
+   "n": 856,
+   "spike_rate_%": 6.78,
+   "lift": 1.34,
+   "drop_rate_%": 6.31,
+   "up_share_of_big_%": 51.8,
+   "next5m_bp": -1.14,
+   "vs_all_bp": -0.46,
+   "t_days": 0.01
+  },
+  {
+   "signal": "morning_star",
+   "n": 598,
+   "spike_rate_%": 6.52,
+   "lift": 1.29,
+   "drop_rate_%": 5.35,
+   "up_share_of_big_%": 54.9,
+   "next5m_bp": -2.46,
+   "vs_all_bp": -1.77,
+   "t_days": -1.59
+  },
+  {
+   "signal": "ema9_cross_21",
+   "n": 1212,
+   "spike_rate_%": 5.94,
+   "lift": 1.18,
+   "drop_rate_%": 6.6,
+   "up_share_of_big_%": 47.4,
+   "next5m_bp": -2.51,
+   "vs_all_bp": -1.82,
+   "t_days": -0.63
+  },
+  {
+   "signal": "new_day_high",
+   "n": 872,
+   "spike_rate_%": 5.85,
+   "lift": 1.16,
+   "drop_rate_%": 8.94,
+   "up_share_of_big_%": 39.5,
+   "next5m_bp": -1.57,
+   "vs_all_bp": -0.89,
+   "t_days": -1.02
+  },
+  {
+   "signal": "bullish_engulfing",
+   "n": 3437,
+   "spike_rate_%": 5.7,
+   "lift": 1.13,
+   "drop_rate_%": 5.64,
+   "up_share_of_big_%": 50.3,
+   "next5m_bp": -1.99,
+   "vs_all_bp": -1.3,
+   "t_days": -1.39
+  },
+  {
+   "signal": "hammer",
+   "n": 1050,
+   "spike_rate_%": 5.43,
+   "lift": 1.08,
+   "drop_rate_%": 4.0,
+   "up_share_of_big_%": 57.6,
+   "next5m_bp": -0.09,
+   "vs_all_bp": 0.6,
+   "t_days": 0.54
+  },
+  {
+   "signal": "inverted_hammer",
+   "n": 1325,
+   "spike_rate_%": 5.43,
+   "lift": 1.08,
+   "drop_rate_%": 3.77,
+   "up_share_of_big_%": 59.0,
+   "next5m_bp": 1.12,
+   "vs_all_bp": 1.8,
+   "t_days": 1.62
+  },
+  {
+   "signal": "three_white_soldiers",
+   "n": 4733,
+   "spike_rate_%": 5.45,
+   "lift": 1.08,
+   "drop_rate_%": 5.87,
+   "up_share_of_big_%": 48.1,
+   "next5m_bp": -0.79,
+   "vs_all_bp": -0.11,
+   "t_days": -0.4
+  },
+  {
+   "signal": "macd_bull_cross",
+   "n": 2095,
+   "spike_rate_%": 5.06,
+   "lift": 1.0,
+   "drop_rate_%": 6.16,
+   "up_share_of_big_%": 45.1,
+   "next5m_bp": -1.04,
+   "vs_all_bp": -0.35,
+   "t_days": -0.21
+  },
+  {
+   "signal": "bollinger_upper_break",
+   "n": 2279,
+   "spike_rate_%": 4.96,
+   "lift": 0.98,
+   "drop_rate_%": 4.12,
+   "up_share_of_big_%": 54.6,
+   "next5m_bp": -1.41,
+   "vs_all_bp": -0.72,
+   "t_days": -0.46
+  },
+  {
+   "signal": "doji_after_drop",
+   "n": 2528,
+   "spike_rate_%": 4.91,
+   "lift": 0.97,
+   "drop_rate_%": 4.11,
+   "up_share_of_big_%": 54.4,
+   "next5m_bp": -0.69,
+   "vs_all_bp": -0.01,
+   "t_days": 0.19
+  },
+  {
+   "signal": "bullish_marubozu",
+   "n": 572,
+   "spike_rate_%": 3.85,
+   "lift": 0.76,
+   "drop_rate_%": 3.85,
+   "up_share_of_big_%": 50.0,
+   "next5m_bp": -2.94,
+   "vs_all_bp": -2.25,
+   "t_days": -1.83
+  },
+  {
+   "signal": "opening_range_breakout",
+   "n": 82,
+   "spike_rate_%": 3.66,
+   "lift": 0.73,
+   "drop_rate_%": 14.63,
+   "up_share_of_big_%": 20.0,
+   "next5m_bp": -4.79,
+   "vs_all_bp": -4.1,
+   "t_days": -0.77
+  },
+  {
+   "signal": "volume_spike_green",
+   "n": 912,
+   "spike_rate_%": 3.62,
+   "lift": 0.72,
+   "drop_rate_%": 4.06,
+   "up_share_of_big_%": 47.1,
+   "next5m_bp": -2.87,
+   "vs_all_bp": -2.18,
+   "t_days": -3.08
+  },
+  {
+   "signal": "bollinger_lower_touch",
+   "n": 6240,
+   "spike_rate_%": 3.49,
+   "lift": 0.69,
+   "drop_rate_%": 3.38,
+   "up_share_of_big_%": 50.8,
+   "next5m_bp": -0.11,
+   "vs_all_bp": 0.57,
+   "t_days": 1.41
+  },
+  {
+   "signal": "squeeze_breakout",
+   "n": 735,
+   "spike_rate_%": 2.99,
+   "lift": 0.59,
+   "drop_rate_%": 2.99,
+   "up_share_of_big_%": 50.0,
+   "next5m_bp": -2.08,
+   "vs_all_bp": -1.39,
+   "t_days": -0.56
+  }
+ ],
+ "combo": {
+  "train_days": "2026-10-27..2026-10-29",
+  "test_days": "2026-10-30..2026-11-02",
+  "test_auc": 0.585,
+  "test_spike_rate_top5pct_%": 16.1,
+  "test_base_%": 7.02,
+  "test_drop_rate_top5pct_%": 10.29,
+  "test_top5pct_next5m_bp": 6.67,
+  "test_all_next5m_bp": -2.67
+ },
+ "control_big_prev_move": [
+  {
+   "signal": "abs_prev_top",
+   "n": 2470,
+   "spike_rate_%": 14.37,
+   "lift": 2.85,
+   "drop_rate_%": 13.77,
+   "up_share_of_big_%": 51.1,
+   "next5m_bp": 0.17,
+   "vs_all_bp": 0.86,
+   "t_days": 0.49
+  }
+ ]
+}
