@@ -4,7 +4,7 @@ Start with $20. On every bar the oracle holds the stock if (and only if) the nex
 product of all the up-moves. With a cost per side, a DP picks the best in/out path (tiny wiggles stop being worth a round
 trip). The "switch" version may hold any one ticker (or cash) each bar. Paper research only; nobody can trade this way.
 
-python oracle.py DATA_DIR DAY   (DATA_DIR/<TICKER>/*.csv in Tiingo IEX 1-minute format: date,open,high,low,close,volume)
+python oracle.py DATA_DIR DAY   (DATA_DIR/<TICKER>/bars.csv in Tiingo IEX 1-minute format: date,open,high,low,close,volume)
 """
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ def switch_oracle(paths: dict[str, np.ndarray], cost_bp: float) -> float:
 
 
 def main(data: str, day: str) -> None:
-    series = {f.parent.name: load(f, day) for f in sorted(Path(data).glob(f"*/{day[:7]}.csv"))}
+    series = {f.parent.name: load(f, day) for f in sorted(Path(data).glob("*/bars.csv"))}
     series = {t: s for t, s in series.items() if len(s)}
     rows, out = [], {"day": day, "start_usd": START, "tickers": {}, "switch": {}}
     for t, s in series.items():

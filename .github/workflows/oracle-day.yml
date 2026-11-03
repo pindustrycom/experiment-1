@@ -8,7 +8,8 @@ on:
     paths: ["research/oracle_day/**", ".github/workflows/oracle-day.yml"]
   workflow_dispatch:
     inputs:
-      day: {description: "YYYY-MM-DD", default: "2026-11-02"}
+      start: {description: "YYYY-MM-DD", default: "2026-10-27"}
+      end: {description: "YYYY-MM-DD", default: "2026-11-02"}
 
 permissions:
   contents: write
@@ -20,7 +21,8 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
       TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
-      DAY: ${{ inputs.day || '2026-11-02' }}
+      START: ${{ inputs.start || '2026-10-27' }}
+      END: ${{ inputs.end || '2026-11-02' }}
     defaults:
       run:
         working-directory: research/oracle_day
@@ -29,10 +31,11 @@ jobs:
       - uses: actions/setup-python@v6
         with: {python-version: "3.12"}
       - run: pip install pandas numpy requests
-      - run: python fetch.py "$DAY" data "$(tr -d ' \n' < tickers.txt)"
-      - run: python oracle.py data "$DAY" | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: python fetch.py "$START" "$END" data "$(tr -d ' \n' < tickers.txt)"
+      - run: python oracle.py data "$END" | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: python week.py data | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Save to release
         run: |
-          tar czf /tmp/oracle-day-$DAY.tar.gz data oracle_result.json oracle_table.csv
+          tar czf /tmp/oracle-$START-$END.tar.gz data oracle_result.json oracle_table.csv week_result.json
           gh release view oracle-day-data >/dev/null 2>&1 || gh release create oracle-day-data --latest=false --title "Oracle day (research data)" --notes "Paper research only."
-          gh release upload oracle-day-data /tmp/oracle-day-$DAY.tar.gz oracle_result.json oracle_table.csv --clobber
+          gh release upload oracle-day-data /tmp/oracle-$START-$END.tar.gz oracle_result.json oracle_table.csv week_result.json --clobber
