@@ -1,0 +1,48 @@
+name: Oracle day (research)
+
+# Paper research only (research/oracle_day): fetch one day's Tiingo IEX 1-minute bars for a ticker list and compute the
+# perfect-hindsight "only the up-moves" result on $20. Bars and results go to the "oracle-day-data" release.
+
+on:
+  pull_request:
+    paths: ["research/oracle_day/**", ".github/workflows/oracle-day.yml"]
+  workflow_dispatch:
+    inputs:
+      start: {description: "YYYY-MM-DD", default: "2026-10-27"}
+      end: {description: "YYYY-MM-DD", default: "2026-11-02"}
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+      START: ${{ inputs.start || '2026-10-27' }}
+      END: ${{ inputs.end || '2026-11-02' }}
+    defaults:
+      run:
+        working-directory: research/oracle_day
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: "3.12"}
+      - run: pip install pandas numpy requests
+      - name: Restore saved bars, else fetch them from Tiingo
+        run: |
+          if gh release download oracle-day-data -p "oracle-$START-$END.tar.gz" -D /tmp/prev 2>/dev/null; then
+            tar xzf "/tmp/prev/oracle-$START-$END.tar.gz" data && echo "restored $(ls data | wc -l) tickers"
+          else
+            python fetch.py "$START" "$END" data "$(tr -d ' \n' < tickers.txt)"
+          fi
+          [ -n "$(ls data 2>/dev/null)" ] || { echo "no bars fetched (Tiingo limit?)"; exit 1; }
+      - run: python oracle.py data "$END" | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: python week.py data | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Save to release
+        run: |
+          tar czf /tmp/oracle-$START-$END.tar.gz data oracle_result.json oracle_table.csv week_result.json
+          gh release view oracle-day-data >/dev/null 2>&1 || gh release create oracle-day-data --latest=false --title "Oracle day (research data)" --notes "Paper research only."
+          gh release upload oracle-day-data /tmp/oracle-$START-$END.tar.gz oracle_result.json oracle_table.csv week_result.json --clobber
