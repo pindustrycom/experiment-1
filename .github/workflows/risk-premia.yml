@@ -1,0 +1,48 @@
+name: Risk premia study
+
+# Research only, paper only (research/risk_premia): do the premia research says investors are paid for (value,
+# momentum, profitability, option selling, carry, trend) still pay, and does a diversified mix beat SPY? Data: Ken
+# French's data library, Cboe strategy index history, Yahoo daily bars, no keys. Nothing is traded or deployed.
+# Results: the log, the job summary and the run's artifact.
+
+on:
+  pull_request:
+    paths: ["research/kakushadze151/**", "research/risk_premia/**", ".github/workflows/risk-premia.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: risk-premia-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: research/risk_premia
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/risk_premia/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Tests
+        run: ruff check . && python -m pytest -q
+
+      - name: Backtest
+        run: |
+          set -o pipefail
+          python premia.py /tmp/cache out | tee out.log
+          cat out/table.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: risk-premia-results
+          path: research/risk_premia/out

@@ -1,0 +1,48 @@
+name: 151 Trading Strategies backtest
+
+# Research only, paper only (research/kakushadze151): the strategies from Kakushadze & Serur, "151 Trading
+# Strategies" (2018), that free daily data can test, run from 2019 with costs against holding SPY. Data: Yahoo daily
+# bars (stocks, ETFs, FX, bitcoin, VIX indexes) and FRED interest rates, no keys. Nothing is traded or deployed.
+# Results: the log, the job summary and the run's artifact.
+
+on:
+  pull_request:
+    paths: ["research/kakushadze151/**", ".github/workflows/kakushadze151.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kakushadze151-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: research/kakushadze151
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/kakushadze151/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Tests
+        run: ruff check . && python -m pytest -q
+
+      - name: Backtest
+        run: |
+          set -o pipefail
+          python run.py /tmp/yahoo out | tee out.log
+          cat out/table.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kakushadze151-results
+          path: research/kakushadze151/out
