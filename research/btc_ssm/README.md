@@ -260,3 +260,96 @@ Bottom line: the only new result that matters is item 7's synthetic. With daily 
 clears t 4 without relying on 28 months. Everything else (sizing other pots, risk reversals, Whalley-Wilmott, the
 premium as a return signal, Kelly with the GRU) adds nothing. The daily chains collector is the next step that can
 change a verdict.
+
+# Round 6 (Oct 30): the volatility trade through the Greeks
+
+`greeks.py`, same 66 first-of-month chains and books as round 4 (band 0.1 hedge, sold at the bid, all costs). Its
+hold-to-expiry results reproduce round 4 exactly (gated call wing +11.3% of the strike a month, t 4.4). Results in
+`results/greeks.json`, `results/greeks_decomp.csv`, `results/greeks_exits_summary.csv`.
+
+**Part 1, where the money comes from.** Each month's P&L split hour by hour (Black-76 at each leg's entry IV), in
+strike units per month:
+
+| book | months | theta (income) | gamma (re-hedging cost) | entry spread | fees | hedge cost | band slip + residual | total |
+|---|---|---|---|---|---|---|---|---|
+| Call wing, gate on | 28 | +1.02 | -0.76 | -0.03 | -0.02 | -0.04 | +0.09 | **+0.27** |
+| Call wing, gate off | 38 | +1.04 | -0.94 | -0.03 | -0.02 | -0.07 | +0.03 | +0.01 |
+| 25-delta strangle, gate on | 28 | +1.11 | -0.83 | -0.03 | -0.01 | -0.04 | +0.03 | +0.23 |
+| 25-delta strangle, gate off | 38 | +0.97 | -0.89 | -0.03 | -0.02 | -0.05 | -0.03 | -0.05 |
+
+- Theta and gamma are both large and nearly cancel: the trade lives on the 10-25% gap between them, and costs take
+  about a third of that gap. Month by month, theta + gamma tracks the implied-minus-realized variance gap (correlation
+  0.65 call wing, 0.82 strangle, 0.95 strip), which is the market-maker story in the data.
+- The gate works on the gamma side: in the months it sells, re-hedging costs 0.76 of the strike, against 0.94 in the
+  months it skips, while theta is about the same. The forecast is picking months where BTC turns out calmer than the
+  IV sold, not months with fatter premiums.
+- Per year (call wing, all months): theta minus gamma was +0.35 in 2021, +0.19 in 2022, +0.09 in 2023, +0.22 in 2024,
+  +0.13 in 2025, +0.07 in 2026. The shrinking premium of round 3 shows up as gamma catching up with theta.
+- In dollars: one straddle-equivalent of vega per BTC of capital collects about $150 a day of theta at the start of
+  a gated month (about $97 in skipped months).
+
+**Part 2, vega risk and exit rules.** Mid-month marks scale each leg's entry IV by DVOL / DVOL at entry (an
+approximation: the wings are only observed on the 1st). Closing pays the model price plus the leg's entry half-spread
+and fees. Rules are checked daily at 00:00 UTC.
+
+| call wing, band 0.1 | always: mean / t | gated: mean / t | gated vs hold (paired t) | gated worst interim mark |
+|---|---|---|---|---|
+| Hold to expiry | +11.6% / 2.1 | **+11.3% / 4.4** | | -0.60 |
+| Take profit at 50% of premium | +12.3% / 2.5 | +10.6% / 4.5 | -0.7% (t -1.6) | -0.60 |
+| Exit when DVOL is up 5 / 10 / 15 points | +1.2% / +7.2% / +3.0% | +5.3% / +8.2% / +8.0% | t -3.1 / -1.6 / -1.6 | |
+| Stop at 1x / 2x premium lost | +8.3% / +5.3% | never fires | | |
+| Exit when 3-day realized vol > 1.5x entry IV | +10.4% / 2.1 | +7.7% / 2.8 | -3.6% (t -2.3) | |
+
+- **No exit rule beats holding to expiry**, on any book, gated or not (every paired t is negative except ungated 50% profit taking on the call wing, +0.7%, t 0.3). IV
+  jumps in BTC mean-revert within the month, so a vega stop sells the spike and gives up the recovery. Worst case:
+  the full strip in Feb 2026 (DVOL 48 -> 89) was marked at -3.0x the strike mid-month and finished at -0.54x; a 1x
+  premium stop would have closed it at -3.09x.
+- Profit taking at 50% is harmless but adds nothing.
+- **The forecast gate is the vega control.** P&L falls with the month's largest DVOL rise (correlation -0.39 call
+  wing, -0.60 strangle, -0.71 strip). DVOL rose 10+ points in 28 of 66 months, but only 8 of those were gate-on
+  months, and the call wing's worst interim mark drops from -2.47x (always) to -0.60x (gated). Skipping the trade
+  works where stopping it out does not.
+
+**Verdict.** The Greeks explain the result rather than change it: the edge is theta beating gamma in months our vol
+forecast picks, sold in the call wing (puts carry the crash gamma). Hold to expiry, keep size small, and let the gate
+handle vega risk. The deciding test is still the daily-chain rerun (`daily_entries.py`) once about three months of the
+`deribit-chains` release exist.
+
+# Round 7 (Oct 30): the call wing entered every day
+
+`daily_greeks.py`. Only one day of the daily Deribit chains exists so far (collection started 2026-10-30), so each
+day from 2021-04-01 to 2026-09 gets a rebuilt book: strikes, smile and bid spreads from the latest real first-of-month
+chain, IV level moved daily with DVOL (ATM IV = DVOL x that chain's ATM/DVOL ratio), real hourly BTC path, band-0.1
+hedge, Deribit fees, 30-day expiry. Rough-vol and HAR forecasts were regenerated with `sv_run.py` and match round 4's
+exactly. 2006 entries, scored on 67 non-overlapping 30-day blocks. Results in `results/daily_greeks.json`.
+
+**Check against the real chains.** On the 66 first-of-month days the rebuilt book's P&L correlates 0.92 with the
+real-chain P&L (theta 0.98, gamma 0.98), mean +12.6% vs +11.6% of the strike (gated +11.9% vs +11.3%). It is close,
+and about 1 point a month optimistic.
+
+| call wing, band 0.1, hold to expiry | days on | mean / entry | t (30-day blocks) | t, NW | first-of-month-only t |
+|---|---|---|---|---|---|
+| Always | 100% | +17.1% | 5.1 | 4.7 | 2.5 |
+| **Rough-vol gate** | 47% | +12.2% (+26.1% when on) | **5.7** | 4.9 | 4.5 |
+| HAR gate | 20% | +6.3% | 3.7 | 3.0 | 3.2 |
+
+- Daily entries settle the evidence question: both always-sell and gated clear the project's t 3.8 bar on their own,
+  without hanging on 28 monthly trades. Random gates with the same 47% of days beat the rough gate's t 1.2% of the time.
+- The 1st of the month was an unlucky entry day: always-sell earns +17.1% a trade across all days against +11.6% on
+  the 1st alone.
+- Greeks per entry: theta +1.08, gamma -0.83 always; gate on theta +1.07, gamma -0.76; gate off theta +1.09, gamma -0.89.
+  Same story as round 6, with 30x the entries.
+- By year, mean per entry (always / gated): 2021 +28% / +30%, 2022 +16% / +11%, 2023 +18% / +2%, 2024 +24% / +23%,
+  2025 +17% / +7%, 2026 -4% / +3%. 2026 is the first year always-sell loses; the gate keeps it slightly positive.
+- Capital (1/30 of one straddle-vega per BTC sold each day, P&L booked at expiry, monthly): always 16.3%/yr, Sharpe
+  2.4, max DD -3.0%; gated 12.3%/yr, Sharpe 2.3, max DD -1.0%. Booking at expiry hides mid-month marks, so the real
+  drawdowns are deeper (worst interim mark: -5.7x the strike always, -2.7x gated).
+
+**Exit rules, daily entries.** Every rule now loses to holding with significance: DVOL +10 stop (vs hold t -4.3
+always, -3.1 gated), 3-day realized-vol breach (-3.0 / -3.2), 2x loss stop (-2.3 / -1.0), and even 50% profit taking
+(-2.8 / -3.2). Hold to expiry.
+
+**Verdict.** The gated call wing passes on daily entries (t 5.7), but this is a rebuilt book on real data, not real
+daily quotes, and it runs about 1 point a month optimistic. The edge has shrunk to near zero in 2026. A paper pot
+is now reasonable. The real-quote rerun (`daily_entries.py` with the `deribit-chains` release) is still the final check
+once about 3 months exist.
