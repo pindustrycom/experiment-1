@@ -1,0 +1,48 @@
+name: Range trading backtest
+
+# Research only, paper only: the textbook horizontal-range setups (fade the edges, deviation and reclaim, breakout as a
+# control) on Bitcoin and Ether 5m/15m/1h bars, 2019 to last month. Bars are Binance's public monthly kline files from
+# data.binance.vision (no key). Results go to the "range-trading-results" release and the run's artifact, and are
+# printed in the log. Nothing is deployed. The SPY/QQQ half runs from the exp7-data cache (results_etf.json).
+
+on:
+  pull_request:
+    paths: ["research/range_trading/**", ".github/workflows/range-trading.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the results release
+
+concurrency:
+  group: range-trading
+  cancel-in-progress: false
+
+env:
+  RESULTS_TAG: range-trading-results
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: research/range_trading
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install pandas numpy
+      - name: Backtest on Bitcoin and Ether
+        run: python run_crypto.py /tmp/klines results_crypto.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: range-trading-results
+          path: research/range_trading/results_crypto.json
+      - name: Save to the results release
+        run: |
+          gh release view "$RESULTS_TAG" >/dev/null 2>&1 || \
+            gh release create "$RESULTS_TAG" --title "Range trading results" --notes "Paper-only backtest output." --prerelease
+          gh release upload "$RESULTS_TAG" results_crypto.json --clobber
