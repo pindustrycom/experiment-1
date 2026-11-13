@@ -88,6 +88,9 @@ CATALOG = [
      "Joaquin Philco's emotion gate and his fear channel beyond the dendrite bandwidth: a visual search that learns what hurts, "
      "steers the eye by fear, and keeps fear on a separate electrical-synapse-like channel. A real run replayed in 3D: extinction, "
      "fear returning after a rest, and fast relearning.", EXPERIMENTS / "exp11_fear"),
+    ("history", RESONANCE, "Idea history", "Idea history · every model, rule and technique",
+     "Joaquin Philco's resonance project as a git-style history: 60 ideas on 13 branches from 17 October on, each with an honest "
+     "outcome, including what failed, and a cycling gallery of 14 small 3D models, one built at a time.", EXPERIMENTS / "history"),
     ("resonance_writeup", RESONANCE, "Write-up", "Write-up · resonant sensors, with controls",
      "A short paper on what the resonance experiments showed: as a sensor front end resonance beats fair low-pass controls on "
      "spoken digits, spoken words and eye movements; the learning rules built after it did not beat simple controls. By Joaquin Philco.",

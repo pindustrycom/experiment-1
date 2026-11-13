@@ -1,0 +1,615 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Idea History</title>
+<style>
+/* Layout: intro, then the 3D gallery (one canvas, one model built at a time), then the branches legend, then the
+   git-style history: newest idea on top, one lane per branch of ideas, a dot per idea with its outcome. */
+:root {
+  --bg: #0b0a10; --panel: #15131d; --ink: #eeecf4; --muted: #a09cb3; --line: #2c2939; --stage: #07060b;
+  --works: #34c77b; --partial: #e6b23a; --null: #8e8aa0; --failed: #ff6a5c; --idea: #a593d4;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace; color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0b0a10; --panel: #15131d; --ink: #eeecf4; } }
+:root[data-theme="dark"] { --bg: #0b0a10; --panel: #15131d; --ink: #eeecf4; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 22px max(16px, env(safe-area-inset-left, 0px)) 56px; display: grid; gap: 26px; }
+h1 { font-size: 1.9rem; margin: 0; letter-spacing: -.02em; text-wrap: balance; }
+h2 { font-size: 1.25rem; margin: 0 0 4px; letter-spacing: -.01em; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 72ch; margin-top: 6px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.mono { font-family: var(--mono); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+button { font: 600 13px/1 inherit; font-family: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 11px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--idea); outline-offset: 2px; }
+a { color: var(--idea); }
+
+/* gallery */
+.gal { display: grid; gap: 10px; }
+#stage { position: relative; height: 360px; border-radius: 14px; overflow: hidden; background: var(--stage); border: 1px solid var(--line); }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: pan-y; cursor: grab; }
+#stage .zoom { position: absolute; right: 10px; bottom: 10px; display: flex; gap: 6px; }
+#stage .zoom button { width: 36px; height: 36px; padding: 0; font-size: 18px; background: rgba(21,19,29,.8); }
+#stage .badge { position: absolute; left: 10px; top: 10px; font: 600 11px var(--mono); letter-spacing: .04em; text-transform: uppercase;
+  padding: 4px 7px; border-radius: 6px; background: rgba(21,19,29,.85); border: 1px solid var(--line); }
+#stage .count { position: absolute; right: 12px; top: 12px; font: 12px var(--mono); color: var(--muted); }
+.gl-fail { position: absolute; inset: 0; padding: 18px; line-height: 1.5; }
+.galbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.galbar .grow { flex: 1; }
+#gtitle { font-size: 17px; font-weight: 650; margin: 0; }
+#gcap { color: var(--muted); max-width: 80ch; }
+#gdots { display: flex; gap: 6px; flex-wrap: wrap; }
+#gdots button { width: 28px; height: 28px; padding: 0; border-radius: 50%; font: 600 11px var(--mono); border-color: var(--c); color: var(--muted); }
+#gdots button[aria-current="true"] { background: var(--c); color: #0b0a10; }
+
+/* branches */
+.legend { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.br { text-align: left; display: grid; gap: 4px; padding: 11px 12px; border-radius: 12px; border-left: 4px solid var(--c); font-weight: 400; line-height: 1.4; }
+.br b { font-size: 14px; } .br span { color: var(--muted); font-size: 13px; }
+.br[aria-pressed="true"] { background: color-mix(in srgb, var(--c) 18%, var(--panel)); }
+.keyrow { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); align-items: center; }
+
+/* history graph */
+#log { list-style: none; margin: 0; padding: 0; }
+.row { display: grid; grid-template-columns: var(--gw) 1fr; transition: opacity .2s; }
+.row.dim { opacity: .22; }
+.g { position: relative; }
+.g i { position: absolute; width: 2px; margin-left: -1px; }
+.g i.h { height: 2px; width: auto; margin: -1px 0 0; }
+.g .dot { position: absolute; top: 15px; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid var(--bg); }
+.g .dot.t0 { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+.t { padding: 4px 0 16px 6px; min-width: 0; }
+.meta { font: 12px var(--mono); color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.meta .sha { color: var(--c); }
+.t b { font-size: 15px; }
+.t p { color: var(--muted); font-size: 14px; margin-top: 2px; max-width: 76ch; }
+.v { font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .05em; padding: 2px 6px; border-radius: 5px; white-space: nowrap; }
+.v.works { color: var(--works); background: color-mix(in srgb, var(--works) 15%, transparent); }
+.v.partial { color: var(--partial); background: color-mix(in srgb, var(--partial) 15%, transparent); }
+.v.null { color: var(--null); background: color-mix(in srgb, var(--null) 18%, transparent); }
+.v.failed { color: var(--failed); background: color-mix(in srgb, var(--failed) 15%, transparent); }
+.v.idea { color: var(--idea); background: color-mix(in srgb, var(--idea) 18%, transparent); }
+.t .acts { margin-top: 6px; display: flex; gap: 8px; flex-wrap: wrap; }
+.t .acts button, .t .acts a { font-size: 12px; padding: 5px 8px; }
+.t .acts a { border: 1px solid var(--line); border-radius: 8px; text-decoration: none; font-weight: 600; }
+.day { font: 600 12px var(--mono); color: var(--ink); padding: 8px 0 4px 6px; }
+@media (max-width: 560px) { h1 { font-size: 1.55rem; } #stage { height: 300px; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header>
+    <h1>Idea history</h1>
+    <p class="lede">Every model, rule and technique tried in Joaquin Philco's resonance project, 17 October to 13 November 2026, drawn like a git history:
+      one branch per family of ideas, newest on top, and an honest outcome on every idea, including the ones that failed.
+      Ideas and designs by Joaquin Philco; experiments run with Claude.</p>
+  </header>
+
+  <section class="gal" aria-labelledby="gtitle">
+    <div id="stage">
+      <canvas id="cv" aria-label="3D model of the selected idea. Drag sideways to turn it, pinch or use the buttons to zoom."></canvas>
+      <span class="badge" id="gbadge"></span><span class="count" id="gcount"></span>
+      <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button></div>
+    </div>
+    <div class="galbar">
+      <button id="gprev" aria-label="Previous model">←</button><button id="gplay">Pause</button><button id="gnext" aria-label="Next model">→</button>
+      <span class="grow"></span><a id="glink" href="#" hidden>Open the full model →</a>
+    </div>
+    <h2 id="gtitle"></h2>
+    <p id="gcap"></p>
+    <div id="gdots" role="group" aria-label="Pick a model"></div>
+    <p class="small muted">The gallery builds one model at a time and frees it before the next one, and it only draws while it is on screen, so the page stays light. Models marked <b>new</b> were made for this page; the others are small versions of a full 3D page on this site.</p>
+  </section>
+
+  <section>
+    <h2>Branches</h2>
+    <p class="muted small" style="margin-bottom:10px">Tap a branch to highlight its ideas in the history. Tap it again to show everything.</p>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <section>
+    <h2>History</h2>
+    <div class="keyrow" style="margin:4px 0 14px"><span>Outcome:</span>
+      <span class="v works">works</span><span>beat its control</span>
+      <span class="v partial">partial</span><span>some gain, with a catch</span>
+      <span class="v null">no gain</span><span>tied its control</span>
+      <span class="v failed">failed</span>
+      <span class="v idea">idea</span><span>theory, goal or plan</span></div>
+    <ol id="log"></ol>
+  </section>
+  <p class="small muted">Numbers come from the project's result notes; most are one to three seeds on a 4-core CPU. "Control" means the fair stand-in for resonance: a low-pass filter, shuffled order, a class average, or the same net trained by backprop.</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js" integrity="sha384-vV17nr/rMaJqmeZkFUzXLpHdQ+ME5QHKdydaqqN+3Ga39RJlNrTatJxHwGV4ml2C" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="../hub/gl_runtime.js"></script>
+<script>
+"use strict";
+// The pruning score is named "resonance index" only when Joaquin allows it in public pages.
+const RI_NAME = "resonance score";
+// ---------- branches: [key, name, colour, one-line verdict]
+const BR = [
+  ["core", "Theory and goals", "#cfc8e8", "The hypothesis, rules, definitions and checks that steered everything else."],
+  ["ssm", "Resonant SSM block", "#7aa2ff", "Joaquin's state score prunes well and the block matches S4D; its open-set lead did not survive Mahalanobis."],
+  ["agent", "Co-resonance wiring and rule agent", "#6fc7d9", "Learns without forgetting, but ties Fuzzy ARTMAP and the class average."],
+  ["vision", "Vision front ends", "#8fc1ad", "Opponent channels and Gabor help digits; photos are limited by the learning rule, not the eye."],
+  ["cell", "Neuron and cell designs", "#e6c86e", "Cell v3 with branches is the best cell; gap junctions, gamma and own bands were null."],
+  ["vol", "Lattices and volumes", "#d98fb8", "A trained lattice never beat a frozen random one; deep space stayed unreachable."],
+  ["mem", "Memory cells and open world", "#ff9f8a", "Claiming sheets detect new classes, but the gain comes from prototypes, not resonance."],
+  ["eye", "Eye movements (fovea)", "#30d158", "The clearest win: resonators reading saccade timing beat their low-pass and shuffled controls."],
+  ["lang", "Letters, words and sound", "#ffb340", "Reads words and names colours from vision; text-only language and new spoken words did not hold."],
+  ["emo", "Emotion, fear and the loop", "#ff6464", "Gates and loops behave as theorised; a frequency carrier equals a scalar."],
+  ["rule", "Learning rules for the net", "#b48cff", "Two-pass and EP nudges make the model itself learn; still about 100x slower than backprop."],
+  ["tf", "Transformers and ViTs", "#5ac8fa", "Cue-gated fixations cut compute by 10x; RoPE beats resonator time."],
+  ["drone", "Stereo drone tracker", "#c7c7cc", "A practical spin-off for Joaquin's two-camera rig: 80% found, about 1.5 m error at 44-113 m."]
+];
+const BI = Object.fromEntries(BR.map((b, i) => [b[0], i]));
+// ---------- ideas: [date, branch, title, outcome, what happened, 3D model key, branches merged in]
+const IDEAS = [
+  ["10-17", "core", "Semantics by allocating structures", "idea", "Joaquin's hypothesis: start with separate blocks; neurons that resonate together across any layers get wired, one structure per concept."],
+  ["10-17", "ssm", "Pruning SSM states by Joaquin's " + RI_NAME, "works", "Pruning 25% of states keeps 98.3% on sequential MNIST; random pruning drops to 47.6%.", "ssm"],
+  ["10-17", "ssm", "Resonant Block", "works", "Resonator states with energy and phase readout: 98.5% on sequential MNIST vs S4D 98.3% and GRU 87% (one seed)."],
+  ["10-17", "ssm", "One-class pruning", "partial", "Pruning tuned on one digit keeps an unseen digit up to 60-75% removed; class selectivity grows with depth."],
+  ["10-17", "agent", "Hebbian co-resonance wiring", "partial", "No backprop, one digit at a time: 72% on MNIST and no forgetting (shuffled links 11%), but a nearest class mean gets 71%.", "agent"],
+  ["10-17", "vision", "Opponent colour channels with ON/OFF cells", "works", "Retina-like front end: digit and colour structures separate cleanly (overlap 0.02).", null, ["agent"]],
+  ["10-18", "agent", "Rules 1a, 1b, 1c: ask, group, sleep", "partial", "The agent asks for labels, groups co-ringing structures and replays at night; axioms plus three agreeing rotated views reach 79.5% on digits and colours."],
+  ["10-18", "agent", "Simple pitch x rhythm world", "partial", "Composition and one-shot placement work; property families need mutual exclusion, which co-firing never gives."],
+  ["10-18", "vision", "Gabor V1 front end", "partial", "Digits and colours 79.5 to 89.5%; CIFAR stays near 30% while a linear probe gets 45%, so the learning rule is the bottleneck.", "vision"],
+  ["10-18", "vision", "Learned V1 by sparse coding", "null", "Gabor-like filters emerge from Imagenette patches, but they score the same as hand-made Gabor (49%)."],
+  ["10-18", "cell", "Soma plus axon resonance machine", "partial", "Joaquin's revision: a time-based soma drives learning and the resonance machine sits on the axon. Good features (linear 48-54%), weak agent (31-35%)."],
+  ["10-18", "lang", "Words from text (WikiText, TinyStories)", "failed", "Families such as months or animals form, but next-word accuracy is 0.6% vs GRU 26%; axioms never form."],
+  ["10-19", "lang", "Alphabet and words from images", "works", "Letters 54%, words 86% once the axon reads phase; word images name colour patches 85% with no stored strings.", "lang"],
+  ["10-19", "cell", "Feedback cell with phase-locked plasticity", "works", "Word-order task 94.4 to 99.6%, as good as the phase readout."],
+  ["10-19", "lang", "Purple test: meet a colour never seen", "partial", "New colours flagged at AUC 0.90 and named 90% after three shots, but the model asks on only 7% of purple patches."],
+  ["10-19", "cell", "Resonant neurons as letter cells", "partial", "Energy-only words 62 to 74%, still under the energy plus phase readout (86%)."],
+  ["10-20", "agent", "Fuzzy ARTMAP comparison", "null", "The best agent ties ARTMAP; its few-shot edge is matched by a nearest class mean; pruning sleep never helps."],
+  ["10-20", "cell", "Neuron v2: an axon per connection, myelin resonators, oligodendrocyte", "idea", "Joaquin's cell spec: the soma decides, each axon has resonators on its sheath, and an oligodendrocyte reads them and sets the weight.", "cell"],
+  ["10-20", "vol", "Layerless 3D lattice", "failed", "A resonance-trained lattice equals a frozen random reservoir; four rounds of fixes (suppression, growth, deep norms, seeds) failed.", "vol"],
+  ["10-20", "vol", "Sleep pruning in a 16x16x16 volume", "partial", "Nearest-mean 72.6% vs frozen 43.5%, but it quiets the deep volume instead of building structures there."],
+  ["10-21", "vol", "Growth front for a new class", "partial", "Growing only where the new input beats every known class: 1-shot new 44% vs 33%, but regions reach depth 2-3 only."],
+  ["10-21", "mem", "Memory cells", "partial", "Gabor face, router, 4x4x4 cells: 57 to 79% vs class average 90%; better novelty AUC (0.70).", "mem", ["vol"]],
+  ["10-21", "core", "Novelty means no sheet claims it", "idea", "Joaquin's definition: every sheet asks \"is this mine?\"; an image nobody claims is new and gets its own cell."],
+  ["10-21", "mem", "Open world: tentative cells, sub-groups, calibration", "partial", "Five known classes: 77% of unknowns caught at 12-14% false alarms, known 84-87%; with 15 known only about 38%."],
+  ["10-21", "mem", "Resonator ablation in memory cells", "failed", "Real resonators, low-pass and phase-scrambled cells all score the same: the gain came from the prototype input axons."],
+  ["10-21", "eye", "Fovea saccades with slow resonators", "works", "First time resonance beats its own control: 92.6% vs low-pass 73%; open world 82.5% detected at 12% false alarms.", "eye", ["mem"]],
+  ["10-21", "core", "Active-vision protocol", "idea", "No image is shown whole; scores are retention, detection at 5% false alarms, few-shot, and fixations to recognise."],
+  ["10-21", "eye", "Fast and careful look", "works", "A stereotyped careful scan lifts the headline 0.64 to 0.83 (5 known); Fashion 0.71 vs low-pass 0.39."],
+  ["10-21", "mem", "Claim lines and two-level error cells", "partial", "Level 2 finds all six colours with no labels (99%), purple flagged 79% at 9% false alarms; class templates with the same error step do nearly as well."],
+  ["10-22", "core", "Goal refocus: a vocabulary from vision", "idea", "Stop chasing CIFAR: letters, numbers and colours from vision first, then words, taught like a child."],
+  ["10-22", "lang", "Child pedagogy: three-period lessons, phonics, eye reading", "partial", "Letters by Montessori lessons, words read by eye movements and bonded to colours and digits, then two-word phrases.", null, ["eye"]],
+  ["10-22", "vol", "Sparse random cell volume", "null", "Co-firing links form within concepts at any distance, but spreading over them costs 5 points and adds no novelty."],
+  ["10-22", "cell", "Cell v3: resonate-and-fire, learned frequency, branches", "works", "Naming 44% vs low-pass 17%; nine location-gated branches 58%; sharp edge maps 62%."],
+  ["10-22", "lang", "Spoken words and the core and shell cube", "partial", "Resonators 68% = spectrogram, far above low-pass 21%; new words fade after sleep.", "sound"],
+  ["10-23", "lang", "SHD spoken digits benchmark", "partial", "An untrained resonator bank plus a linear readout: 85.7% vs low-pass 82.7% (best published 96.3%)."],
+  ["10-23", "core", "Write-up: resonant sensors, with controls", "works", "Resonance wins as a sensor front end; the learning rules built on it did not beat simple controls."],
+  ["10-25", "cell", "Electrical synapses (gap junctions)", "null", "Two-way junctions 0.814 vs 0.837 without; a PV gamma clock and per-structure bands were also null.", "gap"],
+  ["10-28", "emo", "Emotion frequency gate", "null", "The gate does prioritise valued items (+10-14 points), but a frequency carrier behaves exactly like a scalar."],
+  ["10-29", "emo", "Fear channel beyond the dendrite bandwidth", "partial", "A visual search learns what hurts and steers the eye by fear; extinction, renewal and fast relearning appear; false alarms needed a fix."],
+  ["10-30", "emo", "Consciousness as a cortex to memory loop", "partial", "With input off, the resonant loop holds a thought 35-52% (no feedback 0%); a self-made tag stops hallucinated perception.", "loop", ["eye"]],
+  ["10-30", "ssm", "Trained Resonant Block on the eye stream", "partial", "98.6% = S4D; open-set AUROC 91.9 vs 83.7 with a class-average score.", null, ["eye"]],
+  ["10-31", "ssm", "Open-set check with standard scores", "failed", "With Mahalanobis, S4D ties or wins everywhere (97.9 vs 96.5): the open-set lead does not hold."],
+  ["10-31", "core", "Direction survey", "idea", "Ranked the energy readout on the saccade stream first, outline tracing second, fear-steered gaze third; parked lattices and volumes."],
+  ["11-01", "eye", "Outline tracing as rhythm", "partial", "Moving the start point: resonator energy 57% vs template 3%; known as Fourier descriptors (1972)."],
+  ["11-03", "tf", "Spectral key-pruning attention", "failed", "RoPE beats resonator time (1.23 vs 1.32 bits per char); evicting keys by the " + RI_NAME + " is worse than random.", "tf", ["ssm"]],
+  ["11-04", "tf", "Long-range recall and fixed lags", "partial", "Resonator models recall facts 100% out to 4k tokens, but a short convolution gives most of that and RoPE wins exact lags."],
+  ["11-04", "tf", "ViT with selective tuning and a spectral tokenizer", "partial", "Spectral tokenizer 81.9% vs 76.4%; its attention finds pop-out targets 53% vs chance for a plain ViT."],
+  ["11-05", "tf", "Cue-gated ViT at a tenth of the compute", "works", "On CLEVR-style scenes a colour gate on 6 of 144 patches (5% of FLOPs) beats the full ViT; real CoGenT 88.9% at 5-7% FLOPs. Prior work (RAM, GFNet) covers the idea."],
+  ["11-07", "drone", "Stereo drone tracker for the Pi rig", "works", "ViT windows, a Kalman reset fix and self-calibration: 80% found, 1.5 m median error at 44-113 m on a 180 mm baseline.", "drone", ["tf"]],
+  ["11-07", "drone", "Gaussian splat calibration", "partial", "Tracks disparity drift to 0.004 px after one reference, but splat depth error leaves a fixed 0.09 px offset."],
+  ["11-09", "mem", "Autoencoder embedding plus SMOTE", "partial", "A contrastive embedding lifts naming 65 to 88%; SMOTE and ADASYN look-alikes add nothing."],
+  ["11-10", "rule", "Resonator chains gating a net", "null", "Chains tie a plain net and a non-resonant cue gate on recognition and attention."],
+  ["11-10", "rule", "Co-resonance net with a local rule", "failed", "The plain rule sits at chance; with a teacher, 71% vs backprop 94% on the same net."],
+  ["11-10", "rule", "Tiny resonator sweep", "partial", "One or two resonators beat a GRU per unit on rhythm tasks, tie per parameter, and fail the adding control."],
+  ["11-11", "rule", "Merged world: eye, one layer, memory cells", "partial", "Decorrelation stops the layer collapsing: 77.8% = the eye's 76%.", null, ["eye", "mem"]],
+  ["11-11", "rule", "Two-pass contrastive co-resonance", "works", "The first rule where the model itself learns: 98% and 79% on tiny tasks (backprop 100 and 89)."],
+  ["11-12", "rule", "Equilibrium-propagation nudge", "works", "Eye 93.3% vs backprop 97.0%; the tiny tone task 92.7% beats backprop 89.2%. Still about 100x slower than backprop.", "rule"],
+  ["11-13", "tf", "Resonator tokenizer", "partial", "One token per 4-8 characters: 5.5-7x faster at 8k context for +0.2 bits per char."],
+  ["11-13", "ssm", "LinOSS with the energy readout", "null", "Lifts LinOSS on every score but only ties S4D; squared-state readouts are already published."],
+  ["11-13", "core", "Open problems check", "idea", "No single piece is new on its own; the best fit is on-device local learning with oscillators and the two-pass rule."]
+];
+const SITE = { agent: "../exp4/index.html", vision: "../exp5/index.html", lang: "../exp9/index.html", cell: "../exp8/index.html", vol: "../exp8/index.html", emo: "../exp11/index.html" };
+
+// ---------- history graph
+const $ = id => document.getElementById(id);
+const GW = () => (innerWidth < 560 ? 10 : 15);
+function drawLog() {
+  const sp = GW(), x = i => 8 + i * sp, rows = IDEAS.map((d, i) => ({ d, i })).reverse();
+  const span = {}; rows.forEach((r, k) => { const b = r.d[1]; (span[b] ||= [k, k])[1] = k; });
+  span.core = [0, rows.length - 1];
+  const log = $("log"); log.style.setProperty("--gw", (x(BR.length - 1) + 10) + "px"); log.innerHTML = "";
+  let lastDay = "";
+  rows.forEach((r, k) => {
+    const [date, b, title, v, text, model, merged] = r.d, bi = BI[b], col = BR[bi][2];
+    const li = document.createElement("li"); li.className = "row"; li.dataset.b = b; li.style.setProperty("--c", col);
+    let g = "";
+    for (const [key, [a, z]] of Object.entries(span)) {
+      if (k < a || k > z) continue;
+      const lc = BR[BI[key]][2], top = k === a ? "15px" : "0", bot = k === z ? "calc(100% - 15px)" : "0";
+      if (a === z && key !== "core") continue;
+      g += `<i style="left:${x(BI[key])}px;top:${top};bottom:${bot};background:${lc}"></i>`;
+    }
+    const links = [];
+    if (k === span[b][1] && b !== "core") links.push("core");
+    for (const m of merged || []) links.push(m);
+    for (const m of links) {
+      const a = Math.min(x(BI[m]), x(bi)), w = Math.abs(x(BI[m]) - x(bi));
+      g += `<i class="h" style="left:${a}px;width:${w}px;top:15px;background:${m === "core" ? col : BR[BI[m]][2]};opacity:${m === "core" ? 1 : .7}"></i>`;
+    }
+    g += `<span class="dot${b === "core" ? " t0" : ""}" style="left:${x(bi)}px;background:${col}"></span>`;
+    const day = date === lastDay ? "" : date; lastDay = date;
+    const sha = (0x9e3779b1 * (r.i + 7) >>> 0).toString(16).slice(0, 7);
+    const acts = [];
+    if (model) acts.push(`<button data-go="${model}">See it in 3D</button>`);
+    if (merged) acts.push(`<span class="small muted">builds on ${merged.map(m => BR[BI[m]][1].toLowerCase()).join(" and ")}</span>`);
+    li.innerHTML = `<div class="g">${g}</div><div class="t"><div class="meta"><span class="sha">${sha}</span><span>${day ? "2026-" + date : ""}</span><span>${BR[bi][1]}</span></div>` +
+      `<b>${title}</b> <span class="v ${v}">${v === "null" ? "no gain" : v}</span><p>${text}</p>${acts.length ? `<div class="acts">${acts.join("")}</div>` : ""}</div>`;
+    log.appendChild(li);
+  });
+  applyFilter();
+}
+let filter = null;
+function applyFilter() {
+  document.querySelectorAll("#log .row").forEach(r => r.classList.toggle("dim", !!filter && r.dataset.b !== filter));
+  document.querySelectorAll(".br").forEach(e => e.setAttribute("aria-pressed", String(e.dataset.b === filter)));
+}
+function drawLegend() {
+  const n = b => IDEAS.filter(d => d[1] === b).length;
+  $("legend").innerHTML = BR.map(([k, name, c, txt]) =>
+    `<button class="br" data-b="${k}" style="--c:${c}" aria-pressed="false"><b>${name} <span class="mono">· ${n(k)}</span></b><span>${txt}</span></button>`).join("");
+  $("legend").addEventListener("click", e => { const b = e.target.closest(".br"); if (!b) return; filter = filter === b.dataset.b ? null : b.dataset.b; applyFilter(); });
+}
+drawLegend(); drawLog();
+let lastW = innerWidth; addEventListener("resize", () => { if ((innerWidth < 560) !== (lastW < 560)) drawLog(); lastW = innerWidth; });
+$("log").addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) { Gallery.go(MODELS.findIndex(m => m.key === b.dataset.go)); $("stage").scrollIntoView({ behavior: "smooth", block: "center" }); } });
+
+// ---------- 3D helpers
+const T = window.THREE;
+const col = h => new T.Color(h);
+const std = (c, o) => new T.MeshStandardMaterial(Object.assign({ color: c, roughness: .55, metalness: .05 }, o || {}));
+const bas = (c, o) => new T.MeshBasicMaterial(Object.assign({ color: c }, o || {}));
+const SPH = T && new T.SphereGeometry(1, 16, 12), BOX = T && new T.BoxGeometry(1, 1, 1);
+function mesh(geo, m, x, y, z, s) { const o = new T.Mesh(geo, m); o.position.set(x || 0, y || 0, z || 0); if (s != null) o.scale.setScalar(s); return o; }
+const ball = (g, c, x, y, z, r, o) => { const m = mesh(SPH, std(c, o), x, y, z, r); g.add(m); return m; };
+const cube = (g, c, x, y, z, w, h, d, o) => { const m = mesh(BOX, std(c, o), x, y, z); m.scale.set(w, h, d); g.add(m); return m; };
+function seg(g, pts, c, o) { const geo = new T.BufferGeometry().setFromPoints(pts.map(p => new T.Vector3(...p))); const l = new T.Line(geo, new T.LineBasicMaterial(Object.assign({ color: c, transparent: true, opacity: .8 }, o || {}))); g.add(l); return l; }
+function tex(w, h, draw) { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); const t = new T.CanvasTexture(c); t.anisotropy = 4; return t; }
+function plane(g, t, x, y, z, w, h, o) { const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial(Object.assign({ map: t, transparent: true, side: T.DoubleSide }, o || {}))); m.position.set(x, y, z); g.add(m); return m; }
+function label(g, text, x, y, z, s, c) {
+  const t = tex(512, 96, (k, w, h) => { k.font = "600 46px -apple-system,Segoe UI,sans-serif"; k.fillStyle = c || "#eeecf4"; k.textAlign = "center"; k.textBaseline = "middle"; k.fillText(text, w / 2, h / 2); });
+  const sp = new T.Sprite(new T.SpriteMaterial({ map: t, transparent: true, depthWrite: false })); sp.position.set(x, y, z); sp.scale.set(9 * (s || 1), 1.7 * (s || 1), 1); g.add(sp); return sp;
+}
+function glyph(ch, fg, bg, font) { return tex(128, 128, (k, w, h) => { if (bg) { k.fillStyle = bg; k.fillRect(0, 0, w, h); } k.fillStyle = fg; k.font = font || "bold 104px Georgia,serif"; k.textAlign = "center"; k.textBaseline = "middle"; k.fillText(ch, w / 2, h / 2 + 6); }); }
+const glow = (m, a) => { m.material.emissive = m.material.color.clone(); m.material.emissiveIntensity = a; };
+const lerp = (a, b, t) => a + (b - a) * t, clamp01 = v => Math.max(0, Math.min(1, v));
+function curve(a, b, lift) { const c = new T.QuadraticBezierCurve3(new T.Vector3(...a), new T.Vector3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + lift, (a[2] + b[2]) / 2), new T.Vector3(...b)); return c; }
+function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
+
+// ---------- the models. build(g) fills the group and returns update(t, dt) (t in seconds)
+const MODELS = [
+{ key: "ssm", b: "ssm", title: "Pruning SSM states by Joaquin's " + RI_NAME, fresh: true, cam: [17, .5, .55],
+  cap: "Each arrow is one complex state of the Resonant Block, turning at its own frequency and shrinking by its decay. The bar is Joaquin's score: how much that state rings with the input. Every few seconds the weakest half is pruned and turns grey; accuracy barely moves (98.5 to 98.3% at 25% pruned).",
+  build(g) {
+    const N = 20, r = rng(3), st = [];
+    seg(g, Array.from({ length: 65 }, (_, i) => [7 * Math.cos(i / 64 * 6.283), 0, 7 * Math.sin(i / 64 * 6.283)]), "#3a3650");
+    for (let i = 0; i < N; i++) {
+      const a = i / N * 6.283, rho = .55 + .4 * r(), w = .4 + 3 * r(), score = Math.pow(r(), 1.3);
+      const px = 7 * Math.cos(a), pz = 7 * Math.sin(a);
+      const piv = new T.Group(); piv.position.set(px, 0, pz); g.add(piv);
+      const arm = cube(piv, "#7aa2ff", 0, 0, 0, 1.6 * rho, .12, .12); arm.position.x = .8 * rho;
+      const tip = ball(piv, "#cfe0ff", 1.6 * rho, 0, 0, .18);
+      const bar = cube(g, "#7aa2ff", px * .62, 0, pz * .62, .5, 1, .5);
+      st.push({ piv, arm, tip, bar, w, score, rho });
+    }
+    const order = st.map((s, i) => i).sort((a, b) => st[a].score - st[b].score);
+    ball(g, "#eeecf4", 0, 0, 0, .5, { emissive: "#7aa2ff", emissiveIntensity: .6 });
+    label(g, "input", 0, 1.3, 0, .55, "#a09cb3");
+    return t => {
+      const ph = (t % 10) / 10, cut = ph < .45 ? 0 : Math.min(N / 2, Math.floor((ph - .45) * 60));
+      st.forEach((s, i) => {
+        const dead = order.indexOf(i) < cut, grey = dead ? "#4a465c" : "#7aa2ff";
+        s.piv.rotation.y = -t * s.w; s.arm.material.color.set(grey); s.bar.material.color.set(dead ? "#4a465c" : "#a9c4ff");
+        const h = dead ? .15 : .3 + 2.6 * s.score * (.85 + .15 * Math.sin(t * s.w * 2));
+        s.bar.scale.y = h; s.bar.position.y = h / 2; s.tip.visible = !dead;
+      });
+    };
+  } },
+{ key: "agent", b: "agent", title: "Co-resonance wiring across layers", site: true, cam: [19, .7, .4],
+  cap: "Four layers of resonator nodes. Show the model one kind of input and the nodes that ring together, in any layer, get linked into a structure for it. Three concepts take turns here; each keeps its own structure, which is why old digits are not forgotten.",
+  build(g) {
+    const L = 4, n = 5, nodes = [], r = rng(11);
+    for (let l = 0; l < L; l++) for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) nodes.push(ball(g, "#3a4a5a", (i - 2) * 1.6, l * 2.6 - 3.9, (j - 2) * 1.6, .22));
+    const C = ["#6fc7d9", "#ffb340", "#ff6a8a"], sets = C.map(() => { const s = []; for (let l = 0; l < L; l++) for (let k = 0; k < 3; k++) s.push(l * 25 + Math.floor(r() * 25)); return s; });
+    const lines = sets.map((s, ci) => { const pts = []; s.forEach((a, i) => s.forEach((b, j) => { if (j > i && Math.abs((a / 25 | 0) - (b / 25 | 0)) <= 1 && r() < .55) pts.push(nodes[a].position.toArray(), nodes[b].position.toArray()); }));
+      const geo = new T.BufferGeometry().setFromPoints(pts.map(p => new T.Vector3(...p))); const ls = new T.LineSegments(geo, new T.LineBasicMaterial({ color: C[ci], transparent: true, opacity: 0 })); g.add(ls); return ls; });
+    for (let l = 0; l < L; l++) label(g, "layer " + (l + 1), -6.2, l * 2.6 - 3.9, 0, .5, "#a09cb3");
+    return t => {
+      const cur = Math.floor(t / 4) % 3, f = (t % 4) / 4;
+      nodes.forEach(m => { m.material.color.set("#3a4a5a"); m.scale.setScalar(.22); });
+      sets[cur].forEach(i => { nodes[i].material.color.set(C[cur]); nodes[i].scale.setScalar(.3 + .08 * Math.sin(t * 9 + i)); });
+      lines.forEach((ls, i) => { ls.material.opacity = i === cur ? Math.min(1, f * 2) : .18; });
+    };
+  } },
+{ key: "vision", b: "vision", title: "Retina, opponent channels and Gabor V1", site: true, cam: [18, .35, .2],
+  cap: "Left to right: a green digit, the cone-opponent channels with ON and OFF cells, a bank of Gabor cells (4 orientations, 2 scales) and the resonator body. The front end lifted digits and colours from 79.5 to 89.5%, but did not fix photos.",
+  build(g) {
+    plane(g, glyph("3", "#30d158", "#111"), -8, 0, 0, 3, 3);
+    const ch = [["red−green", "#ff6a6a"], ["blue−yellow", "#6a9dff"], ["light", "#dddddd"]];
+    ch.forEach(([n, c], i) => { plane(g, glyph("3", c, "#0c0c12"), -3.6, 2.4 - i * 2.4, 0, 2, 2, { opacity: .9 }); label(g, n, -3.6, 3.5 - i * 2.4, 0, .4, "#a09cb3"); });
+    const gab = [];
+    for (let o = 0; o < 4; o++) for (let s = 0; s < 2; s++) {
+      const t = tex(64, 64, (k, w, h) => { const im = k.createImageData(w, h), a = o * Math.PI / 4, f = s ? .45 : .25;
+        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const u = x - 32, v = y - 32, e = Math.exp(-(u * u + v * v) / 260), q = Math.cos(f * (u * Math.cos(a) + v * Math.sin(a)));
+          const p = (y * w + x) * 4, val = 128 + 120 * e * q; im.data[p] = val * .7; im.data[p + 1] = val; im.data[p + 2] = val * .85; im.data[p + 3] = 255; }
+        k.putImageData(im, 0, 0); });
+      gab.push(plane(g, t, 1 + s * 1.7, 2.7 - o * 1.8, 0, 1.5, 1.5));
+    }
+    const bars = []; for (let i = 0; i < 8; i++) bars.push(cube(g, "#8fc1ad", 6 + (i % 4) * .9, -1 + (i >> 2) * 3, 0, .5, 1, .5));
+    label(g, "Gabor V1", 1.85, 4.3, 0, .55); label(g, "resonators", 7.3, 3.6, 0, .55);
+    const pulse = ball(g, "#ffffff", -8, 0, 0, .2, { emissive: "#ffffff", emissiveIntensity: 1 });
+    return t => {
+      const f = (t % 4) / 4; pulse.position.x = lerp(-8, 8, f); pulse.position.y = Math.sin(f * 12) * .3;
+      gab.forEach((p, i) => p.material.opacity = .45 + .55 * clamp01(1 - Math.abs(f - .55) * 4) * (i % 3 ? 1 : .6) + .2);
+      bars.forEach((b, i) => { const h = .3 + 2 * clamp01(f * 1.3 - .55) * (.5 + .5 * Math.sin(t * (2 + i) + i)); b.scale.y = h; });
+    };
+  } },
+{ key: "cell", b: "cell", title: "Joaquin's neuron v2", site: true, cam: [16, .6, .35],
+  cap: "The soma decides in time (a sigmoid). Every connection is its own axon; the myelin sheath holds the resonators (rings that pulse at their own rhythm), and the oligodendrocyte (the small body above) reads them and sets the weight at the axon's end (the size of the end bulb).",
+  build(g) {
+    ball(g, "#e6c86e", 0, 0, 0, 1.2, { emissive: "#e6c86e", emissiveIntensity: .25 });
+    const tg = [[7, 2, -2], [7, -1.5, 2.5], [6, -3.5, -2.5]], ol = ball(g, "#c7b8ff", 2.5, 4, 0, .45), axons = [];
+    tg.forEach((p, i) => {
+      const c = curve([1, 0, 0], p, 1.5 - i); const tube = new T.Mesh(new T.TubeGeometry(c, 40, .09, 6), std("#8a7a4a")); g.add(tube);
+      ball(g, "#e6c86e", p[0] + .9, p[1], p[2], .7, { transparent: true, opacity: .6 });
+      const rings = [.3, .45, .6].map((u, k) => { const r = new T.Mesh(new T.TorusGeometry(.28, .08, 8, 20), std(["#ffd27a", "#ffa94d", "#ff7b5c"][k])); r.position.copy(c.getPoint(u)); r.lookAt(c.getPoint(u + .01)); g.add(r); seg(g, [ol.position.toArray(), r.position.toArray()], "#c7b8ff", { opacity: .35 }); return r; });
+      const bulb = ball(g, "#ffffff", ...c.getPoint(.97).toArray(), .25), spike = ball(g, "#fff3c4", 0, 0, 0, .14, { emissive: "#fff3c4", emissiveIntensity: 1 });
+      axons.push({ c, rings, bulb, spike, w: [2, 3.3, 5.1][i] });
+    });
+    label(g, "soma", 0, -1.9, 0, .55); label(g, "oligodendrocyte", 2.5, 5, 0, .55, "#c7b8ff");
+    return t => axons.forEach((a, i) => {
+      a.spike.position.copy(a.c.getPoint(((t * .45 + i * .33) % 1)));
+      a.rings.forEach((r, k) => { const s = 1 + .35 * Math.max(0, Math.sin(t * a.w * (k + 1) * .7)); r.scale.setScalar(s); });
+      a.bulb.scale.setScalar(.18 + .12 * (1 + Math.sin(t * .4 + i * 2)));
+    });
+  } },
+{ key: "vol", b: "vol", title: "Lattice volume trained by resonance", site: true, cam: [24, .8, .45],
+  cap: "A 10 x 10 x 10 lattice of resonant cells. The front face is driven by the image and the activity is meant to spread inward and form class regions. Honest picture: the drive fades within two or three slices, so the deep volume stays dark, and a trained lattice never beat a frozen random one.",
+  build(g) {
+    const N = 10, pos = [], colr = [];
+    for (let z = 0; z < N; z++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { pos.push(x - 4.5, y - 4.5, z * 1.1 - 5); colr.push(.2, .2, .25); }
+    const geo = new T.BufferGeometry(); geo.setAttribute("position", new T.Float32BufferAttribute(pos, 3)); geo.setAttribute("color", new T.Float32BufferAttribute(colr, 3));
+    const pts = new T.Points(geo, new T.PointsMaterial({ size: .42, vertexColors: true })); g.add(pts);
+    label(g, "image face", 0, 6, -5, .55, "#a09cb3"); label(g, "deep volume", 0, 6, 6, .55, "#a09cb3");
+    const C = [col("#d98fb8"), col("#6fc7d9"), col("#ffb340")];
+    return t => {
+      const cls = Math.floor(t / 3.5) % 3, c = C[cls], a = geo.attributes.color.array;
+      for (let z = 0; z < N; z++) for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+        const i = (z * 100 + y * 10 + x) * 3, reg = ((x + y * 3 + cls * 4) % 7) < 3, v = (reg ? 1 : .25) * Math.exp(-z / 1.3) * (.7 + .3 * Math.sin(t * 6 - z));
+        a[i] = .28 + c.r * v; a[i + 1] = .28 + c.g * v; a[i + 2] = .34 + c.b * v;
+      }
+      geo.attributes.color.needsUpdate = true;
+    };
+  } },
+{ key: "mem", b: "mem", title: "Memory cells that claim what is theirs", fresh: true, cam: [19, .25, .25],
+  cap: "Each sheet asks \"is this mine?\" and claims an image when its score passes its own line. Known shapes are claimed by their sheet; when nobody claims an image a tentative sheet opens (faint), and it is confirmed only when a second unclaimed image joins it.",
+  build(g) {
+    const sheets = [], C = ["#ff9f8a", "#6fc7d9", "#e6c86e", "#8fc1ad"];
+    const mk = (i, c) => { const s = new T.Group(); s.position.set(-6 + i * 4, 0, 0); g.add(s); const cells = [];
+      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) cells.push(cube(s, c, (a - 1.5) * .7, (b - 1.5) * .7, 0, .55, .55, .55, { transparent: true, opacity: .9 }));
+      const bar = cube(s, c, 0, -3.2, 0, .5, 1, .5); cube(s, "#eeecf4", 0, -3.2 + .9, 0, 1.4, .04, .04); return { s, cells, bar, c }; };
+    C.forEach((c, i) => sheets.push(mk(i, c)));
+    const nw = mk(4, "#d0b0ff"); nw.s.visible = false;
+    const shapes = ["●", "▲", "■", "★", "✚"], inp = plane(g, glyph("●", "#fff", "#1c1a27", "bold 90px sans-serif"), 0, 4.5, 0, 2, 2);
+    label(g, "claim line", -9.2, -2.3, 0, .45, "#a09cb3");
+    let last = -1;
+    return t => {
+      const k = Math.floor(t / 3) % 7, f = (t % 3) / 3, who = k < 4 ? k : 4;
+      if (k !== last) { inp.material.map.dispose(); inp.material.map = glyph(shapes[who], "#fff", "#1c1a27", "bold 90px sans-serif"); last = k; if (k === 0) nw.s.visible = false; }
+      sheets.concat([nw]).forEach((s, i) => { const mine = i === who, lv = mine ? (i === 4 ? .9 : 1.9) : .35 + .25 * Math.sin(i * 3 + t);
+        const h = .2 + lv * clamp01(f * 2); s.bar.scale.y = h; s.bar.position.y = -3.6 + h / 2; s.cells.forEach((c, j) => c.material.opacity = mine ? .5 + .5 * Math.abs(Math.sin(t * 4 + j)) : .35); });
+      if (k >= 4 && f > .5) { nw.s.visible = true; nw.cells.forEach(c => c.material.opacity = k === 4 ? .18 : .85); }
+    };
+  } },
+{ key: "eye", b: "eye", title: "Fovea saccades read by slow resonators", fresh: true, cam: [17, .2, .3],
+  cap: "The model never sees the whole image: a small fovea jumps over a 3 x 3 grid of fixations and drifts a little at each. Fast resonators ring within a fixation; slow ones ring across the whole scan, so they encode where things were in time. This beat its low-pass control (92.6 vs 73%).",
+  build(g) {
+    plane(g, glyph("7", "#e8e8ee", "#16161e"), -4, 1, 0, 7, 7);
+    const fov = new T.LineSegments(new T.EdgesGeometry(new T.PlaneGeometry(2.2, 2.2)), new T.LineBasicMaterial({ color: "#30d158" })); g.add(fov);
+    const trail = seg(g, [[0, 0, 0], [0, 0, 0]], "#30d158", { opacity: .4 });
+    const fast = [], slow = [];
+    for (let i = 0; i < 6; i++) fast.push(cube(g, "#30d158", 2.5 + i * .8, -2.5, 0, .5, 1, .5));
+    for (let i = 0; i < 6; i++) slow.push(cube(g, "#9ef0b8", 2.5 + i * .8, 1.5, 0, .5, 1, .5));
+    label(g, "slow, across fixations", 4.5, 4.2, 0, .5, "#9ef0b8"); label(g, "fast, within one", 4.5, -.7, 0, .5, "#30d158");
+    const fx = []; for (let j = 0; j < 3; j++) for (let i = 0; i < 3; i++) fx.push([-6.2 + i * 2.2, 3.2 - j * 2.2]);
+    return t => {
+      const s = t * 1.1, k = Math.floor(s) % 9, f = s % 1, p = fx[k];
+      fov.position.set(p[0] + .25 * Math.sin(f * 6), p[1] + .2 * Math.cos(f * 5), .05);
+      trail.geometry.setFromPoints(fx.slice(0, k + 1).map(q => new T.Vector3(q[0], q[1], .04)));
+      fast.forEach((b, i) => { const h = .2 + 1.4 * Math.abs(Math.sin(t * (6 + i * 2) + k)); b.scale.y = h; b.position.y = -4 + h / 2; });
+      slow.forEach((b, i) => { const h = .2 + 2.2 * Math.abs(Math.sin((k + f) * (i + 1) * .35)); b.scale.y = h; b.position.y = 0 + h / 2; });
+    };
+  } },
+{ key: "lang", b: "lang", title: "Reading a word and naming a colour", site: true, cam: [17, .3, .3],
+  cap: "Letter images feed letter cells, letter cells feed a word cell, and the word bonds to what it names: a colour patch or a count of dots. The full lesson-by-lesson reading model is on Exp9 and Exp10.",
+  build(g) {
+    const words = [["RED", "#ff5a5a"], ["BLUE", "#5a8dff"], ["GREEN", "#30d158"]], grp = new T.Group(); g.add(grp);
+    let cur = -1, parts = null;
+    const make = w => {
+      LabGL.dispose(grp); grp.clear();
+      const [s, c] = words[w], n = s.length, L = [], cells = [];
+      [...s].forEach((ch, i) => { const x = (i - (n - 1) / 2) * 1.8; L.push(plane(grp, glyph(ch, "#eeecf4", "#1c1a27"), x, 3.5, 0, 1.4, 1.4)); cells.push(ball(grp, "#ffb340", x, .8, 0, .35)); seg(grp, [[x, 2.8, 0], [x, 1.1, 0]], "#ffb340", { opacity: .4 }); });
+      const word = ball(grp, "#ffb340", 0, -1.8, 0, .6); cells.forEach(m => seg(grp, [m.position.toArray(), [0, -1.8, 0]], "#ffb340", { opacity: .5 }));
+      const patch = cube(grp, c, 5.5, -1.8, 0, 2, 2, .2); seg(grp, [[0, -1.8, 0], [4.4, -1.8, 0]], c);
+      label(grp, "letter cells", -6, .8, 0, .5, "#a09cb3"); label(grp, "word", -1.8, -3.1, 0, .5, "#a09cb3"); label(grp, "names", 5.5, -3.3, 0, .5, "#a09cb3");
+      return { L, cells, word, patch, n };
+    };
+    return t => {
+      const w = Math.floor(t / 4.5) % 3, f = (t % 4.5) / 4.5; if (w !== cur) { parts = make(w); cur = w; }
+      parts.cells.forEach((m, i) => { const on = f * (parts.n + 2) > i; glow(m, on ? .9 : .05); m.scale.setScalar(on ? .42 : .3); });
+      glow(parts.word, f > .7 ? 1 : .05); parts.patch.scale.z = f > .8 ? 1 + 2 * Math.sin(t * 5) ** 2 : .2;
+    };
+  } },
+{ key: "sound", b: "lang", title: "Spoken words through a resonator cochlea", fresh: true, cam: [19, .55, .3],
+  cap: "Sound comes in as a moving spectrogram, rings a spiral of resonators tuned low to high (like the cochlea), and lands in the core and shell cube of memory cells, which sleeps to move words from the shell to the core. Resonators matched a spectrogram (68%), far above low-pass (21%).",
+  build(g) {
+    const W = 64, spec = tex(W, 32, () => {}), cv = spec.image, k = cv.getContext("2d");
+    const sp = plane(g, spec, -7, 0, 0, 5, 3); const res = [];
+    for (let i = 0; i < 24; i++) { const a = i * .5, r = 3 - i * .1; res.push(ball(g, `hsl(${30 + i * 8},90%,60%)`, Math.cos(a) * r, Math.sin(a) * r, i * .15 - 1.5, .26)); }
+    const core = cube(g, "#ffb340", 7, 0, 0, 1.8, 1.8, 1.8, { emissive: "#ffb340", emissiveIntensity: .3 });
+    const shell = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(4, 4, 4)), new T.LineBasicMaterial({ color: "#ffd9a0" })); shell.position.set(7, 0, 0); g.add(shell);
+    label(g, "spectrogram", -7, 2.3, 0, .5, "#a09cb3"); label(g, "resonators", 0, 3.9, 0, .5, "#a09cb3"); label(g, "core + shell", 7, 3, 0, .5, "#a09cb3");
+    let col0 = 0;
+    return t => {
+      k.drawImage(cv, -1, 0); for (let y = 0; y < 32; y++) { const v = Math.max(0, Math.sin(t * 2 + y * .3) * Math.sin(t * .7 + y * .11)); k.fillStyle = `hsl(${30 + y * 6},90%,${8 + v * 55}%)`; k.fillRect(W - 1, 31 - y, 1, 1); }
+      spec.needsUpdate = true; col0++;
+      res.forEach((m, i) => m.scale.setScalar(.2 + .22 * Math.max(0, Math.sin(t * 2 + i * .9) * Math.sin(t * .7 + i * .35))));
+      core.rotation.y = shell.rotation.y = t * .3; core.scale.setScalar(1 + .08 * Math.sin(t * 3));
+    };
+  } },
+{ key: "loop", b: "emo", title: "The loop between senses and memory", fresh: true, cam: [17, .4, .3],
+  cap: "Joaquin's theory of the inner voice: a constant loop from the sensory cortex to long-term memory and back through a thalamus-like relay. When the input switches off (the sheet dims) the loop keeps a thought alive; a self-made tag (purple) marks it as imagined so it is not taken for something seen. The fear channel (red) runs on its own path.",
+  build(g) {
+    const sheet = []; for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) sheet.push(cube(g, "#30d158", (i - 2.5) * .9, -3, (j - 2.5) * .9, .7, .15, .7));
+    const mem = []; const r = rng(5); for (let i = 0; i < 14; i++) mem.push(ball(g, "#ffb340", (r() - .5) * 3, 3.2 + (r() - .5) * 1.6, (r() - .5) * 3, .32));
+    const relay = ball(g, "#eeecf4", 4.5, 0, 0, .45);
+    const path = new T.CatmullRomCurve3([[0, -2.6, 0], [4.5, 0, 0], [0, 2.6, 0], [-4.5, 0, 0]].map(p => new T.Vector3(...p)), true);
+    g.add(new T.Mesh(new T.TubeGeometry(path, 80, .05, 6, true), bas("#5a5670")));
+    const runner = ball(g, "#ffffff", 0, 0, 0, .22, { emissive: "#ffffff", emissiveIntensity: 1 }), tag = ball(g, "#b48cff", 0, 0, 0, .12, { emissive: "#b48cff", emissiveIntensity: 1 });
+    const fear = seg(g, [[-3, -3, 3], [-6, 0, 3], [-3, 3.2, 3]], "#ff6464", { opacity: .9 });
+    label(g, "senses", -4.2, -3.6, 0, .5, "#a09cb3"); label(g, "memory", 0, 5, 0, .5, "#a09cb3"); label(g, "relay", 6, .9, 0, .45, "#a09cb3"); label(g, "fear", -7, 0, 3, .45, "#ff6464");
+    return t => {
+      const off = (t % 12) > 6, u = (t * .25) % 1; runner.position.copy(path.getPoint(u)); tag.visible = off; tag.position.copy(path.getPoint((u + .985) % 1));
+      sheet.forEach((c, i) => { c.material.opacity = 1; glow(c, off ? .05 + .12 * Math.sin(t * 3 + i) ** 2 : .5 + .3 * Math.sin(t * 2 + i)); c.material.color.set(off ? "#2b5f3a" : "#30d158"); });
+      mem.forEach((m, i) => glow(m, .2 + .5 * Math.max(0, Math.sin(t * 2 + i))));
+      fear.material.opacity = .4 + .5 * Math.max(0, Math.sin(t * 1.3));
+    };
+  } },
+{ key: "gap", b: "cell", title: "Electrical synapses: a two-way channel", fresh: true, cam: [16, .3, .75],
+  cap: "Joaquin's idea: real neurons also join through gap junctions, channels that pass current both ways, so two ringing cells interfere. The surface is the sum of both cells' waves. The test was null: two-way junctions scored 0.814 vs 0.837 without them.",
+  build(g) {
+    const A = [-3.5, 0], B = [3.5, 0], nx = 46, nz = 26, pos = [];
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) pos.push((i - nx / 2) * .3, 0, (j - nz / 2) * .3);
+    const geo = new T.BufferGeometry(); geo.setAttribute("position", new T.Float32BufferAttribute(pos, 3));
+    g.add(new T.Points(geo, new T.PointsMaterial({ color: "#e6c86e", size: .09 })));
+    const a = ball(g, "#e6c86e", A[0], 1.2, 0, .8), b = ball(g, "#ffa94d", B[0], 1.2, 0, .8);
+    cube(g, "#eeecf4", 0, 1.2, 0, 5.4, .14, .14, { transparent: true, opacity: .5 });
+    label(g, "gap junction", 0, 2.1, 0, .5);
+    return t => {
+      const p = geo.attributes.position.array, wa = 3, wb = 3.6;
+      for (let k = 0; k < p.length; k += 3) { const x = p[k], z = p[k + 2], da = Math.hypot(x - A[0], z), db = Math.hypot(x - B[0], z);
+        p[k + 1] = .35 * (Math.sin(da * 2 - t * wa) / (1 + da * .4) + Math.sin(db * 2 - t * wb) / (1 + db * .4)); }
+      geo.attributes.position.needsUpdate = true; glow(a, .3 + .3 * Math.sin(t * wa)); glow(b, .3 + .3 * Math.sin(t * wb));
+    };
+  } },
+{ key: "rule", b: "rule", title: "Two-pass learning: free, then nudged", fresh: true, cam: [17, .35, .25],
+  cap: "Equilibrium-propagation style. In the free pass the net settles on its own answer (blue, flowing up). In the nudged pass the output is pulled a little toward the right answer (green, flowing down). Each link changes by how its co-resonance differs between the two passes (warm = strengthen, cool = weaken).",
+  build(g) {
+    const lay = [8, 6, 4], ns = lay.map((n, l) => Array.from({ length: n }, (_, i) => ball(g, "#b48cff", (i - (n - 1) / 2) * 1.3, l * 3 - 3, 0, .3)));
+    const links = []; const r = rng(9);
+    for (let l = 0; l < 2; l++) ns[l].forEach(a => ns[l + 1].forEach(b => { const ln = seg(g, [a.position.toArray(), b.position.toArray()], "#5a5670", { opacity: .35 }); links.push({ ln, d: r() - .5 }); }));
+    const target = 2, ph = label(g, "", 0, 5.2, 0, .7);
+    let lastP = -1;
+    return t => {
+      const p = Math.floor(t / 3) % 2, f = (t % 3) / 3;
+      if (p !== lastP) { ph.material.map.dispose(); ph.material.map = tex(512, 96, (k, w, h) => { k.font = "600 46px -apple-system,sans-serif"; k.fillStyle = p ? "#30d158" : "#7aa2ff"; k.textAlign = "center"; k.textBaseline = "middle"; k.fillText(p ? "nudged pass" : "free pass", w / 2, h / 2); }); lastP = p; }
+      ns.forEach((row, l) => row.forEach((m, i) => { const wave = p ? clamp01(f * 3 - (2 - l)) : clamp01(f * 3 - l); m.material.color.set(p ? (l === 2 && i === target ? "#30d158" : "#7fdca0") : "#7aa2ff"); glow(m, wave * .8); }));
+      links.forEach(o => { if (p && f > .7) { o.ln.material.color.set(o.d > 0 ? "#ff9f6a" : "#6ab0ff"); o.ln.material.opacity = .3 + Math.abs(o.d); } else { o.ln.material.color.set("#5a5670"); o.ln.material.opacity = .3; } });
+    };
+  } },
+{ key: "tf", b: "tf", title: "A cue gate picks a few patches for the ViT", fresh: true, cam: [18, .45, .35],
+  cap: "A 12 x 12 grid of patches from a scene. The cue (\"the red object\") and spectral colour-orientation energy light up the patches that matter; only those 6 of 144 rise and go to the transformer, about 5% of the compute, and it still beat the full ViT on CLEVR-style questions.",
+  build(g) {
+    const r = rng(21), cols = ["#ff5a5a", "#5a8dff", "#30d158", "#e6c86e"], P = [], obj = [];
+    for (let i = 0; i < 6; i++) obj.push([Math.floor(r() * 10) + 1, Math.floor(r() * 10) + 1, i < 2 ? 0 : 1 + (i % 3)]);
+    for (let j = 0; j < 12; j++) for (let i = 0; i < 12; i++) { const o = obj.find(q => Math.abs(q[0] - i) <= 0 && Math.abs(q[1] - j) <= 0), c = o ? cols[o[2]] : "#2a2838";
+      const m = cube(g, c, (i - 5.5) * .8 - 3, 0, (j - 5.5) * .8, .72, .12, .72); P.push({ m, hot: o && o[2] === 0, near: obj.some(q => q[2] === 0 && Math.abs(q[0] - i) <= 1 && Math.abs(q[1] - j) <= 1 && !(q[0] === i && q[1] === j)), base: m.position.clone() }); }
+    const sel = P.filter(p => p.hot || p.near).slice(0, 6);
+    const box = cube(g, "#5ac8fa", 6.5, 1.5, 0, 2.2, 3, 2.2, { transparent: true, opacity: .25 }); label(g, "transformer", 6.5, 3.6, 0, .5); label(g, "cue: red", -3, 1.8, -5.5, .5, "#ff5a5a");
+    return t => {
+      const f = (t % 6) / 6;
+      P.forEach(p => { p.m.position.copy(p.base); p.m.material.emissive = new T.Color(p.hot || p.near ? "#5ac8fa" : "#000"); p.m.material.emissiveIntensity = clamp01(f * 4) * .5; });
+      sel.forEach((p, i) => { const u = clamp01((f - .35) * 2.2); p.m.position.set(lerp(p.base.x, 6.5, u), lerp(0, .5 + i * .45, u) + Math.sin(u * 3.14) * 2, lerp(p.base.z, 0, u)); });
+      box.material.opacity = .2 + .3 * clamp01((f - .75) * 5);
+    };
+  } },
+{ key: "drone", b: "drone", title: "Two cameras find a far drone", fresh: true, cam: [17, .7, .35],
+  cap: "Joaquin's rig: two cameras 180 mm apart (drawn wider here). Each camera sees the drone as a few moving pixels among birds; the tracker locks on, matches it across both views and triangulates its 3D position from the disparity. On real flight data it found the drone 80% of the time with about 1.5 m error at 44-113 m.",
+  build(g) {
+    const L = [-1.2, -2, 6], R = [1.2, -2, 6];
+    [L, R].forEach(p => { cube(g, "#c7c7cc", p[0], p[1], p[2], .8, .6, 1); cube(g, "#5ac8fa", p[0], p[1], p[2] - .55, .4, .4, .2); });
+    cube(g, "#6e6e75", 0, -2.45, 6, 3, .1, .3);
+    const drone = new T.Group(); g.add(drone); cube(drone, "#eeecf4", 0, 0, 0, 1.1, .12, .12); cube(drone, "#eeecf4", 0, 0, 0, .12, .12, 1.1);
+    const est = ball(g, "#30d158", 0, 0, 0, .25, { transparent: true, opacity: .8 });
+    const rl = seg(g, [L, [0, 0, 0]], "#5ac8fa", { opacity: .6 }), rr = seg(g, [R, [0, 0, 0]], "#5ac8fa", { opacity: .6 });
+    const birds = Array.from({ length: 6 }, () => ball(g, "#6e6e75", 0, 0, 0, .18)), r = rng(4), bp = birds.map(() => [r() * 6.28, r() * 4, -2 - r() * 5]);
+    const trail = []; const tl = seg(g, [[0, 0, 0], [0, 0, 0]], "#30d158", { opacity: .5 });
+    label(g, "stereo rig", 0, -.7, 6, .5, "#a09cb3");
+    return t => {
+      const p = [6 * Math.sin(t * .35), 3 + 1.2 * Math.sin(t * .6), -3 + 2.5 * Math.cos(t * .35)]; drone.position.set(...p); drone.rotation.y = t * 4;
+      const e = [p[0] + .3 * Math.sin(t * 3), p[1] + .2 * Math.cos(t * 2.3), p[2] + .6 * Math.sin(t * 1.7)]; est.position.set(...e);
+      rl.geometry.setFromPoints([new T.Vector3(...L), drone.position]); rr.geometry.setFromPoints([new T.Vector3(...R), drone.position]);
+      trail.push(est.position.clone()); if (trail.length > 90) trail.shift(); tl.geometry.setFromPoints(trail);
+      birds.forEach((b, i) => { const q = bp[i]; b.position.set(7 * Math.cos(t * .5 + q[0]), q[1] + .3 * Math.sin(t * 4 + i), q[2] + 2 * Math.sin(t * .4 + q[0])); });
+    };
+  } }
+];
+
+// ---------- gallery: one renderer, one model at a time, built on demand and freed on leave
+const Gallery = (() => {
+  const cv = $("cv"); let gl = null, scene, cam, root, upd, idx = 0, t0 = 0, playing = true, lastSwap = 0, az = .5, el = .4, dist = 18, goal = 18;
+  const dots = $("gdots");
+  dots.innerHTML = MODELS.map((m, i) => `<button style="--c:${BR[BI[m.b]][2]}" aria-label="${m.title}" title="${m.title}">${i + 1}</button>`).join("");
+  dots.addEventListener("click", e => { const b = e.target.closest("button"); if (b) go([...dots.children].indexOf(b)); });
+  function show(i) {
+    idx = (i + MODELS.length) % MODELS.length; const m = MODELS[idx];
+    $("gtitle").textContent = m.title; $("gcap").textContent = m.cap; $("gcount").textContent = `${idx + 1} / ${MODELS.length}`;
+    $("gbadge").textContent = m.fresh ? "new 3D model" : BR[BI[m.b]][1]; $("gbadge").style.color = BR[BI[m.b]][2];
+    const link = SITE[m.key] || SITE[m.b]; $("glink").hidden = !(m.site && link); if (link) $("glink").href = link;
+    [...dots.children].forEach((d, k) => d.setAttribute("aria-current", String(k === idx)));
+    if (!gl) return;
+    if (root) { scene.remove(root); LabGL.dispose(root); }
+    root = new T.Group(); scene.add(root); upd = m.build(root); upd(0); const bb = new T.Box3().setFromObject(root), c = bb.getCenter(new T.Vector3()); root.position.sub(c);
+    [goal, az, el] = m.cam; goal *= Math.max(1, 1.5 / cam.aspect); dist = goal * 1.25; t0 = performance.now(); lastSwap = t0;
+  }
+  function go(i) { show(i); }
+  function init() {
+    if (!T || !window.LabGL) { $("stage").insertAdjacentHTML("beforeend", '<div class="gl-fail">The 3D library could not load. The history below still works.</div>'); return; }
+    gl = LabGL.start(cv, { antialias: true }); if (!gl) return;
+    scene = new T.Scene(); scene.background = new T.Color("#07060b");
+    cam = new T.PerspectiveCamera(45, 1, .1, 400);
+    scene.add(new T.HemisphereLight("#ffffff", "#30283f", .9)); const d = new T.DirectionalLight("#ffffff", .8); d.position.set(5, 10, 8); scene.add(d);
+    const fit = () => { const w = cv.clientWidth, h = cv.clientHeight; gl.renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); };
+    new ResizeObserver(fit).observe(cv); fit();
+    show(idx);
+    gl.loop(now => {
+      const t = Math.max(0, (now - t0) / 1000);
+      if (playing && now - lastSwap > 15000) show(idx + 1);
+      dist += (goal - dist) * .08; if (playing && !drag) az += .0015;
+      cam.position.set(dist * Math.cos(el) * Math.sin(az), dist * Math.sin(el), dist * Math.cos(el) * Math.cos(az)); cam.lookAt(0, 0, 0);
+      upd && upd(t); gl.renderer.render(scene, cam);
+    });
+    const ptrs = new Map(); let drag = null, pinch = null;
+    cv.addEventListener("pointerdown", e => { ptrs.set(e.pointerId, [e.clientX, e.clientY]); lastSwap = performance.now() + 20000;
+      if (ptrs.size === 1) drag = [e.clientX, e.clientY, az, el]; else { const [a, b] = [...ptrs.values()]; pinch = [Math.hypot(a[0] - b[0], a[1] - b[1]), goal]; drag = null; } });
+    cv.addEventListener("pointermove", e => { if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pinch && ptrs.size === 2) { const [a, b] = [...ptrs.values()]; goal = Math.max(6, Math.min(60, pinch[1] * pinch[0] / Math.max(20, Math.hypot(a[0] - b[0], a[1] - b[1])))); }
+      else if (drag) { az = drag[2] - (e.clientX - drag[0]) * .008; el = Math.max(-.2, Math.min(1.3, drag[3] + (e.clientY - drag[1]) * .006)); } });
+    const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (!ptrs.size) drag = null; };
+    cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up); cv.addEventListener("pointerleave", up);
+    cv.addEventListener("wheel", e => { e.preventDefault(); goal = Math.max(6, Math.min(60, goal * (1 + e.deltaY * .001))); }, { passive: false });
+  }
+  $("zin").onclick = () => goal = Math.max(6, goal * .8); $("zout").onclick = () => goal = Math.min(60, goal * 1.25);
+  $("gprev").onclick = () => show(idx - 1); $("gnext").onclick = () => show(idx + 1);
+  $("gplay").onclick = () => { playing = !playing; $("gplay").textContent = playing ? "Pause" : "Play"; lastSwap = performance.now(); };
+  init(); if (!gl) show(0);
+  return { go };
+})();
+</script>
+</body>
+</html>
