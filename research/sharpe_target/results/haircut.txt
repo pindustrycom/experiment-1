@@ -1,0 +1,12 @@
+pot (2019-01..2026-10) Sharpe     t    HC M=1   HC M=15   HC M=50  HC M=300  excess-over-SPY Sharpe -> haircut at M=300
+trend                   -0.07  -0.2     -0.07     -0.00     -0.00     -0.00  IR -0.27 -> -0.00
+reversal                 0.59   1.7      0.59      0.00      0.00      0.00  IR -0.00 -> -0.00
+SPY                      0.78   2.2      0.78      0.00      0.00      0.00
+best_ideas               0.99   2.8      0.99      0.39      0.00      0.00  IR +0.66 -> +0.00
+conviction               0.85   2.4      0.85      0.06      0.00      0.00  IR +0.34 -> +0.00
+pelosi                   0.93   2.6      0.93      0.26      0.00      0.00  IR +0.52 -> +0.00
+exp1                    -0.29  -0.8     -0.29     -0.00     -0.00     -0.00  IR -0.32 -> -0.00
+exp2                     1.88   5.2      1.88      1.60      1.48      1.29  IR +1.96 -> +1.41
+exp7                     0.06   0.2      0.06      0.00      0.00      0.00  IR +0.01 -> +0.00
+
+weekly reversal rebuilt here: x3.71, Sharpe 0.59; random 20 weekly: median x2.48 (5-95% 1.86-3.29), Sharpe median 0.52; reversal beats 100% of random on money, 68% on Sharpe; SPY x3.44 Sharpe 0.78
