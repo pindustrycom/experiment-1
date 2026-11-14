@@ -1,0 +1,90 @@
+name: Kronos forecast test
+
+# Research only, paper only (research/kronos): run the open-source Kronos candle model (github.com/shiyu-coder/Kronos,
+# NeoQuasar/Kronos-small on Hugging Face) out of sample on Bitcoin and Ether hourly candles from Sep 2025 (after the
+# model's release), keep every sampled forecast path, and publish them to the "kronos-results" release so the scoring
+# (analyze.py) can run anywhere. Nothing traded, nothing deployed, no keys.
+
+# Manual only: a pull_request trigger re-ran the ~3-hour job on every push to the PR (its path filter looks at the
+# whole PR diff) and would overwrite the published results with a different data cut.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the results release
+
+concurrency:
+  group: kronos-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  KRONOS_COMMIT: 67b630e   # shiyu-coder/Kronos main on 2026-04-13
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install numpy pandas
+      - run: mkdir -p /tmp/data && python research/kronos/fetch.py /tmp/data BTCUSDT ETHUSDT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: data
+          path: /tmp/data
+
+  forecast:
+    needs: fetch
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: pip install numpy pandas einops==0.8.1 huggingface_hub==0.33.1 safetensors==0.6.2 tqdm
+      - name: Kronos code at a pinned commit
+        run: |
+          git clone https://github.com/shiyu-coder/Kronos /tmp/Kronos
+          git -C /tmp/Kronos checkout "$KRONOS_COMMIT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: data
+          path: /tmp/data
+      - name: Forecast
+        run: mkdir -p /tmp/out && python research/kronos/forecast.py /tmp/data /tmp/Kronos /tmp/out --shard ${{ matrix.shard }} --shards 20
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: paths-${{ matrix.shard }}
+          path: /tmp/out
+
+  publish:
+    needs: forecast
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: /tmp/all
+      - name: Publish to the results release
+        run: |
+          mkdir -p /tmp/pub
+          cp /tmp/all/paths-*/*.npz /tmp/all/paths-0/model_info.json /tmp/pub/ 2>/dev/null || true
+          cp /tmp/all/data/*.csv /tmp/pub/
+          tar czf /tmp/kronos-results.tar.gz -C /tmp/pub .
+          gh release view kronos-results --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create kronos-results --repo "$GITHUB_REPOSITORY" --title "Kronos forecast test" \
+              --notes "Sampled Kronos-small forecast paths for research/kronos (BTC, ETH hourly, Sep 2025 on). Research only."
+          gh release upload kronos-results /tmp/kronos-results.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
