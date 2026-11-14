@@ -1,0 +1,11 @@
+symbol,model,qlike,vs_garch,t_vs_garch,log_r2,log_slope,bias_ratio
+BTCUSDT,kronos,0.9131,0.4249,5.65,0.121,0.36,0.9
+BTCUSDT,kronos_x_level_fixed,0.8155,0.3274,5.03,0.121,0.36,1.0
+BTCUSDT,ewma,0.4622,-0.026,-0.74,0.173,0.61,1.24
+BTCUSDT,garch,0.4882,0.0,,0.188,0.91,2.39
+BTCUSDT,har,0.383,-0.1052,-5.38,0.225,0.88,1.54
+ETHUSDT,kronos,1.2303,0.7858,3.66,0.126,0.36,0.81
+ETHUSDT,kronos_x_level_fixed,0.9812,0.5368,3.19,0.126,0.36,1.0
+ETHUSDT,ewma,0.5216,0.0772,1.14,0.186,0.62,1.25
+ETHUSDT,garch,0.4445,0.0,,0.182,0.82,1.97
+ETHUSDT,har,0.4205,-0.024,-0.68,0.232,0.86,1.48

@@ -1,0 +1,650 @@
+{
+ "n_origins": {
+  "BTCUSDT": {
+   "n": 2629,
+   "first": "2025-09-01 00:00:00",
+   "last": "2026-11-13 00:00:00"
+  },
+  "ETHUSDT": {
+   "n": 1315,
+   "first": "2025-09-01 00:00:00",
+   "last": "2026-11-13 00:00:00"
+  }
+ },
+ "direction": [
+  {
+   "symbol": "BTCUSDT",
+   "h": 1,
+   "n": 2629,
+   "hit_kronos": 0.5089,
+   "hit_always_up": 0.4918,
+   "hit_momentum": 0.4816,
+   "share_called_up": 0.45,
+   "auc_mean": 0.5136,
+   "auc_prob_up": 0.5091,
+   "rank_ic": 0.0229,
+   "ic_t": 1.08,
+   "p": 0.2813,
+   "ic_momentum": -0.0262,
+   "corr_kronos_vs_past_return": -0.278,
+   "p_holm": 1.0
+  },
+  {
+   "symbol": "BTCUSDT",
+   "h": 2,
+   "n": 2629,
+   "hit_kronos": 0.5112,
+   "hit_always_up": 0.4945,
+   "hit_momentum": 0.485,
+   "share_called_up": 0.44,
+   "auc_mean": 0.5218,
+   "auc_prob_up": 0.5209,
+   "rank_ic": 0.0322,
+   "ic_t": 1.54,
+   "p": 0.1238,
+   "ic_momentum": -0.0309,
+   "corr_kronos_vs_past_return": -0.253,
+   "p_holm": 1.0
+  },
+  {
+   "symbol": "BTCUSDT",
+   "h": 4,
+   "n": 2629,
+   "hit_kronos": 0.4983,
+   "hit_always_up": 0.5002,
+   "hit_momentum": 0.4713,
+   "share_called_up": 0.449,
+   "auc_mean": 0.5044,
+   "auc_prob_up": 0.5025,
+   "rank_ic": 0.0104,
+   "ic_t": 0.53,
+   "p": 0.596,
+   "ic_momentum": -0.0368,
+   "corr_kronos_vs_past_return": -0.277,
+   "p_holm": 1.0
+  },
+  {
+   "symbol": "BTCUSDT",
+   "h": 8,
+   "n": 2629,
+   "hit_kronos": 0.4998,
+   "hit_always_up": 0.5101,
+   "hit_momentum": 0.469,
+   "share_called_up": 0.44,
+   "auc_mean": 0.5032,
+   "auc_prob_up": 0.5025,
+   "rank_ic": 0.0096,
+   "ic_t": 0.41,
+   "p": 0.6786,
+   "ic_momentum": -0.0429,
+   "corr_kronos_vs_past_return": -0.304,
+   "p_holm": 1.0
+  },
+  {
+   "symbol": "BTCUSDT",
+   "h": 24,
+   "n": 2629,
+   "hit_kronos": 0.4739,
+   "hit_always_up": 0.5055,
+   "hit_momentum": 0.5029,
+   "share_called_up": 0.46,
+   "auc_mean": 0.4673,
+   "auc_prob_up": 0.4761,
+   "rank_ic": -0.0416,
+   "ic_t": -1.09,
+   "p": 0.2739,
+   "ic_momentum": -0.0038,
+   "corr_kronos_vs_past_return": -0.333,
+   "p_holm": 1.0
+  },
+  {
+   "symbol": "ETHUSDT",
+   "h": 1,
+   "n": 1315,
+   "hit_kronos": 0.5156,
+   "hit_always_up": 0.5065,
+   "hit_momentum": 0.4783,
+   "share_called_up": 0.433,
+   "auc_mean": 0.512,
+   "auc_prob_up": 0.5139,
+   "rank_ic": -0.0104,
+   "ic_t": -0.36,
+   "p": 0.7221,
+   "ic_momentum": -0.0144,
+   "corr_kronos_vs_past_return": -0.337,
+   "p_holm": 1.0
+  },
+  {
+   "symbol": "ETHUSDT",
+   "h": 2,
+   "n": 1315,
+   "hit_kronos": 0.4867,
+   "hit_always_up": 0.5141,
+   "hit_momentum": 0.4821,
+   "share_called_up": 0.444,
+   "auc_mean": 0.4811,
+   "auc_prob_up": 0.4864,
+   "rank_ic": -0.0344,
+   "ic_t": -1.18,
+   "p": 0.2398,
+   "ic_momentum": -0.0129,
+   "corr_kronos_vs_past_return": -0.278,
+   "p_holm": 1.0
+  },
+  {
+   "symbol": "ETHUSDT",
+   "h": 4,
+   "n": 1315,
+   "hit_kronos": 0.4814,
+   "hit_always_up": 0.5141,
+   "hit_momentum": 0.492,
+   "share_called_up": 0.43,
+   "auc_mean": 0.4823,
+   "auc_prob_up": 0.4901,
+   "rank_ic": -0.0387,
+   "ic_t": -1.36,
+   "p": 0.1746,
+   "ic_momentum": 0.0149,
+   "corr_kronos_vs_past_return": -0.312,
+   "p_holm": 1.0
+  },
+  {
+   "symbol": "ETHUSDT",
+   "h": 8,
+   "n": 1315,
+   "hit_kronos": 0.5027,
+   "hit_always_up": 0.508,
+   "hit_momentum": 0.4798,
+   "share_called_up": 0.418,
+   "auc_mean": 0.5071,
+   "auc_prob_up": 0.5082,
+   "rank_ic": 0.0185,
+   "ic_t": 0.66,
+   "p": 0.508,
+   "ic_momentum": -0.0362,
+   "corr_kronos_vs_past_return": -0.331,
+   "p_holm": 1.0
+  },
+  {
+   "symbol": "ETHUSDT",
+   "h": 24,
+   "n": 1315,
+   "hit_kronos": 0.508,
+   "hit_always_up": 0.4989,
+   "hit_momentum": 0.4875,
+   "share_called_up": 0.459,
+   "auc_mean": 0.5184,
+   "auc_prob_up": 0.5147,
+   "rank_ic": 0.0194,
+   "ic_t": 0.49,
+   "p": 0.626,
+   "ic_momentum": 0.0039,
+   "corr_kronos_vs_past_return": -0.302,
+   "p_holm": 1.0
+  }
+ ],
+ "vol": [
+  {
+   "symbol": "BTCUSDT",
+   "model": "kronos",
+   "qlike": 0.9131,
+   "vs_garch": 0.4249,
+   "t_vs_garch": 5.65,
+   "log_r2": 0.121,
+   "log_slope": 0.36,
+   "bias_ratio": 0.9
+  },
+  {
+   "symbol": "BTCUSDT",
+   "model": "kronos_x_level_fixed",
+   "qlike": 0.8155,
+   "vs_garch": 0.3274,
+   "t_vs_garch": 5.03,
+   "log_r2": 0.121,
+   "log_slope": 0.36,
+   "bias_ratio": 1.0
+  },
+  {
+   "symbol": "BTCUSDT",
+   "model": "ewma",
+   "qlike": 0.4622,
+   "vs_garch": -0.026,
+   "t_vs_garch": -0.74,
+   "log_r2": 0.173,
+   "log_slope": 0.61,
+   "bias_ratio": 1.24
+  },
+  {
+   "symbol": "BTCUSDT",
+   "model": "garch",
+   "qlike": 0.4882,
+   "vs_garch": 0.0,
+   "t_vs_garch": NaN,
+   "log_r2": 0.188,
+   "log_slope": 0.91,
+   "bias_ratio": 2.39
+  },
+  {
+   "symbol": "BTCUSDT",
+   "model": "har",
+   "qlike": 0.383,
+   "vs_garch": -0.1052,
+   "t_vs_garch": -5.38,
+   "log_r2": 0.225,
+   "log_slope": 0.88,
+   "bias_ratio": 1.54
+  },
+  {
+   "symbol": "BTCUSDT",
+   "note": "kronos_x_level_fixed rescales Kronos by the in-sample ratio of geometric means (look-ahead in the level, kept only to see the ranking skill)"
+  },
+  {
+   "symbol": "ETHUSDT",
+   "model": "kronos",
+   "qlike": 1.2303,
+   "vs_garch": 0.7858,
+   "t_vs_garch": 3.66,
+   "log_r2": 0.126,
+   "log_slope": 0.36,
+   "bias_ratio": 0.81
+  },
+  {
+   "symbol": "ETHUSDT",
+   "model": "kronos_x_level_fixed",
+   "qlike": 0.9812,
+   "vs_garch": 0.5368,
+   "t_vs_garch": 3.19,
+   "log_r2": 0.126,
+   "log_slope": 0.36,
+   "bias_ratio": 1.0
+  },
+  {
+   "symbol": "ETHUSDT",
+   "model": "ewma",
+   "qlike": 0.5216,
+   "vs_garch": 0.0772,
+   "t_vs_garch": 1.14,
+   "log_r2": 0.186,
+   "log_slope": 0.62,
+   "bias_ratio": 1.25
+  },
+  {
+   "symbol": "ETHUSDT",
+   "model": "garch",
+   "qlike": 0.4445,
+   "vs_garch": 0.0,
+   "t_vs_garch": NaN,
+   "log_r2": 0.182,
+   "log_slope": 0.82,
+   "bias_ratio": 1.97
+  },
+  {
+   "symbol": "ETHUSDT",
+   "model": "har",
+   "qlike": 0.4205,
+   "vs_garch": -0.024,
+   "t_vs_garch": -0.68,
+   "log_r2": 0.232,
+   "log_slope": 0.86,
+   "bias_ratio": 1.48
+  },
+  {
+   "symbol": "ETHUSDT",
+   "note": "kronos_x_level_fixed rescales Kronos by the in-sample ratio of geometric means (look-ahead in the level, kept only to see the ranking skill)"
+  }
+ ],
+ "calibration": {
+  "BTCUSDT": {
+   "rank_counts_0_to_S": [
+    689,
+    232,
+    160,
+    134,
+    144,
+    160,
+    166,
+    241,
+    703
+   ],
+   "expected_each": 292.1,
+   "chi2_p": 0.0,
+   "inside_min_max": 0.471,
+   "inside_expected": 0.778,
+   "path_sd_24h_%": 1.05,
+   "realized_abs_24h_%": 1.14
+  },
+  "ETHUSDT": {
+   "rank_counts_0_to_S": [
+    321,
+    104,
+    103,
+    85,
+    87,
+    64,
+    94,
+    110,
+    347
+   ],
+   "expected_each": 146.1,
+   "chi2_p": 1.446067942114998e-131,
+   "inside_min_max": 0.492,
+   "inside_expected": 0.778,
+   "path_sd_24h_%": 1.29,
+   "realized_abs_24h_%": 1.54
+  }
+ },
+ "trading": {
+  "BTCUSDT": {
+   "0bp": {
+    "kronos_long_flat": {
+     "total_%": -20.6,
+     "cagr_%": -17.4,
+     "vol_%": 27.5,
+     "sharpe": -0.56,
+     "max_dd_%": -35.9,
+     "share_long": 0.449,
+     "trades_per_year": 745.0
+    },
+    "kronos_long_short": {
+     "total_%": -11.6,
+     "cagr_%": -9.8,
+     "vol_%": 41.3,
+     "sharpe": -0.04,
+     "max_dd_%": -31.7,
+     "share_long": 0.449,
+     "trades_per_year": 1489.0
+    },
+    "momentum_long_flat": {
+     "total_%": -4.3,
+     "cagr_%": -3.6,
+     "vol_%": 29.3,
+     "sharpe": 0.02,
+     "max_dd_%": -35.4
+    },
+    "hold": {
+     "total_%": -36.3,
+     "cagr_%": -31.3,
+     "vol_%": 41.3,
+     "sharpe": -0.7,
+     "max_dd_%": -53.4
+    },
+    "donchian_4h": {
+     "total_%": 6.8,
+     "cagr_%": 5.7,
+     "vol_%": 21.0,
+     "sharpe": 0.37,
+     "max_dd_%": -22.0
+    },
+    "kronos_long_flat_vs_same_exposure_hold_t": -0.13
+   },
+   "5bp": {
+    "kronos_long_flat": {
+     "total_%": -49.2,
+     "cagr_%": -43.2,
+     "vol_%": 27.6,
+     "sharpe": -1.91,
+     "max_dd_%": -52.7,
+     "share_long": 0.449,
+     "trades_per_year": 745.0
+    },
+    "kronos_long_short": {
+     "total_%": -63.9,
+     "cagr_%": -57.2,
+     "vol_%": 41.4,
+     "sharpe": -1.84,
+     "max_dd_%": -65.3,
+     "share_long": 0.449,
+     "trades_per_year": 1489.0
+    },
+    "momentum_long_flat": {
+     "total_%": -52.3,
+     "cagr_%": -46.0,
+     "vol_%": 29.4,
+     "sharpe": -1.95,
+     "max_dd_%": -56.1
+    },
+    "hold": {
+     "total_%": -36.3,
+     "cagr_%": -31.3,
+     "vol_%": 41.3,
+     "sharpe": -0.7,
+     "max_dd_%": -53.4
+    },
+    "donchian_4h": {
+     "total_%": 4.8,
+     "cagr_%": 4.0,
+     "vol_%": 21.0,
+     "sharpe": 0.29,
+     "max_dd_%": -22.6
+    },
+    "kronos_long_flat_vs_same_exposure_hold_t": -2.18
+   },
+   "10bp": {
+    "kronos_long_flat": {
+     "total_%": -67.6,
+     "cagr_%": -60.9,
+     "vol_%": 27.7,
+     "sharpe": -3.25,
+     "max_dd_%": -68.7,
+     "share_long": 0.449,
+     "trades_per_year": 745.0
+    },
+    "kronos_long_short": {
+     "total_%": -85.3,
+     "cagr_%": -79.7,
+     "vol_%": 41.7,
+     "sharpe": -3.62,
+     "max_dd_%": -85.2,
+     "share_long": 0.449,
+     "trades_per_year": 1489.0
+    },
+    "momentum_long_flat": {
+     "total_%": -76.2,
+     "cagr_%": -69.7,
+     "vol_%": 29.4,
+     "sharpe": -3.91,
+     "max_dd_%": -77.0
+    },
+    "hold": {
+     "total_%": -36.4,
+     "cagr_%": -31.4,
+     "vol_%": 41.3,
+     "sharpe": -0.7,
+     "max_dd_%": -53.4
+    },
+    "donchian_4h": {
+     "total_%": 2.9,
+     "cagr_%": 2.4,
+     "vol_%": 21.0,
+     "sharpe": 0.22,
+     "max_dd_%": -23.2
+    },
+    "kronos_long_flat_vs_same_exposure_hold_t": -4.22
+   },
+   "25bp": {
+    "kronos_long_flat": {
+     "total_%": -91.6,
+     "cagr_%": -87.2,
+     "vol_%": 28.3,
+     "sharpe": -7.13,
+     "max_dd_%": -91.5,
+     "share_long": 0.449,
+     "trades_per_year": 745.0
+    },
+    "kronos_long_short": {
+     "total_%": -99.0,
+     "cagr_%": -97.9,
+     "vol_%": 43.2,
+     "sharpe": -8.67,
+     "max_dd_%": -99.0,
+     "share_long": 0.449,
+     "trades_per_year": 1489.0
+    },
+    "momentum_long_flat": {
+     "total_%": -97.1,
+     "cagr_%": -94.7,
+     "vol_%": 30.0,
+     "sharpe": -9.64,
+     "max_dd_%": -97.1
+    },
+    "hold": {
+     "total_%": -36.4,
+     "cagr_%": -31.5,
+     "vol_%": 41.3,
+     "sharpe": -0.71,
+     "max_dd_%": -53.4
+    },
+    "donchian_4h": {
+     "total_%": -2.8,
+     "cagr_%": -2.4,
+     "vol_%": 21.0,
+     "sharpe": -0.01,
+     "max_dd_%": -25.0
+    },
+    "kronos_long_flat_vs_same_exposure_hold_t": -10.11
+   }
+  },
+  "ETHUSDT": {
+   "0bp": {
+    "kronos_long_flat": {
+     "total_%": -6.3,
+     "cagr_%": -5.2,
+     "vol_%": 37.6,
+     "sharpe": 0.04,
+     "max_dd_%": -40.6,
+     "share_long": 0.418,
+     "trades_per_year": 386.0
+    },
+    "kronos_long_short": {
+     "total_%": 58.1,
+     "cagr_%": 46.4,
+     "vol_%": 57.8,
+     "sharpe": 0.95,
+     "max_dd_%": -47.2,
+     "share_long": 0.418,
+     "trades_per_year": 773.0
+    },
+    "momentum_long_flat": {
+     "total_%": -36.9,
+     "cagr_%": -31.8,
+     "vol_%": 40.4,
+     "sharpe": -0.75,
+     "max_dd_%": -46.8
+    },
+    "hold": {
+     "total_%": -56.0,
+     "cagr_%": -49.5,
+     "vol_%": 57.8,
+     "sharpe": -0.89,
+     "max_dd_%": -66.9
+    },
+    "kronos_long_flat_vs_same_exposure_hold_t": 0.89
+   },
+   "5bp": {
+    "kronos_long_flat": {
+     "total_%": -25.7,
+     "cagr_%": -21.9,
+     "vol_%": 37.6,
+     "sharpe": -0.47,
+     "max_dd_%": -44.4,
+     "share_long": 0.418,
+     "trades_per_year": 386.0
+    },
+    "kronos_long_short": {
+     "total_%": -0.6,
+     "cagr_%": -0.5,
+     "vol_%": 57.8,
+     "sharpe": 0.28,
+     "max_dd_%": -51.8,
+     "share_long": 0.418,
+     "trades_per_year": 773.0
+    },
+    "momentum_long_flat": {
+     "total_%": -55.1,
+     "cagr_%": -48.7,
+     "vol_%": 40.4,
+     "sharpe": -1.45,
+     "max_dd_%": -57.6
+    },
+    "hold": {
+     "total_%": -56.0,
+     "cagr_%": -49.5,
+     "vol_%": 57.8,
+     "sharpe": -0.89,
+     "max_dd_%": -66.9
+    },
+    "kronos_long_flat_vs_same_exposure_hold_t": 0.15
+   },
+   "10bp": {
+    "kronos_long_flat": {
+     "total_%": -41.1,
+     "cagr_%": -35.6,
+     "vol_%": 37.6,
+     "sharpe": -0.98,
+     "max_dd_%": -48.6,
+     "share_long": 0.418,
+     "trades_per_year": 386.0
+    },
+    "kronos_long_short": {
+     "total_%": -37.6,
+     "cagr_%": -32.5,
+     "vol_%": 57.9,
+     "sharpe": -0.39,
+     "max_dd_%": -56.1,
+     "share_long": 0.418,
+     "trades_per_year": 773.0
+    },
+    "momentum_long_flat": {
+     "total_%": -68.1,
+     "cagr_%": -61.4,
+     "vol_%": 40.5,
+     "sharpe": -2.15,
+     "max_dd_%": -68.8
+    },
+    "hold": {
+     "total_%": -56.0,
+     "cagr_%": -49.5,
+     "vol_%": 57.8,
+     "sharpe": -0.89,
+     "max_dd_%": -66.9
+    },
+    "kronos_long_flat_vs_same_exposure_hold_t": -0.6
+   },
+   "25bp": {
+    "kronos_long_flat": {
+     "total_%": -70.7,
+     "cagr_%": -64.0,
+     "vol_%": 37.7,
+     "sharpe": -2.51,
+     "max_dd_%": -71.7,
+     "share_long": 0.418,
+     "trades_per_year": 386.0
+    },
+    "kronos_long_short": {
+     "total_%": -84.6,
+     "cagr_%": -78.9,
+     "vol_%": 58.3,
+     "sharpe": -2.37,
+     "max_dd_%": -86.6,
+     "share_long": 0.418,
+     "trades_per_year": 773.0
+    },
+    "momentum_long_flat": {
+     "total_%": -88.6,
+     "cagr_%": -83.6,
+     "vol_%": 40.6,
+     "sharpe": -4.24,
+     "max_dd_%": -88.6
+    },
+    "hold": {
+     "total_%": -56.1,
+     "cagr_%": -49.6,
+     "vol_%": 57.8,
+     "sharpe": -0.89,
+     "max_dd_%": -66.9
+    },
+    "kronos_long_flat_vs_same_exposure_hold_t": -2.86
+   }
+  }
+ }
+}
