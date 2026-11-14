@@ -53,8 +53,8 @@ every 4 hours at 5 bp a side turned BTC's -36% into -49%; the live pot's Donchia
 | ETH | 24h | 50.8% | 49.9% | 0.518 | +0.019 | 0.49 | 1.0 |
 
 What the model does: its mean path leans against the last move (rank correlation with the previous same-length
-return -0.25 to -0.34) and it calls "down" 55-58% of the time. Short-term reversal on its own has no edge here either
-(momentum IC -0.004 to -0.043), so Kronos is mostly a noisy reversal signal.
+return -0.25 to -0.34) and it calls "down" 54-58% of the time. Short-term reversal on its own has no edge here either
+(momentum IC between -0.043 and +0.015), so Kronos is mostly a noisy reversal signal.
 
 ### Volatility (next 24h realized variance; lower QLIKE is better, vs GARCH)
 
@@ -91,7 +91,7 @@ round trip of costs at 5 bp removes all of it.
 
 - Direction: same as every BTC model so far (state-space, GRU, stochastic vol in research/btc_ssm): no edge.
 - Risk: worse than GARCH, HAR and the Student-t GRU; HAR stays the best 24h vol forecast.
-- Trading: the BTC Donchian pot beat holding by about 41 points over this window with ~20 trades; Kronos loses to costs.
+- Trading: the BTC Donchian pot beat holding by about 41 points over this window; Kronos loses to costs.
 - Edge-test standard (research/edge_tests, PR #50 haircut): nothing here comes close to passing (Holm p = 1.0 on all
   10 direction tests), so Exp2's synthetic vol trade is still the only survivor.
 
