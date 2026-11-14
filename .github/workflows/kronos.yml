@@ -5,9 +5,9 @@ name: Kronos forecast test
 # model's release), keep every sampled forecast path, and publish them to the "kronos-results" release so the scoring
 # (analyze.py) can run anywhere. Nothing traded, nothing deployed, no keys.
 
+# Manual only: a pull_request trigger re-ran the ~3-hour job on every push to the PR (its path filter looks at the
+# whole PR diff) and would overwrite the published results with a different data cut.
 on:
-  pull_request:
-    paths: ["research/kronos/fetch.py", "research/kronos/forecast.py", ".github/workflows/kronos.yml"]
   workflow_dispatch:
 
 permissions:
@@ -69,7 +69,7 @@ jobs:
 
   publish:
     needs: forecast
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
