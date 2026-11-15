@@ -1,0 +1,44 @@
+name: TTWO GTA VI data
+
+# Research only, paper only (research/ttwo_gta): Take-Two daily prices, today's option chain (Cboe), earnings dates
+# (SEC), USD/CAD (Bank of Canada) and recent Take-Two / GTA 6 headlines scored by Haiku. Saved to the "ttwo-gta-data"
+# release (the chain under a dated name too, so later runs build a history around the GTA VI launch). Nothing is traded.
+
+on:
+  pull_request:
+    paths: ["research/ttwo_gta/**", ".github/workflows/ttwo-gta.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the data release
+
+concurrency:
+  group: ttwo-gta-data
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      SEC_USER_AGENT: ${{ vars.SEC_USER_AGENT }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install pandas numpy requests anthropic
+      - run: python research/ttwo_gta/fetch.py /tmp/out
+      - name: Save to release
+        run: |
+          cd /tmp/out
+          stamp=$(date -u +%Y%m%d)
+          if [ -f chain_TTWO.json ]; then cp chain_TTWO.json "chain_TTWO_${stamp}.json"; fi
+          ls -la
+          tar czf /tmp/ttwo-gta-data.tar.gz .
+          mv /tmp/ttwo-gta-data.tar.gz .
+          gh release view ttwo-gta-data -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create ttwo-gta-data -R "$GITHUB_REPOSITORY" --title "TTWO GTA VI study (research data)" --notes "Prices, option chains, earnings dates, FX and headlines for research/ttwo_gta. Paper research only."
+          gh release upload ttwo-gta-data -R "$GITHUB_REPOSITORY" ttwo-gta-data.tar.gz $(ls chain_TTWO_*.json 2>/dev/null) --clobber
