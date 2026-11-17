@@ -40,6 +40,7 @@ def reload_markets(self, force=False, *, load_leverage_tiers=True):
 
 
 E.Exchange.reload_markets = reload_markets
+E.Exchange.validate_pricing = lambda self, pricing: None     # ticker pricing is never used in a backtest
 E.Exchange.fetch_trading_fees = lambda self: {}
 E.Exchange.additional_exchange_init = lambda self: None
 

@@ -72,14 +72,22 @@ for asset in a.assets.split(","):
     for cls, sdir, tf, run_tf in jobs:
         done = f"{a.out}/{label}_{mode}_{cls}{a.tag}.done"
         if os.path.exists(done):
-            continue
+            old = json.load(open(done))
+            # done = it ran and its export exists (first CI runs recorded no zip name; their spot exports were fine)
+            if old.get("ok") and (os.path.exists(f"{a.out}/{old['zip']}") if old.get("zip") else mode == "S"):
+                continue
+        prefix = f"res_{label}_{mode}_{run_tf}-"
+        before = set(glob.glob(f"{a.out}/{prefix}*.zip"))
         cmd = [sys.executable, f"{HERE}/ftrun.py", "backtesting", "-c", cpath, "-s", cls, "--strategy-path", sdir,
                "--timeframe", run_tf, "--timerange", a.timerange, "--export", "trades", "--cache", "none",
                "--backtest-directory", f"{a.out}/res_{label}_{mode}_{run_tf}", "--datadir", os.path.abspath(a.datadir),
                "--userdir", os.path.abspath(a.out)]
         env = dict(os.environ, FT_BASES=",".join(x for x in asset.split("+")))
         r = subprocess.run(cmd, capture_output=True, text=True, env=env)
+        new = sorted(set(glob.glob(f"{a.out}/{prefix}*.zip")) - before)
+        ok = r.returncode == 0 and bool(new)      # freqtrade can exit 0 after a configuration error
         meta = {"strategy": cls, "asset": label, "pairs": pairs, "native_tf": tf, "run_tf": run_tf, "mode": mode,
-                "fee": a.fee, "ok": r.returncode == 0, "err": "" if r.returncode == 0 else r.stderr[-1500:]}
+                "fee": a.fee, "ok": ok, "zip": os.path.basename(new[-1]) if new else None,
+                "err": "" if ok else r.stderr[-1500:]}
         open(done, "w").write(json.dumps(meta))
         print(label, mode, cls, tf, run_tf, "OK" if meta["ok"] else "FAIL " + r.stderr[-300:].replace("\n", " "), flush=True)
