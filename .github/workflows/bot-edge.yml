@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [ft5m, nfi_btc, nfi_eth, nfi_basket]
+        part: [ft5m, nfi_btc, nfi_eth, nfi_basket, nfi_oos_x4, nfi_oos_x5, nfi_oos_x6]
     env:
       GH_TOKEN: ${{ github.token }}
     defaults:
@@ -54,12 +54,19 @@ jobs:
           for f in /tmp/fts/user_data/strategies/lookahead_bias/*.py; do cp "$f" "/tmp/strats/LA_$(basename "$f")"; done
           cp /tmp/fts/user_data/strategies/futures/*.py /tmp/strats_fut/
           cp /tmp/nfi/NostalgiaForInfinityX7.py /tmp/nfi_s/
+          # out-of-sample: each NFI generation exactly as it stood on a past date, tested only on later data
+          mkdir -p /tmp/nfi_x4 /tmp/nfi_x5 /tmp/nfi_x6
+          git -C /tmp/nfi show 418bfa6f03fa2b3d4c4c15c3a8044e5ef80592bd:NostalgiaForInfinityX4.py > /tmp/nfi_x4/NostalgiaForInfinityX4.py  # 2023-12-30
+          git -C /tmp/nfi show e5b345a8d81e4559572cc0806d86d9178d0719e1:NostalgiaForInfinityX5.py > /tmp/nfi_x5/NostalgiaForInfinityX5.py  # 2024-12-30
+          git -C /tmp/nfi show cd6e1b7e891a9a83def47b884f1ec15e6afd4098:NostalgiaForInfinityX6.py > /tmp/nfi_x6/NostalgiaForInfinityX6.py  # 2025-07-01
           sed -i "s/^from numpy.lib import math/import math/" /tmp/strats/*.py /tmp/strats_fut/*.py   # numpy 2 removed numpy.lib.math
 
       - name: Binance 5-minute bars
         run: |
-          if [ "${{ matrix.part }}" = nfi_basket ]; then python prep_data.py binance /tmp/data "$BASKET" 2022-09
-          else python prep_data.py binance /tmp/data BTCUSDT,ETHUSDT 2018-10; fi
+          case "${{ matrix.part }}" in
+            nfi_basket|nfi_oos_*) python prep_data.py binance /tmp/data "$BASKET" 2022-09 ;;
+            *) python prep_data.py binance /tmp/data BTCUSDT,ETHUSDT 2018-10 ;;
+          esac
 
       - name: Earlier exports (a re-run only scores what is already done)
         run: |
@@ -85,6 +92,12 @@ jobs:
               B=$(echo "$BASKET" | sed 's/USDT//g; s/,/+/g')
               python ft_batch.py --strategies /tmp/nfi_s --assets "$B" --fee 0.001 --tfs 5m --max-open-trades 6 \
                 --timerange 20230101- --datadir /tmp/data --out /tmp/out | tee /tmp/out.log ;;
+            nfi_oos_*)
+              v=${{ matrix.part }}; v=${v#nfi_oos_}
+              case $v in x4) T=20240101-;; x5) T=20250101-;; x6) T=20250701-;; esac
+              B=$(echo "$BASKET" | sed 's/USDT//g; s/,/+/g')
+              python ft_batch.py --strategies /tmp/nfi_$v --assets "$B" --fee 0.001 --tfs 5m --max-open-trades 6 \
+                --timerange "$T" --datadir /tmp/data --out /tmp/out | tee /tmp/out.log ;;
           esac
           grep -h FAIL /tmp/out.log || true
 

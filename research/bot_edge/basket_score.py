@@ -4,7 +4,7 @@
 
 Equity is freqtrade's own wallet export (cash plus every holding marked to the candle's price), so CAGR, Sharpe and
 drawdown are freqtrade's numbers. For the random-timing test each coin's holding weight (its value over equity,
-held over the next bar) is shifted in time by its own random offset (at least 20 days), 2000 draws, and the gross
+held over the next bar) is shifted in time by its own random offset (at least 20 days), 20,000 draws, and the gross
 weight x return sum is compared with the real one. Benchmark: equal-weight basket of the same coins, daily rebalanced.
 Also reports how much of the profit came from the five best days (crash rebounds, where 5-minute close fills are
 least realistic).
@@ -51,8 +51,8 @@ def shift_z(m, draws):
 
 
 allm = np.ones(len(R), bool)
-_, p, zz = shift_z(allm, 2000)
-half = pd.Timestamp("2025-01-01", tz="UTC")
+_, p, zz = shift_z(allm, 20000)
+half = R.index[len(R) // 2]                                   # split the sample in two halves
 _, p1, z1 = shift_z(np.asarray(R.index < half), 500)
 _, p2, z2 = shift_z(np.asarray(R.index >= half), 500)
 dn = eq.resample("1D").last().pct_change().dropna()
@@ -70,6 +70,6 @@ row = {"source": "NostalgiaForInfinity (basket)", "strategy": strat, "asset": f"
        "ft_profit_total": s["profit_total"], "win_rate": float((tr.profit_ratio > 0).mean()), "years": len(dn) / 365,
        "top5_days_profit_share": float(byday.head(5).sum() / tr.profit_abs.sum()), "top5_days": ",".join(byday.head(5).index),
        "cagr_h1": ek.perf(dn[dn.index < half], 365)["cagr"], "cagr_h2": ek.perf(dn[dn.index >= half], 365)["cagr"],
-       "note": "sample 2023-01 to 2026-10, halves split at 2025-01-01"}
+       "note": f"sample {R.index[0]:%Y-%m-%d} to {R.index[-1]:%Y-%m-%d}, halves split at {half:%Y-%m-%d}"}
 pd.DataFrame([row]).to_csv(out, index=False)
 print(json.dumps(row, indent=1, default=str))
