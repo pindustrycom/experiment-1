@@ -58,6 +58,16 @@ def metas(dirs):
     return m
 
 
+def wallet_equity(zpath):
+    zz = zipfile.ZipFile(zpath)
+    names = [n for n in zz.namelist() if n.endswith("_wallet.feather")]
+    if not names:
+        return None
+    import io
+    w = pd.read_feather(io.BytesIO(zz.read(names[0])))
+    return w.groupby("date").total_quote.sum()
+
+
 def score_zip(z, datadir, meta):
     tag = os.path.basename(z).split("-")[0].split("_")      # res_BTC_S_1h / res_BTC_0 (old) / res_BTC_F (old)
     asset = tag[1]
@@ -71,13 +81,25 @@ def score_zip(z, datadir, meta):
         b = bars(datadir, asset, s["timeframe"])
         tr = trades_on(b, s["trades"])
         net, gross, pos = ek.bar_returns_from_trades(b, tr, fee)
+        # position adjustments (DCA, sliced orders) or leverage: open/close replay is wrong, use freqtrade's own equity
+        complex_ = any(len(t["orders"]) > 2 or t["leverage"] != 1 for t in s["trades"])
+        if complex_:
+            eq = wallet_equity(z)
+            if eq is not None:
+                eq = eq.reindex(b.index, method="ffill").bfill()
+                net = eq.pct_change().fillna(0.0)
+                gross = net.copy()
         r = ek.score(b, net, gross, pos, 365 if crypto else 252, len(tr))
+        if complex_:
+            r["gross_cagr"] = r["gross_sharpe"] = np.nan
         mt = meta.get((asset, mode, strat), {})
         r.update({"source": "freqtrade" + (" (shorts allowed)" if mode == "F" else ""), "strategy": strat, "asset": asset,
                   "tf": s["timeframe"], "native_tf": mt.get("native_tf", s["timeframe"]), "fee": fee,
                   "ft_profit_total": s["profit_total"],
                   "win_rate": float(np.mean([t["profit_ratio"] > 0 for t in s["trades"]])) if s["trades"] else np.nan,
-                  "lookahead_flag": strat in {"DevilStra", "GodStraNew", "Zeus", "wtc"}})
+                  "lookahead_flag": strat in {"DevilStra", "GodStraNew", "Zeus", "wtc"},
+                  "note": ("position adjustments/leverage: performance from freqtrade's wallet, random test on entry-exit spans; "
+                           f"max leverage {max(t['leverage'] for t in s['trades']):.0f}x") if complex_ else ""})
         rows.append(r)
     return rows
 
