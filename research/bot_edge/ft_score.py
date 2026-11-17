@@ -1,18 +1,31 @@
-"""Score freqtrade's own backtest results (exported trades) with evalkit."""
-import glob, json, sys, zipfile, os
-import numpy as np, pandas as pd
-sys.path.insert(0, os.path.dirname(__file__))
-import evalkit as ek
+"""Score freqtrade's own trade exports with evalkit (one row per strategy and market).
 
-DATA = "/tmp/claude-0/ft_ud/data/binance"
+  python ft_score.py DATADIR OUT.csv RESULT_DIR [RESULT_DIR ...]
+
+Each zip in a result dir is one freqtrade backtest (one strategy, one pair). The trades are replayed bar by bar on
+the bars freqtrade used (entry and exit at freqtrade's fill prices, its fee on both sides), so the CAGR here matches
+freqtrade's own total profit; the bars also give the position series for the random-timing test.
+"""
+import glob
+import json
+import os
+import sys
+import zipfile
+
+import numpy as np
+import pandas as pd
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import evalkit as ek  # noqa: E402
+
+CRYPTO = {"BTC", "ETH", "SOL", "XRP", "ADA", "DOGE", "LTC", "LINK", "AVAX", "DOT", "TRX", "ATOM"}
 _bars = {}
 
 
-def bars(asset, tf, fut=False):
-    k = (asset, tf)
+def bars(datadir, base, tf):
+    k = (datadir, base, tf)
     if k not in _bars:
-        d = pd.read_feather(f"{DATA}/{asset}_USDT-{tf}.feather").set_index("date").sort_index()
-        _bars[k] = d
+        _bars[k] = pd.read_feather(f"{datadir}/{base}_USDT-{tf}.feather").set_index("date").sort_index()
     return _bars[k]
 
 
@@ -22,47 +35,62 @@ def load(zpath):
     return json.loads(z.read(name))["strategy"]
 
 
-def score_dir(zpath, asset, fee, run_tf, native_tf, source="freqtrade", strat_only=None):
+def trades_on(b, trades):
+    idx = b.index
+    out = []
+    for t in trades:
+        i0 = idx.searchsorted(pd.Timestamp(t["open_date"]))
+        i1 = min(idx.searchsorted(pd.Timestamp(t["close_date"])), len(idx) - 1)
+        out.append((min(i0, len(idx) - 1), i1, -1 if t["is_short"] else 1, t["open_rate"], t["close_rate"]))
+    return out
+
+
+def metas(dirs):
+    m = {}
+    for d in dirs:
+        for f in glob.glob(f"{d}/*.done"):
+            j = json.load(open(f))
+            if "strategy" in j:
+                m[(j["asset"], j["mode"], j["strategy"])] = j
+            else:   # first sandbox batch: <ASSET>_<fee>_<Strategy>.json.done
+                a, fee, cls = os.path.basename(f)[:-len(".json.done")].split("_", 2)
+                m[(a, "F" if fee.startswith("F") else "S", cls)] = j
+    return m
+
+
+def score_zip(z, datadir, meta):
+    tag = os.path.basename(z).split("-")[0].split("_")      # res_BTC_S_1h / res_BTC_0 (old) / res_BTC_F (old)
+    asset = tag[1]
+    mode = "F" if tag[2] == "F" else "S"
     rows = []
-    for strat, s in load(zpath).items():
-        if strat_only and strat != strat_only:
-            continue
-        b = bars(asset, run_tf)
-        idx = b.index
-        tr = []
-        for t in s["trades"]:
-            i0 = idx.get_indexer([pd.Timestamp(t["open_date"])])[0]
-            i1 = idx.get_indexer([pd.Timestamp(t["close_date"])])[0]
-            if i0 < 0:
-                i0 = idx.searchsorted(pd.Timestamp(t["open_date"]))
-            if i1 < 0:
-                i1 = min(idx.searchsorted(pd.Timestamp(t["close_date"])), len(idx) - 1)
-            tr.append((i0, i1, -1 if t["is_short"] else 1, t["open_rate"], t["close_rate"]))
+    for strat, s in load(z).items():
+        if asset.startswith("BASKET"):
+            continue                                            # scored by basket_score.py
+        crypto = asset in CRYPTO
+        fee = s["trades"][0]["fee_open"] if s["trades"] else (0.001 if crypto else 0.0002)
+        b = bars(datadir, asset, s["timeframe"])
+        tr = trades_on(b, s["trades"])
         net, gross, pos = ek.bar_returns_from_trades(b, tr, fee)
-        per_year = 365 if asset in ("BTC", "ETH") else 252
-        row = ek.score(b, net, gross, pos, per_year, len(tr))
-        row.update({"source": source, "strategy": strat, "asset": asset, "tf": run_tf, "native_tf": native_tf,
-                    "ft_profit_total": s["profit_total"], "ft_cagr": s.get("cagr"), "win_rate": float(np.mean([t["profit_ratio"] > 0 for t in s["trades"]])) if s["trades"] else np.nan})
-        rows.append(row)
+        r = ek.score(b, net, gross, pos, 365 if crypto else 252, len(tr))
+        mt = meta.get((asset, mode, strat), {})
+        r.update({"source": "freqtrade" + (" (shorts allowed)" if mode == "F" else ""), "strategy": strat, "asset": asset,
+                  "tf": s["timeframe"], "native_tf": mt.get("native_tf", s["timeframe"]), "fee": fee,
+                  "ft_profit_total": s["profit_total"],
+                  "win_rate": float(np.mean([t["profit_ratio"] > 0 for t in s["trades"]])) if s["trades"] else np.nan,
+                  "lookahead_flag": strat in {"DevilStra", "GodStraNew", "Zeus", "wtc"}})
+        rows.append(r)
     return rows
 
 
 if __name__ == "__main__":
-    out = []
-    meta = {}
-    for done in glob.glob("ftout/*.json.done"):
-        a, f, cls = os.path.basename(done)[:-len(".json.done")].split("_", 2)
-        meta[(a, cls)] = json.load(open(done))
-    for z in sorted(glob.glob("ftout/res_*.zip")):
-        tag = os.path.basename(z).split("-")[0]          # res_BTC_0 / res_BTC_F
-        asset = tag.split("_")[1]
-        fut = tag.endswith("_F")
-        fee = (0.0005 if fut else 0.001) if asset in ("BTC", "ETH") else 0.0002
-        for strat, s in load(z).items():
-            m = meta.get((asset, strat), {"native_tf": s["timeframe"]})
-            rows = score_dir(z, asset, fee, s["timeframe"], m["native_tf"], "freqtrade" + (" futures" if fut else ""), strat_only=strat)
-            out += rows
-            for x in rows:
-                print(f"{asset} {x['strategy']:28} {x['tf']:4} trades {x['trades']:5d} cagr {x['cagr']:+.1%} gross {x['gross_cagr']:+.1%} "
-                      f"(ft {x['ft_profit_total']:+.0%}) sh {x['sharpe']:.2f} hold {x['hold_sharpe']:.2f} p_rand {x['p_random']:.3f} z {x['z_random']:+.1f} a_t {x['alpha_t']:+.1f}", flush=True)
-    pd.DataFrame(out).to_csv(sys.argv[1] if len(sys.argv) > 1 else "ft_rows.csv", index=False)
+    datadir, out, dirs = sys.argv[1], sys.argv[2], sys.argv[3:]
+    meta = metas(dirs)
+    rows = []
+    for d in dirs:
+        for z in sorted(glob.glob(f"{d}/res_*.zip")):
+            for x in score_zip(z, datadir, meta):
+                rows.append(x)
+                print(f"{x['asset']:4} {x['strategy']:28} {x['tf']:4} n {x['trades']:5d} cagr {x['cagr']:+.1%} gross {x['gross_cagr']:+.1%} "
+                      f"(ft {x['ft_profit_total']:+.0%}) sh {x['sharpe']:.2f} hold {x['hold_sharpe']:.2f} p {x['p_random']:.3f} "
+                      f"z {x['z_random']:+.1f} a_t {x['alpha_t']:+.1f}", flush=True)
+    pd.DataFrame(rows).to_csv(out, index=False)

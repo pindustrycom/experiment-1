@@ -2,8 +2,10 @@
 functions (jesse.indicators) and an event loop that follows Jesse's order flow: signal at a candle's close, market
 fill at the next open, stop / take-profit checked on each candle's range (stop first), update_position at closes.
 Full stake per trade (the originals size by risk %, which only scales returns)."""
-import sys, os
-import numpy as np, pandas as pd
+import sys
+import os
+import numpy as np
+import pandas as pd
 import jesse.indicators as ta
 sys.path.insert(0, os.path.dirname(__file__))
 import evalkit as ek

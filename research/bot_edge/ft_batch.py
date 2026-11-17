@@ -47,7 +47,7 @@ for d in a.strategies:
         if not mm:
             continue
         cls = mm.group(1)
-        shorts = bool(re.search(r"can_short\s*(:\s*bool)?\s*=\s*True", src))
+        shorts = bool(re.search(r"^\s+can_short\s*(:\s*bool)?\s*=\s*True", src, re.M))   # class attribute, not self.can_short
         if cls in SKIP or (names and cls not in names) or shorts != a.futures:
             continue
         m = re.search(r"^\s+timeframe\s*=\s*['\"](\w+)['\"]", src, re.M)

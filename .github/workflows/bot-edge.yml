@@ -54,12 +54,19 @@ jobs:
           for f in /tmp/fts/user_data/strategies/lookahead_bias/*.py; do cp "$f" "/tmp/strats/LA_$(basename "$f")"; done
           cp /tmp/fts/user_data/strategies/futures/*.py /tmp/strats_fut/
           cp /tmp/nfi/NostalgiaForInfinityX7.py /tmp/nfi_s/
-          sed -i 's/^from numpy.lib import math/import math/' /tmp/strats/*.py   # numpy 2 removed numpy.lib.math
+          sed -i "s/^from numpy.lib import math/import math/" /tmp/strats/*.py /tmp/strats_fut/*.py   # numpy 2 removed numpy.lib.math
 
       - name: Binance 5-minute bars
         run: |
           if [ "${{ matrix.part }}" = nfi_basket ]; then python prep_data.py binance /tmp/data "$BASKET" 2022-09
           else python prep_data.py binance /tmp/data BTCUSDT,ETHUSDT 2018-10; fi
+
+      - name: Earlier exports (a re-run only scores what is already done)
+        run: |
+          mkdir -p /tmp/out
+          if gh release download bot-edge-results --repo "$GITHUB_REPOSITORY" --pattern "bot-edge-${{ matrix.part }}.tar.gz" --dir /tmp/prev; then
+            tar xzf /tmp/prev/bot-edge-${{ matrix.part }}.tar.gz -C /tmp/out && rm -f /tmp/out/out.log; fi
+          ls /tmp/out | head
 
       - name: Backtest
         run: |
@@ -81,10 +88,17 @@ jobs:
           esac
           grep -h FAIL /tmp/out.log || true
 
+      - name: Score (random-timing test, costs, halves, alpha vs holding)
+        if: always()
+        run: |
+          python ft_score.py /tmp/data /tmp/out/rows_${{ matrix.part }}.csv /tmp/out | tail -60
+          for z in /tmp/out/res_BASKET*.zip; do [ -f "$z" ] && python basket_score.py /tmp/data "$z" /tmp/out/rows_basket.csv; done; true
+
       - name: Upload trade exports
         if: always()
         run: |
-          cd /tmp/out && tar czf /tmp/bot-edge-${{ matrix.part }}.tar.gz *.zip *.done ../out.log 2>/dev/null || tar czf /tmp/bot-edge-${{ matrix.part }}.tar.gz .
+          cp /tmp/out.log /tmp/out/out.log 2>/dev/null || true
+          cd /tmp/out && tar czf /tmp/bot-edge-${{ matrix.part }}.tar.gz $(ls *.zip *.done *.csv out.log 2>/dev/null)
           gh release view bot-edge-results --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create bot-edge-results --repo "$GITHUB_REPOSITORY" --title "Bot edge test results" \
               --notes "freqtrade trade exports from .github/workflows/bot-edge.yml (research only)." --prerelease

@@ -460,3 +460,11 @@ def qt_bollinger_w(d, n=20, k=2.0):
             cur = 0
         pos[i] = cur
     return pd.Series(pos, d.index)
+
+
+# ---------------- kernc/backtesting.py README example ----------------
+def btpy_smacross(d, n1=10, n2=20):
+    """SmaCross from the backtesting.py README: buy on the 10/20 SMA cross up, close and sell short on the cross down
+    (always in the market, long or short)."""
+    s1, s2 = sma(d.close, n1), sma(d.close, n2)
+    return pd.Series(np.where(s1 > s2, 1.0, np.where(s1 < s2, -1.0, np.nan)), d.index).ffill().fillna(0)

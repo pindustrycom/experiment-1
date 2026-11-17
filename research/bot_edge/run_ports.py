@@ -1,6 +1,8 @@
 """Backtest the hand-ported bots (hummingbot, Superalgos, huseinzol05, quant-trading) and score them."""
-import sys, os
-import numpy as np, pandas as pd
+import sys
+import os
+import numpy as np
+import pandas as pd
 sys.path.insert(0, os.path.dirname(__file__))
 import evalkit as ek
 import ports as P
@@ -35,7 +37,17 @@ def add(src, name, asset, tf, d, trades, fee, per_year, start="2019-01-01", note
           f"hold {r['hold_sharpe']:.2f} p {r['p_random']:.3f} z {r['z_random']:+.1f} a_t {r['alpha_t']:+.1f}", flush=True)
 
 
+ONLY_EXTRA = len(sys.argv) > 3 and sys.argv[3] == "extra"
+
 for asset in ("BTC", "ETH", "SPY", "QQQ"):
+    crypto = asset in ("BTC", "ETH")
+    py = 365 if crypto else 252
+    fee = FEE["crypto"] if crypto else FEE["stock"]
+    for tf in ("1d", "1h"):
+        d = load(asset, tf)
+        add("backtesting.py", "SmaCross 10/20 (README)", asset, tf, d, P.signal_trades(d, P.btpy_smacross(d).to_numpy()), fee, py)
+    if ONLY_EXTRA:
+        continue
     crypto = asset in ("BTC", "ETH")
     py = 365 if crypto else 252
     fee = FEE["crypto"] if crypto else FEE["stock"]
