@@ -1,0 +1,91 @@
+name: Bot edge test (5-minute crypto part)
+
+# Research only, paper only (research/bot_edge). Runs freqtrade's own backtester, offline (ftrun.py supplies a fixed
+# market table instead of calling an exchange), on Binance spot 5-minute bars from data.binance.vision (public, no key).
+# The sandbox that did the rest of the study has only hourly crypto bars, so this job covers what needs 5-minute bars:
+# freqtrade community strategies written for 5m/15m/30m, and NostalgiaForInfinity X7 (single pair and a 12-coin basket).
+# No exchange keys, no live trading, nothing deployed. Trade exports go to the bot-edge-results release.
+
+on:
+  pull_request:
+    paths: ["research/bot_edge/**", ".github/workflows/bot-edge.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bot-edge-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FT_STRATS_SHA: f3340ce11f5bdf62f598522e64d1f5638eaa13f5   # freqtrade/freqtrade-strategies, 2026-09-08
+  NFI_SHA: 3243cbe4350479f49e4edbeade4684d4dc78ae0b         # iterativv/NostalgiaForInfinity, 2026-11-17 (X7 v17.5.266)
+  BASKET: BTCUSDT,ETHUSDT,SOLUSDT,XRPUSDT,ADAUSDT,DOGEUSDT,LTCUSDT,LINKUSDT,AVAXUSDT,DOTUSDT,TRXUSDT,ATOMUSDT
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [ft5m, nfi_btc, nfi_eth, nfi_basket]
+    env:
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: research/bot_edge
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: research/bot_edge/requirements.txt
+      - run: pip install -r requirements.txt
+
+      - name: Strategy repos (pinned commits)
+        run: |
+          git clone -q https://github.com/freqtrade/freqtrade-strategies /tmp/fts && git -C /tmp/fts checkout -q "$FT_STRATS_SHA"
+          git clone -q --filter=blob:none https://github.com/iterativv/NostalgiaForInfinity /tmp/nfi && git -C /tmp/nfi checkout -q "$NFI_SHA"
+          mkdir -p /tmp/strats /tmp/strats_fut /tmp/nfi_s
+          find /tmp/fts/user_data/strategies -name '*.py' -not -path '*futures*' -not -path '*lookahead_bias*' -exec cp {} /tmp/strats/ \;
+          for f in /tmp/fts/user_data/strategies/lookahead_bias/*.py; do cp "$f" "/tmp/strats/LA_$(basename "$f")"; done
+          cp /tmp/fts/user_data/strategies/futures/*.py /tmp/strats_fut/
+          cp /tmp/nfi/NostalgiaForInfinityX7.py /tmp/nfi_s/
+          sed -i 's/^from numpy.lib import math/import math/' /tmp/strats/*.py   # numpy 2 removed numpy.lib.math
+
+      - name: Binance 5-minute bars
+        run: |
+          if [ "${{ matrix.part }}" = nfi_basket ]; then python prep_data.py binance /tmp/data "$BASKET" 2022-09
+          else python prep_data.py binance /tmp/data BTCUSDT,ETHUSDT 2018-10; fi
+
+      - name: Backtest
+        run: |
+          set -o pipefail
+          case "${{ matrix.part }}" in
+            ft5m)
+              python ft_batch.py --strategies /tmp/strats --assets BTC,ETH --fee 0.001 --tfs 5m,15m,30m --fallback 5m \
+                --only-native 1m,5m,15m,30m --datadir /tmp/data --out /tmp/out | tee /tmp/out.log
+              python ft_batch.py --strategies /tmp/strats /tmp/strats_fut --futures --assets BTC,ETH --fee 0.0005 \
+                --tfs 5m,15m,30m --fallback 5m --only-native 1m,5m,15m,30m --datadir /tmp/data --out /tmp/out | tee -a /tmp/out.log ;;
+            nfi_btc)
+              python ft_batch.py --strategies /tmp/nfi_s --assets BTC --fee 0.001 --tfs 5m --datadir /tmp/data --out /tmp/out | tee /tmp/out.log ;;
+            nfi_eth)
+              python ft_batch.py --strategies /tmp/nfi_s --assets ETH --fee 0.001 --tfs 5m --datadir /tmp/data --out /tmp/out | tee /tmp/out.log ;;
+            nfi_basket)
+              B=$(echo "$BASKET" | sed 's/USDT//g; s/,/+/g')
+              python ft_batch.py --strategies /tmp/nfi_s --assets "$B" --fee 0.001 --tfs 5m --max-open-trades 6 \
+                --timerange 20230101- --datadir /tmp/data --out /tmp/out | tee /tmp/out.log ;;
+          esac
+          grep -h FAIL /tmp/out.log || true
+
+      - name: Upload trade exports
+        if: always()
+        run: |
+          cd /tmp/out && tar czf /tmp/bot-edge-${{ matrix.part }}.tar.gz *.zip *.done ../out.log 2>/dev/null || tar czf /tmp/bot-edge-${{ matrix.part }}.tar.gz .
+          gh release view bot-edge-results --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create bot-edge-results --repo "$GITHUB_REPOSITORY" --title "Bot edge test results" \
+              --notes "freqtrade trade exports from .github/workflows/bot-edge.yml (research only)." --prerelease
+          gh release upload bot-edge-results /tmp/bot-edge-${{ matrix.part }}.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
