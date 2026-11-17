@@ -260,3 +260,24 @@ def test_free_filter_drops_noise_before_claude():
     assert screen(doc("8-K", "", kind="filing"), ["KO"], [ko]) is None  # filings always go through
     # one-letter tickers are ordinary words unless written as a ticker
     assert not mentions("V shaped recovery for retailers", v) and mentions("Visa (V) beats estimates", v)
+
+
+@requires_db
+def test_rejected_key_stops_after_first_call(db):
+    from sqlalchemy import select
+
+    from app.models import NewsArticle
+    from app.services.news_service import analyze_pending, monitored_companies, store_document
+
+    class KeyRejected(Exception):
+        status_code = 401
+
+    store_document(db, _doc(), monitored_companies(db))
+    store_document(db, _doc(title="PepsiCo names new chief financial officer", url="https://example.com/pep-cfo", text="PepsiCo said its board appointed a new chief financial officer effective next month.", published=datetime(2026, 9, 25, 13, tzinfo=UTC)), monitored_companies(db))
+    db.commit()
+    client, msgs = fake_client(KeyRejected("invalid x-api-key"), KeyRejected("invalid x-api-key"))
+    rep = analyze_pending(db, analyst=NewsAnalyst(client=client))
+    assert len(msgs.calls) == 1 and rep["failed"] == 1 and "invalid x-api-key" in rep["auth_error"]
+    arts = db.scalars(select(NewsArticle)).all()
+    assert len(arts) == 2, [a.analysis_status for a in arts]
+    assert sorted(a.analysis_status for a in arts) == ["failed", "pending"]

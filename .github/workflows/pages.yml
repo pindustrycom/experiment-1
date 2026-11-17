@@ -156,6 +156,14 @@ jobs:
               use = db.execute(select(ProviderUsage.provider, func.count(), func.sum(ProviderUsage.cost_usd))
                                .where(ProviderUsage.ts >= since).group_by(ProviderUsage.provider)).all()
               print("\n**Provider calls this run:** " + ("; ".join(f"{p}: {n} calls, ${c or 0:.3f}" for p, n, c in use) or "none"))
+              ai = dict(((ok, n) for ok, n in db.execute(select(ProviderUsage.success, func.count()).where(
+                  ProviderUsage.ts >= since, ProviderUsage.provider == "anthropic").group_by(ProviderUsage.success)).all()))
+              if ai.get(False) and not ai.get(True):  # every Claude call failed: show it on the run, not just in the summary
+                  aie = db.scalar(select(ProviderUsage.error).where(ProviderUsage.ts >= since, ProviderUsage.provider == "anthropic",
+                                                                     ProviderUsage.success.is_(False)).limit(1)) or ""
+                  import sys
+                  print(f"::warning title=Claude news analysis failed::all {ai[False]} Claude calls failed this run: {aie[:200]}", file=sys.stderr)
+                  print(f"\n**Warning:** all {ai[False]} Claude calls failed this run. First error: {aie[:300]}")
               fdiag = []
               print("\n| Pair | SI-v1 | SI-v2 | SI-v2 status | coverage | why |\n|---|---|---|---|---|---|")
               for pr in db.scalars(select(Pair).where(Pair.status == "active").order_by(Pair.slug)):

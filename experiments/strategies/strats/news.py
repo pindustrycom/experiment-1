@@ -94,7 +94,11 @@ def leans(tickers: list[str], d: pd.Timestamp) -> dict[str, dict]:
         log.warning("SEC names: %s", ex)
         nm = {}
     out = {}
+    auth_err = None
     for t in tickers:
+        if auth_err:  # the key was rejected: every later call fails the same way
+            out[t] = {"lean": None, "sentiment": None, "n": 0, "error": auth_err}
+            continue
         try:
             titles = headlines(nm.get(t, t), t, d)
             js = read(titles, client) if titles else {}
@@ -102,6 +106,9 @@ def leans(tickers: list[str], d: pd.Timestamp) -> dict[str, dict]:
         except Exception as ex:  # noqa: BLE001 - one name without news is bought as a plain straddle
             log.warning("news %s: %s", t, ex)
             out[t] = {"lean": None, "sentiment": None, "n": 0, "error": f"{type(ex).__name__}: {str(ex)[:200]}"}
+            if getattr(ex, "status_code", None) in (401, 403):
+                auth_err = out[t]["error"]
+                print(f"::warning title=Claude API key rejected::news leans skipped, check the ANTHROPIC_API_KEY secret ({auth_err[:120]})")
         time.sleep(1.0)
     return out
 

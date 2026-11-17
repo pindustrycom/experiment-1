@@ -184,6 +184,14 @@ def pairs_for_article(db: Session, art: NewsArticle) -> list[Pair]:
     return [p for p in db.scalars(select(Pair).where(Pair.status == "active")).all() if {p.company_a.ticker, p.company_b.ticker} & tick]
 
 
+def _is_auth_error(e: BaseException) -> bool:
+    """True for a rejected API key (HTTP 401/403): every later call would fail the same way."""
+    for x in (e, e.__cause__):
+        if x is not None and getattr(x, "status_code", None) in (401, 403):
+            return True
+    return False
+
+
 def analyze_pending(db: Session, analyst: NewsAnalyst | None = None, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     s = get_settings()
@@ -191,12 +199,15 @@ def analyze_pending(db: Session, analyst: NewsAnalyst | None = None, now: dateti
     budget = settings_service.get_section(db, "budget")
     pending = db.scalars(select(NewsArticle).where(NewsArticle.analysis_status.in_(("pending", "budget_blocked", "not_configured", "failed")))
                          .order_by(NewsArticle.first_published_at.desc()).limit(500)).all()
-    report = {"analyzed": 0, "skipped": 0, "filtered": 0, "failed": 0, "budget_blocked": 0, "not_configured": 0, "events": 0, "material_pairs": []}
+    report = {"analyzed": 0, "skipped": 0, "filtered": 0, "failed": 0, "budget_blocked": 0, "not_configured": 0, "events": 0, "material_pairs": [],
+              "auth_error": None}
     material_pairs: set[int] = set()
     if analyst is None and s.secret("anthropic_api_key"):
         analyst = NewsAnalyst(model=llm["model"], effort=llm["effort"], pricing=llm["pricing"], refusal_fallback=llm["refusal_fallback"])
     calls = 0
     for art in pending:
+        if report["auth_error"]:  # the key was rejected: leave the rest pending for the next run instead of failing each one
+            break
         doc = _primary_document(art)
         pairs = pairs_for_article(db, art)
         if not pairs:
@@ -254,6 +265,9 @@ def analyze_pending(db: Session, analyst: NewsAnalyst | None = None, now: dateti
                 art.analysis_error = f"{type(e).__name__}: {str(e)[:500]}"
                 report["failed"] += 1
                 failed = True
+                if _is_auth_error(e):
+                    report["auth_error"] = f"{type(e).__name__}: {str(e)[:300]}"
+                    log.error("Anthropic rejected the API key; stopping news analysis for this run: %s", report["auth_error"])
                 break
             db.add(ProviderUsage(provider="anthropic", operation="analyze_document", success=True, model=res.model,
                                  input_tokens=res.input_tokens, output_tokens=res.output_tokens, cache_read_tokens=res.cache_read_tokens,
