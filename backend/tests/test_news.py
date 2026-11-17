@@ -273,7 +273,10 @@ def test_rejected_key_stops_after_first_call(db):
         status_code = 401
 
     store_document(db, _doc(), monitored_companies(db))
-    store_document(db, _doc(title="PepsiCo names new chief financial officer", url="https://example.com/pep-cfo", text="PepsiCo said its board appointed a new chief financial officer effective next month.", published=datetime(2026, 9, 25, 13, tzinfo=UTC)), monitored_companies(db))
+    cfo = _doc(title="PepsiCo names new chief financial officer", url="https://example.com/pep-cfo",
+               text="PepsiCo said its board appointed a new chief financial officer effective next month.",
+               published=datetime(2026, 9, 25, 13, tzinfo=UTC))
+    store_document(db, cfo, monitored_companies(db))
     db.commit()
     client, msgs = fake_client(KeyRejected("invalid x-api-key"), KeyRejected("invalid x-api-key"))
     rep = analyze_pending(db, analyst=NewsAnalyst(client=client))
