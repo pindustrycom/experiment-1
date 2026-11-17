@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import sys
 import time
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
@@ -108,7 +109,7 @@ def leans(tickers: list[str], d: pd.Timestamp) -> dict[str, dict]:
             out[t] = {"lean": None, "sentiment": None, "n": 0, "error": f"{type(ex).__name__}: {str(ex)[:200]}"}
             if getattr(ex, "status_code", None) in (401, 403):
                 auth_err = out[t]["error"]
-                print(f"::warning title=Claude API key rejected::news leans skipped, check the ANTHROPIC_API_KEY secret ({auth_err[:120]})")
+                print(f"::warning title=Claude API key rejected::news leans skipped, check the ANTHROPIC_API_KEY secret ({auth_err[:120]})", file=sys.stderr)  # stdout is the run's JSON
         time.sleep(1.0)
     return out
 
