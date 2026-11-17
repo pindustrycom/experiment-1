@@ -15,13 +15,13 @@ out = Path(sys.argv[1])
 out.mkdir(parents=True, exist_ok=True)
 df = pd.concat([pd.read_csv(f) for f in sys.argv[2:]], ignore_index=True)
 df["tested"] = df.trades >= 10
+df["beats_hold_sharpe"] = df.sharpe > df.hold_sharpe
+df["net_positive"] = df.cagr > 0
 t = df[df.tested].copy()
 t["holm_p"] = ek.holm(t.p_random.to_numpy())
 df = df.merge(t[["holm_p"]], left_index=True, right_index=True, how="left")
 df["verdict"] = [ek.verdict(r, r["holm_p"] if not np.isnan(r["holm_p"]) else 1.0) if r["tested"] else "too few trades"
                  for _, r in df.iterrows()]
-df["beats_hold_sharpe"] = df.sharpe > df.hold_sharpe
-df["net_positive"] = df.cagr > 0
 df.to_csv(out / "results.csv", index=False)
 
 n = int(df.tested.sum())
