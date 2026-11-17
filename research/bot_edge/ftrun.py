@@ -9,7 +9,16 @@ spot (BASE/USDT) or linear-perpetual (BASE/USDT:USDT) markets. Everything else i
 import os
 import sys
 
-import freqtrade.exchange.exchange as E
+import warnings
+
+import pandas as pd
+
+# NFI X5/X6 (2024-25) write booleans into columns pandas 3 now types as str; restore the pandas 2 behaviour they assume
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    pd.options.future.infer_string = False
+
+import freqtrade.exchange.exchange as E  # noqa: E402
 from freqtrade.enums import TradingMode
 
 BASES = os.environ.get("FT_BASES", "BTC,ETH,SPY,QQQ").split(",")
