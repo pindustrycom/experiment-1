@@ -8,14 +8,14 @@ whether any has a real edge or is just luck: at minimum it has to beat random. P
 freqtrade and 7 Jesse rules; this study runs the bots' own code wherever it can and adds every other repo listed plus
 the most popular freqtrade strategy (NostalgiaForInfinity).
 
-**Short answer: one strategy passes, and it is small.** Of 967 strategy x market rows with 10+ trades (three rounds,
-about 90 repos, plus an ML trade filter), 11% beat random timing before correction (5% would by chance), 9 survive the
-multiple-testing correction, and one passes every check: **ClucHAnix_5m** from ssssi/freqtrade_strs on BTC 5-minute bars
-(+13.2%/yr net 2019-2026, Sharpe 1.42 vs 0.95 for holding BTC, max drawdown -7%, alpha t 3.4, beats random in both
-halves). It is a dip buyer that is in the market under 1% of the time, so it earns far less than holding (BTC +47%/yr).
-Its file was last changed in December 2022, so 2023-2026 is out of sample: 17 trades, +5.8%/yr, Sharpe 1.15 vs 1.11 for
-holding. On ETH it makes +9.7%/yr out of sample (Sharpe 1.07 vs 0.51) but fails the full-period checks. A 12-coin basket
-run from 2023 is the deciding test (CI part `cluc_basket`).
+**Short answer: one strategy passes, out of sample too.** Of 968 strategy x market rows with 10+ trades (three rounds,
+about 90 repos, plus an ML trade filter), 11% beat random timing before correction (5% would by chance), 10 survive the
+multiple-testing correction, and one strategy passes every check: **ClucHAnix_5m** from ssssi/freqtrade_strs, a 5-minute
+dip buyer. On BTC 2019-2026: +13.2%/yr net, Sharpe 1.42 vs 0.95 for holding, max drawdown -7%, alpha t 3.4. Its file
+was last changed in December 2022, so a 12-coin basket run from 2023 is a clean out-of-sample test, and it passes there
+too: **+21.7%/yr net, Sharpe 1.64 vs 0.66 for holding the basket, max drawdown -11.7% vs -69%**, 880 trades, beats random
+timing in both halves (z 6.5 and 5.6), alpha t 3.0, Holm p 0.048. It is mostly in cash, so it earns less than holding in
+a strong year (basket +24%/yr over the same span) but with a fraction of the risk. The top 5 days give 26% of profit.
 
 The rest that survive Holm fail a later check: two freqtrade scalpers that lose 66-69%/yr after costs, NostalgiaForInfinity
 X7 on a 12-coin basket (passes everything, but only on data it was written after), the R-Breaker day-trading rule on ETH
@@ -83,14 +83,14 @@ A row counts as an **EDGE** only if it passes all four. Rows with fewer than 10 
 
 ## Results
 
-Tested strategy x market rows (10+ trades): 967
+Tested strategy x market rows (10+ trades): 968
 
-- raw p_random < 0.05 (beats random timing before any correction): 110 (11%; chance alone gives ~5%)
-- survive Holm across all 967: 9
-- random-timing z >= 3.8 (project-wide bar): 17
-- net Sharpe above buy-and-hold: 43
-- net CAGR above zero: 369; above buy-and-hold CAGR: 19
-- EDGE (all checks): 1 (plus 1 that pass only in-sample, not counted)
+- raw p_random < 0.05 (beats random timing before any correction): 111 (11%; chance alone gives ~5%)
+- survive Holm across all 968: 10
+- random-timing z >= 3.8 (project-wide bar): 18
+- net Sharpe above buy-and-hold: 44
+- net CAGR above zero: 370; above buy-and-hold CAGR: 19
+- EDGE (all checks): 2 (plus 1 that pass only in-sample, not counted)
 
 | source | rows | median net CAGR | median gross CAGR | raw p<0.05 | Sharpe > hold | median win rate |
 |---|---|---|---|---|---|---|
@@ -118,6 +118,7 @@ Tested strategy x market rows (10+ trades): 967
 | freqtrade (shorts allowed) | 24 | -8.6% | +4.5% | 3 | 1 | 51% |
 | freqtrade: nateemma/strategies | 230 | -10.7% | +6.3% | 13 | 4 | 72% |
 | freqtrade: ssssi/freqtrade_strs | 29 | -0.9% | +6.3% | 8 | 1 | 65% |
+| freqtrade: ssssi/freqtrade_strs basket (out of sample, 2023+) | 1 | +21.7% | n/a | 1 | 1 | 71% |
 | gekko | 36 | +3.2% | +7.2% | 6 | 0 | 61% |
 | gekko + ML filter | 12 | +0.9% | +6.0% | 3 | 1 | 43% |
 | gekko-strategies | 28 | -1.8% | +20.1% | 5 | 2 | 51% |
@@ -141,6 +142,7 @@ Top 25 by random-timing z (all rows):
 | source | strategy | asset | tf | trades | net CAGR | gross | Sharpe | hold Sharpe | z vs random | p | Holm p | z 2019-22 | z 2023-26 | alpha t | verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | freqtrade: ssssi/freqtrade_strs | BBMod | BTC | 5m | 377 | +3.2% | +13.7% | 0.33 | 0.95 | +11.0 | 0.000 | 0.00 | +7.0 | +11.1 | +0.5 | beats random (raw p) but fails a later check |
+| freqtrade: ssssi/freqtrade_strs basket (out of sample, 2023+) | ClucHAnix_5m | basket of 12 | 5m | 880 | +21.7% | n/a | 1.64 | 0.66 | +8.8 | 0.000 | 0.05 | +6.5 | +5.6 | +3.0 | EDGE |
 | NostalgiaForInfinity basket (X7, in-sample) | NostalgiaForInfinityX7 | basket of 12 | 5m | 149 | +12.0% | n/a | 2.12 | 0.66 | +7.8 | 0.000 | 0.05 | +4.9 | +6.6 | +3.6 | passes in-sample only (not counted) |
 | Binance-volatility-trading-bot | +10% jump buy, TP 0.8% trailing 0.4/0.1, SL 5% | basket of 12 | 5m | 46 | +7.8% | +8.1% | 0.50 | 0.54 | +7.3 | 0.000 | 0.18 | +11.4 | +1.0 | +1.0 | beats random (raw p) but fails a later check |
 | freqtrade: ssssi/freqtrade_strs | ClucHAnix_5m | BTC | 5m | 119 | +13.2% | +16.7% | 1.42 | 0.95 | +6.8 | 0.000 | 0.00 | +5.0 | +4.8 | +3.4 | EDGE |
@@ -164,7 +166,6 @@ Top 25 by random-timing z (all rows):
 | backtesting.py | SmaCross 10/20 (README) | ETH | 1h | 3887 | -30.0% | +88.0% | -0.07 | 0.83 | +3.2 | 0.001 | 0.56 | +2.8 | +1.4 | -0.3 | beats random (raw p) but fails a later check |
 | vnpy | DoubleMaStrategy | ETH | 1h | 3878 | +14.8% | +87.8% | 0.56 | 0.83 | +3.1 | 0.001 | 0.56 | +2.8 | +1.4 | +1.5 | beats random (raw p) but fails a later check |
 | freqtrade | CofiBitStrategy | ETH | 5m | 5629 | -68.8% | +31.4% | -5.60 | 0.86 | +3.0 | 0.001 | 1.00 | +3.8 | -0.4 | -13.9 | beats random (raw p) but fails a later check |
-| gekko-strategies | TEMA (SMA200 safety) | ETH | 1h | 662 | +27.3% | +50.6% | 0.89 | 0.83 | +3.0 | 0.001 | 1.00 | +2.6 | +1.4 | +1.8 | beats random (raw p) but fails a later check |
 
 ### NostalgiaForInfinity, the one that looks real
 
@@ -237,6 +238,7 @@ include whatever data its parameters were tuned on.
 |---|---|---|---|---|---|---|---|---|
 | BTC 2019-2026 | 119 | +13.2% | 1.42 | -6.8% | +47.4% | 0.95 | 6.8 (halves 5.0 / 4.8) | 3.4 |
 | BTC 2023-2026 (out of sample) | 17 | +5.8% | 1.15 | -4.0% | +49.9% | 1.11 | 4.8 | 2.2 |
+| **12-coin basket 2023-2026 (out of sample, 6 slots)** | 880 | **+21.7%** | **1.64** | -11.7% | +24.1% | 0.66 | 8.8 (halves 6.5 / 5.6) | 3.0 |
 | ETH 2019-2026 | 217 | +7.2% | 0.48 | -30.5% | +43.7% | 0.86 | 3.8 | 0.9 |
 | ETH 2023-2026 (out of sample) | 44 | +9.7% | 1.07 | -12.8% | +13.2% | 0.51 | 2.4 | 2.2 |
 
@@ -274,9 +276,9 @@ moments, but they earn +0.9% and +5.1%/yr with 0.3-0.4% exposure: less than T-bi
 ETH +21%/yr over 2021-26). After Holm across all rows none passes. Comparison rows with all trades:
 `results/rows_meta_*.csv`.
 
-ClucHAnix_5m passes, so a paper pot is offered, not started. It would mostly sit in cash (BTC under 1% of the time),
-so as a whole pot it earns about T-bill money; it makes more sense as a sleeve that uses idle cash, and only if the
-12-coin basket run from 2023 also holds up.
+ClucHAnix_5m passes, including the out-of-sample basket, so a paper pot is offered, not started: the 12-coin basket,
+6 slots, 10bp fees, run on 5-minute bars. Caveats: backtest fills (no slippage beyond fees), one strategy chosen from
+968 rows (Holm p 0.048 is just under the line), and its trade count on BTC alone has dried up since 2025.
 
 ## Files
 

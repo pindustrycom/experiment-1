@@ -93,8 +93,8 @@ jobs:
       - name: Earlier exports (a re-run only scores what is already done)
         run: |
           mkdir -p /tmp/out
-          if gh release download bot-edge-results --repo "$GITHUB_REPOSITORY" --pattern "bot-edge-${{ matrix.part }}.tar.gz" --dir /tmp/prev; then
-            tar xzf /tmp/prev/bot-edge-${{ matrix.part }}.tar.gz -C /tmp/out && rm -f /tmp/out/out.log; fi
+          if gh release download bot-edge-results --repo "$GITHUB_REPOSITORY" --pattern "bot-edge-${{ matrix.part }}.tar.gz*" --dir /tmp/prev; then
+            cat $(ls /tmp/prev/bot-edge-${{ matrix.part }}.tar.gz* | sort) | tar xz -C /tmp/out && rm -f /tmp/out/out.log; fi
           ls /tmp/out | head
 
       - name: Backtest
@@ -157,6 +157,13 @@ jobs:
           gh release view bot-edge-results --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create bot-edge-results --repo "$GITHUB_REPOSITORY" --title "Bot edge test results" \
               --notes "freqtrade trade exports from .github/workflows/bot-edge.yml (research only)." --prerelease
-          for i in 1 2 3 4; do   # the API sometimes times out; retry with backoff
-            gh release upload bot-edge-results /tmp/bot-edge-${{ matrix.part }}.tar.gz --repo "$GITHUB_REPOSITORY" --clobber && exit 0
-            sleep $((i * 20)); done; exit 1
+          # release assets must be under 2 GiB: big exports go up in 1.9 GB parts (.tar.gz.part-aa, -ab, ...)
+          F=/tmp/bot-edge-${{ matrix.part }}.tar.gz
+          if [ "$(stat -c %s "$F")" -gt 1900000000 ]; then split -b 1900m "$F" "$F.part-"; rm "$F"; fi
+          for old in $(gh release view bot-edge-results --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | grep "^bot-edge-${{ matrix.part }}\.tar\.gz"); do
+            [ -e "/tmp/$old" ] || gh release delete-asset bot-edge-results "$old" --repo "$GITHUB_REPOSITORY" -y || true; done
+          for f in $F*; do
+            for i in 1 2 3 4; do   # the API sometimes times out; retry with backoff
+              gh release upload bot-edge-results "$f" --repo "$GITHUB_REPOSITORY" --clobber && break
+              [ $i = 4 ] && exit 1; sleep $((i * 20)); done
+          done

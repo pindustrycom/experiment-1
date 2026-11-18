@@ -63,7 +63,7 @@ X = np.column_stack([np.ones(len(dn)), hold.to_numpy()])
 b, tt = ek.nw_t(dn.to_numpy(), X)
 tr = pd.DataFrame(s["trades"])
 byday = tr.groupby(tr.open_date.str[:10]).profit_abs.sum().sort_values(ascending=False)
-row = {"source": "NostalgiaForInfinity (basket)", "strategy": strat, "asset": f"basket of {len(pairs)}", "tf": tf, "native_tf": tf,
+row = {"source": ("NostalgiaForInfinity (basket)" if strat.startswith("Nostalgia") else "freqtrade basket"), "strategy": strat, "asset": f"basket of {len(pairs)}", "tf": tf, "native_tf": tf,
        "trades": len(tr), **pf, "gross_cagr": np.nan, "hold_cagr": ph["cagr"], "hold_sharpe": ph["sharpe"], "hold_dd": ph["max_dd"],
        "p_random": p, "z_random": zz, "p_random_h1": p1, "z_random_h1": z1, "p_random_h2": p2, "z_random_h2": z2,
        "alpha_ann": float(b[0] * 365), "alpha_t": float(tt[0]), "beta": float(b[1]), "exposure": float(W.sum(axis=1).mean()),
