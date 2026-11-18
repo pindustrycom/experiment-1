@@ -30,7 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [ft5m, nfi_btc, nfi_eth, nfi_basket, nfi_oos_x4, nfi_oos_x5, nfi_oos_x6, ports2]
+        part: [ft5m, nfi_btc, nfi_eth, nfi_basket, nfi_oos_x4, nfi_oos_x5, nfi_oos_x6, ports2, meta]
     env:
       GH_TOKEN: ${{ github.token }}
     defaults:
@@ -65,6 +65,7 @@ jobs:
         run: |
           case "${{ matrix.part }}" in
             nfi_basket|nfi_oos_*) python prep_data.py binance /tmp/data "$BASKET" 2022-09 ;;
+            meta) python prep_data.py binance /tmp/data BTCUSDT,ETHUSDT 2018-10 ;;
             ports2) python prep_data.py binance /tmp/data BTCUSDT,ETHUSDT 2018-10
                     python prep_data.py binance /tmp/bdata "$BASKET" 2022-09 ;;
             *) python prep_data.py binance /tmp/data BTCUSDT,ETHUSDT 2018-10 ;;
@@ -101,15 +102,18 @@ jobs:
               python ft_batch.py --strategies /tmp/nfi_$v --assets "$B" --fee 0.001 --tfs 5m --max-open-trades 6 \
                 --timerange "$T" --datadir /tmp/data --out /tmp/out | tee /tmp/out.log ;;
             ports2)
+              [ -f /tmp/out/rows_ports2.csv ] && exit 0
               pip install -q smartmoneyconcepts==0.0.27
               python run_ports2.py ci /tmp/data /tmp/bdata /tmp/out/rows_ports2.csv | tee /tmp/out.log ;;
+            meta)
+              [ -f /tmp/out/rows_meta.csv ] || python meta.py ci /tmp/data /tmp/out/rows_meta.csv | tee /tmp/out.log ;;
           esac
           grep -h FAIL /tmp/out.log || true
 
       - name: Score (random-timing test, costs, halves, alpha vs holding)
         if: always()
         run: |
-          [ "${{ matrix.part }}" = ports2 ] && exit 0
+          case "${{ matrix.part }}" in ports2|meta) exit 0;; esac
           python ft_score.py /tmp/data /tmp/out/rows_${{ matrix.part }}.csv /tmp/out | tail -60
           for z in /tmp/out/res_BASKET*.zip; do [ -f "$z" ] && python basket_score.py /tmp/data "$z" /tmp/out/rows_basket.csv; done; true
 
