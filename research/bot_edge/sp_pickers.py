@@ -21,6 +21,7 @@ import sys
 
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
 
 sys.path.insert(0, os.path.dirname(__file__))
 import evalkit as ek  # noqa: E402
@@ -150,15 +151,16 @@ def score_row(name, src, E, M, Ro, idx, hold, bench_d, rng, note):
         sims.append(rs.mean())
         sims_h.append([rs[rs.index < split].mean(), rs[rs.index >= split].mean()])
     sims, sims_h = np.array(sims), np.array(sims_h)
-    pr = (1 + np.sum(sims >= act)) / (1 + N_RAND)
+    p_emp = (1 + np.sum(sims >= act)) / (1 + N_RAND)
     z = (act - sims.mean()) / sims.std()
+    pr = float(norm.sf(z))          # 200 draws floor the empirical p at 0.005, too coarse for Holm over ~1,000 rows
     zh = [(act_h[k] - sims_h[:, k].mean()) / sims_h[:, k].std() for k in (0, 1)]
     ph = [(1 + np.sum(sims_h[:, k] >= act_h[k])) / (1 + N_RAND) for k in (0, 1)]
     r = {"source": src, "strategy": name, "asset": "S&P 500 (point-in-time)", "tf": "1d", "native_tf": "1d", "fee": FEE,
          "cagr": p["cagr"], "sharpe": p["sharpe"], "max_dd": p["max_dd"], "vol": p["vol"], "gross_cagr": gp["cagr"],
          "gross_sharpe": gp["sharpe"], "hold_cagr": hp["cagr"], "hold_sharpe": hp["sharpe"], "hold_dd": hp["max_dd"],
          "alpha_ann": float(b[0] * 252), "alpha_t": float(t[0]), "beta": float(b[1]),
-         "p_random": float(pr), "z_random": float(z), "p_random_h1": float(ph[0]), "z_random_h1": float(zh[0]),
+         "p_random": float(pr), "p_random_empirical": float(p_emp), "z_random": float(z), "p_random_h1": float(ph[0]), "z_random_h1": float(zh[0]),
          "p_random_h2": float(ph[1]), "z_random_h2": float(zh[1]),
          "trades": int(E[m].sum()), "exposure": float(held[m].mean()), "years": len(dn) / 252,
          "note": note + f" random null = same number of picks per day from that day's members ({N_RAND} draws); "
