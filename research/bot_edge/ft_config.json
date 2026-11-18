@@ -4,7 +4,7 @@
   "fee": 0.001, "timeframe": "1h",
   "exchange": {"name": "binance", "key": "", "secret": "", "pair_whitelist": ["BTC/USDT"], "pair_blacklist": []},
   "pairlists": [{"method": "StaticPairList"}],
-  "entry_pricing": {"price_side": "same", "use_order_book": false, "price_last_balance": 0.0},
-  "exit_pricing": {"price_side": "same", "use_order_book": false},
+  "entry_pricing": {"price_side": "other", "use_order_book": false, "price_last_balance": 0.0},
+  "exit_pricing": {"price_side": "other", "use_order_book": false},
   "internals": {"process_throttle_secs": 5}
 }
