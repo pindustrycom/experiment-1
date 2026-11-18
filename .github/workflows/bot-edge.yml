@@ -148,4 +148,6 @@ jobs:
           gh release view bot-edge-results --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create bot-edge-results --repo "$GITHUB_REPOSITORY" --title "Bot edge test results" \
               --notes "freqtrade trade exports from .github/workflows/bot-edge.yml (research only)." --prerelease
-          gh release upload bot-edge-results /tmp/bot-edge-${{ matrix.part }}.tar.gz --repo "$GITHUB_REPOSITORY" --clobber
+          for i in 1 2 3 4; do   # the API sometimes times out; retry with backoff
+            gh release upload bot-edge-results /tmp/bot-edge-${{ matrix.part }}.tar.gz --repo "$GITHUB_REPOSITORY" --clobber && exit 0
+            sleep $((i * 20)); done; exit 1
