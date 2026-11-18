@@ -1,11 +1,11 @@
-Tested strategy x market rows (10+ trades): 876
+Tested strategy x market rows (10+ trades): 967
 
-- raw p_random < 0.05 (beats random timing before any correction): 101 (12%; chance alone gives ~5%)
-- survive Holm across all 876: 7
-- random-timing z >= 3.8 (project-wide bar): 14
-- net Sharpe above buy-and-hold: 42
-- net CAGR above zero: 363; above buy-and-hold CAGR: 19
-- EDGE (all checks): 0 (plus 1 that pass only in-sample, not counted)
+- raw p_random < 0.05 (beats random timing before any correction): 110 (11%; chance alone gives ~5%)
+- survive Holm across all 967: 9
+- random-timing z >= 3.8 (project-wide bar): 17
+- net Sharpe above buy-and-hold: 43
+- net CAGR above zero: 369; above buy-and-hold CAGR: 19
+- EDGE (all checks): 1 (plus 1 that pass only in-sample, not counted)
 
 | source | rows | median net CAGR | median gross CAGR | raw p<0.05 | Sharpe > hold | median win rate |
 |---|---|---|---|---|---|---|
@@ -31,8 +31,8 @@ Tested strategy x market rows (10+ trades): 876
 | fmzquant | 9 | +7.0% | +18.5% | 5 | 0 | 40% |
 | freqtrade | 250 | -4.3% | +3.4% | 21 | 7 | 66% |
 | freqtrade (shorts allowed) | 24 | -8.6% | +4.5% | 3 | 1 | 51% |
-| freqtrade: nateemma/strategies | 152 | -2.4% | +4.6% | 11 | 4 | 71% |
-| freqtrade: ssssi/freqtrade_strs | 16 | -0.8% | +4.1% | 1 | 0 | 67% |
+| freqtrade: nateemma/strategies | 230 | -10.7% | +6.3% | 13 | 4 | 72% |
+| freqtrade: ssssi/freqtrade_strs | 29 | -0.9% | +6.3% | 8 | 1 | 65% |
 | gekko | 36 | +3.2% | +7.2% | 6 | 0 | 61% |
 | gekko + ML filter | 12 | +0.9% | +6.0% | 3 | 1 | 43% |
 | gekko-strategies | 28 | -1.8% | +20.1% | 5 | 2 | 51% |
@@ -55,28 +55,28 @@ Top 25 by random-timing z (all rows):
 
 | source | strategy | asset | tf | trades | net CAGR | gross | Sharpe | hold Sharpe | z vs random | p | Holm p | z 2019-22 | z 2023-26 | alpha t | verdict |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| NostalgiaForInfinity basket (X7, in-sample) | NostalgiaForInfinityX7 | basket of 12 | 5m | 149 | +12.0% | n/a | 2.12 | 0.66 | +7.8 | 0.000 | 0.04 | +4.9 | +6.6 | +3.6 | passes in-sample only (not counted) |
-| Binance-volatility-trading-bot | +10% jump buy, TP 0.8% trailing 0.4/0.1, SL 5% | basket of 12 | 5m | 46 | +7.8% | +8.1% | 0.50 | 0.54 | +7.3 | 0.000 | 0.17 | +11.4 | +1.0 | +1.0 | beats random (raw p) but fails a later check |
+| freqtrade: ssssi/freqtrade_strs | BBMod | BTC | 5m | 377 | +3.2% | +13.7% | 0.33 | 0.95 | +11.0 | 0.000 | 0.00 | +7.0 | +11.1 | +0.5 | beats random (raw p) but fails a later check |
+| NostalgiaForInfinity basket (X7, in-sample) | NostalgiaForInfinityX7 | basket of 12 | 5m | 149 | +12.0% | n/a | 2.12 | 0.66 | +7.8 | 0.000 | 0.05 | +4.9 | +6.6 | +3.6 | passes in-sample only (not counted) |
+| Binance-volatility-trading-bot | +10% jump buy, TP 0.8% trailing 0.4/0.1, SL 5% | basket of 12 | 5m | 46 | +7.8% | +8.1% | 0.50 | 0.54 | +7.3 | 0.000 | 0.18 | +11.4 | +1.0 | +1.0 | beats random (raw p) but fails a later check |
+| freqtrade: ssssi/freqtrade_strs | ClucHAnix_5m | BTC | 5m | 119 | +13.2% | +16.7% | 1.42 | 0.95 | +6.8 | 0.000 | 0.00 | +5.0 | +4.8 | +3.4 | EDGE |
 | myhhub/stock (instock) | keep_increasing (rising MA30, +20%) | S&P 500 (point-in-time) | 1d | 48331 | +11.5% | +13.3% | 0.49 | 0.70 | +5.8 | 0.000 | 0.00 | +7.7 | -0.1 | +0.1 | beats random (raw p) but fails a later check |
 | myhhub/stock (instock) | low_backtrace_increase (+60% in 60d, no deep drop) | S&P 500 (point-in-time) | 1d | 4108 | +12.2% | +13.4% | 0.52 | 0.70 | +5.4 | 0.000 | 0.00 | +2.6 | +4.5 | +1.6 | beats random (raw p) but fails a later check |
-| NostalgiaForInfinity basket (out of sample) | NostalgiaForInfinityX4 | basket of 12 | 5m | 35 | +3.8% | n/a | 1.61 | 0.26 | +5.0 | 0.000 | 0.43 | +6.2 | +1.2 | +2.6 | beats random (raw p) but fails a later check |
+| NostalgiaForInfinity basket (out of sample) | NostalgiaForInfinityX4 | basket of 12 | 5m | 35 | +3.8% | n/a | 1.61 | 0.26 | +5.0 | 0.000 | 0.47 | +6.2 | +1.2 | +2.6 | beats random (raw p) but fails a later check |
 | fmzquant | R-Breaker (0.35/0.07/0.25, intraday) | ETH | 1h | 1016 | +22.8% | +39.7% | 0.74 | 0.83 | +4.6 | 0.000 | 0.01 | +4.6 | +1.3 | +1.9 | beats random (raw p) but fails a later check |
-| freqtrade: ssssi/freqtrade_strs | E0V1E | BTC | 1h | 81 | +12.1% | +14.5% | 0.87 | 0.95 | +4.5 | 0.000 | 0.09 | +3.2 | +3.5 | +1.8 | beats random (raw p) but fails a later check |
-| zenbot + ML filter | sar | BTC | 5m | 114 | +0.9% | +4.9% | 0.17 | 0.58 | +4.1 | 0.000 | 0.15 | +2.5 | +3.3 | +0.4 | beats random (raw p) but fails a later check |
-| vnpy + ML filter | DoubleMaStrategy | ETH | 5m | 109 | +5.1% | +7.1% | 0.57 | 0.63 | +4.1 | 0.000 | 0.14 | +2.0 | +4.1 | +1.3 | beats random (raw p) but fails a later check |
+| freqtrade: ssssi/freqtrade_strs | E0V1E | BTC | 1h | 81 | +12.1% | +14.5% | 0.87 | 0.95 | +4.5 | 0.000 | 0.10 | +3.2 | +3.5 | +1.8 | beats random (raw p) but fails a later check |
+| zenbot + ML filter | sar | BTC | 5m | 114 | +0.9% | +4.9% | 0.17 | 0.58 | +4.1 | 0.000 | 0.16 | +2.5 | +3.3 | +0.4 | beats random (raw p) but fails a later check |
+| freqtrade: ssssi/freqtrade_strs | ClucHAnix | BTC | 5m | 252 | +7.5% | +14.7% | 0.52 | 0.95 | +4.1 | 0.000 | 0.07 | +1.7 | +7.2 | +0.9 | beats random (raw p) but fails a later check |
+| vnpy + ML filter | DoubleMaStrategy | ETH | 5m | 109 | +5.1% | +7.1% | 0.57 | 0.63 | +4.1 | 0.000 | 0.16 | +2.0 | +4.1 | +1.3 | beats random (raw p) but fails a later check |
 | freqtrade | CofiBitStrategy | BTC | 5m | 5370 | -68.7% | +23.2% | -7.28 | 0.95 | +4.0 | 0.000 | 0.03 | +3.1 | +2.8 | -20.5 | beats random (raw p) but fails a later check |
-| freqtrade | Scalp | BTC | 5m | 4999 | -65.8% | +22.6% | -8.07 | 0.95 | +4.0 | 0.000 | 0.04 | +2.1 | +4.2 | -23.0 | beats random (raw p) but fails a later check |
+| freqtrade | Scalp | BTC | 5m | 4999 | -65.8% | +22.6% | -8.07 | 0.95 | +4.0 | 0.000 | 0.05 | +2.1 | +4.2 | -23.0 | beats random (raw p) but fails a later check |
 | fmzquant | R-Breaker (0.35/0.07/0.25, intraday) | ETH | 5m | 1690 | +7.0% | +32.8% | 0.37 | 0.86 | +3.9 | 0.000 | 0.01 | +4.2 | +0.7 | +0.9 | beats random (raw p) but fails a later check |
-| freqtrade | Scalp | SPY | 1m | 5410 | -18.3% | +6.7% | -3.61 | 0.81 | +3.9 | 0.000 | 0.09 | +3.7 | +1.3 | -10.1 | beats random (raw p) but fails a later check |
-| fmzquant | R-Breaker (0.35/0.07/0.25, intraday) | BTC | 1h | 1100 | +9.1% | +25.6% | 0.44 | 0.95 | +3.9 | 0.000 | 0.09 | +3.5 | +1.7 | +1.1 | beats random (raw p) but fails a later check |
-| NostalgiaForInfinity basket (out of sample) | NostalgiaForInfinityX5 | basket of 12 | 5m | 60 | +13.4% | n/a | 0.93 | -0.30 | +3.7 | 0.000 | 0.09 | +3.7 | +2.3 | +1.7 | beats random (raw p) but fails a later check |
-| freqtrade (shorts allowed) | VolatilitySystem | ETH | 1h | 195 | +185.4% | n/a | 1.13 | 0.83 | +3.2 | 0.001 | 0.44 | +3.3 | +0.8 | +3.2 | beats random (raw p) but fails a later check |
-| gekko-strategies | TEMA (SMA200 safety) | ETH | 5m | 8634 | -83.0% | +54.3% | -5.24 | 0.86 | +3.2 | 0.001 | 0.59 | +2.2 | +2.4 | -17.9 | beats random (raw p) but fails a later check |
-| backtesting.py | SmaCross 10/20 (README) | ETH | 1h | 3887 | -30.0% | +88.0% | -0.07 | 0.83 | +3.2 | 0.001 | 0.51 | +2.8 | +1.4 | -0.3 | beats random (raw p) but fails a later check |
-| vnpy | DoubleMaStrategy | ETH | 1h | 3878 | +14.8% | +87.8% | 0.56 | 0.83 | +3.1 | 0.001 | 0.51 | +2.8 | +1.4 | +1.5 | beats random (raw p) but fails a later check |
+| freqtrade | Scalp | SPY | 1m | 5410 | -18.3% | +6.7% | -3.61 | 0.81 | +3.9 | 0.000 | 0.10 | +3.7 | +1.3 | -10.1 | beats random (raw p) but fails a later check |
+| fmzquant | R-Breaker (0.35/0.07/0.25, intraday) | BTC | 1h | 1100 | +9.1% | +25.6% | 0.44 | 0.95 | +3.9 | 0.000 | 0.10 | +3.5 | +1.7 | +1.1 | beats random (raw p) but fails a later check |
+| freqtrade: ssssi/freqtrade_strs | ClucHAnix_5m | ETH | 5m | 217 | +7.2% | +13.3% | 0.48 | 0.86 | +3.8 | 0.000 | 0.18 | +2.8 | +2.4 | +0.9 | beats random (raw p) but fails a later check |
+| NostalgiaForInfinity basket (out of sample) | NostalgiaForInfinityX5 | basket of 12 | 5m | 60 | +13.4% | n/a | 0.93 | -0.30 | +3.7 | 0.000 | 0.10 | +3.7 | +2.3 | +1.7 | beats random (raw p) but fails a later check |
+| freqtrade (shorts allowed) | VolatilitySystem | ETH | 1h | 195 | +185.4% | n/a | 1.13 | 0.83 | +3.2 | 0.001 | 0.49 | +3.3 | +0.8 | +3.2 | beats random (raw p) but fails a later check |
+| gekko-strategies | TEMA (SMA200 safety) | ETH | 5m | 8634 | -83.0% | +54.3% | -5.24 | 0.86 | +3.2 | 0.001 | 0.65 | +2.2 | +2.4 | -17.9 | beats random (raw p) but fails a later check |
+| backtesting.py | SmaCross 10/20 (README) | ETH | 1h | 3887 | -30.0% | +88.0% | -0.07 | 0.83 | +3.2 | 0.001 | 0.56 | +2.8 | +1.4 | -0.3 | beats random (raw p) but fails a later check |
+| vnpy | DoubleMaStrategy | ETH | 1h | 3878 | +14.8% | +87.8% | 0.56 | 0.83 | +3.1 | 0.001 | 0.56 | +2.8 | +1.4 | +1.5 | beats random (raw p) but fails a later check |
 | freqtrade | CofiBitStrategy | ETH | 5m | 5629 | -68.8% | +31.4% | -5.60 | 0.86 | +3.0 | 0.001 | 1.00 | +3.8 | -0.4 | -13.9 | beats random (raw p) but fails a later check |
 | gekko-strategies | TEMA (SMA200 safety) | ETH | 1h | 662 | +27.3% | +50.6% | 0.89 | 0.83 | +3.0 | 0.001 | 1.00 | +2.6 | +1.4 | +1.8 | beats random (raw p) but fails a later check |
-| zenbot + ML filter | trend_ema (default) | BTC | 5m | 164 | +3.0% | +8.9% | 0.33 | 0.58 | +3.0 | 0.002 | 1.00 | +1.1 | +3.6 | +0.7 | beats random (raw p) but fails a later check |
-| freqtrade: nateemma/strategies | FVE | SPY | 5m | 291 | +4.8% | +6.3% | 0.57 | 0.81 | +2.9 | 0.002 | 1.00 | +2.2 | +2.0 | +0.5 | beats random (raw p) but fails a later check |
-| freqtrade | EMASkipPump | BTC | 5m | 6540 | -68.7% | +66.1% | -2.98 | 0.95 | +2.9 | 0.002 | 1.00 | +3.1 | -0.5 | -11.7 | beats random (raw p) but fails a later check |
-| freqtrade: nateemma/strategies | LWBreakout | SPY | 5m | 130 | +3.7% | +4.4% | 0.47 | 0.81 | +2.9 | 0.002 | 1.00 | +2.6 | +0.9 | +0.2 | beats random (raw p) but fails a later check |

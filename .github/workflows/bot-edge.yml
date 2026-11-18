@@ -32,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        part: [ft5m, nfi_btc, nfi_eth, nfi_basket, nfi_oos_x4, nfi_oos_x5, nfi_oos_x6, ports2, meta, packs, ports3]
+        part: [ft5m, nfi_btc, nfi_eth, nfi_basket, nfi_oos_x4, nfi_oos_x5, nfi_oos_x6, ports2, meta, packs, ports3, cluc_basket]
     env:
       GH_TOKEN: ${{ github.token }}
     defaults:
@@ -63,6 +63,10 @@ jobs:
           git -C /tmp/nfi show cd6e1b7e891a9a83def47b884f1ec15e6afd4098:NostalgiaForInfinityX6.py > /tmp/nfi_x6/NostalgiaForInfinityX6.py  # 2025-07-01
           sed -i "s/^from numpy.lib import math/import math/" /tmp/strats/*.py /tmp/strats_fut/*.py   # numpy 2 removed numpy.lib.math
           # round 3 packs: ssssi (ClucHAnix, E0V1E, archive) and nateemma SimpleStrategies (needs its framework folders)
+          if [ "${{ matrix.part }}" = cluc_basket ]; then   # out-of-sample check of the one pack strategy that passed
+            git clone -q https://github.com/ssssi/freqtrade_strs /tmp/ssssi && git -C /tmp/ssssi checkout -q "$SSSSI_SHA"
+            mkdir -p /tmp/cluc && cp /tmp/ssssi/ClucHAnix/ClucHAnix_5m.py /tmp/cluc/
+          fi
           if [ "${{ matrix.part }}" = packs ]; then
             git clone -q https://github.com/ssssi/freqtrade_strs /tmp/ssssi && git -C /tmp/ssssi checkout -q "$SSSSI_SHA"
             git clone -q --filter=blob:none https://github.com/nateemma/strategies /tmp/nate && git -C /tmp/nate checkout -q "$NATE_SHA"
@@ -79,7 +83,7 @@ jobs:
       - name: Binance 5-minute bars
         run: |
           case "${{ matrix.part }}" in
-            nfi_basket|nfi_oos_*) python prep_data.py binance /tmp/data "$BASKET" 2022-09 ;;
+            nfi_basket|nfi_oos_*|cluc_basket) python prep_data.py binance /tmp/data "$BASKET" 2022-09 ;;
             meta|packs) python prep_data.py binance /tmp/data BTCUSDT,ETHUSDT 2018-10 ;;
             ports2|ports3) python prep_data.py binance /tmp/data BTCUSDT,ETHUSDT 2018-10
                     python prep_data.py binance /tmp/bdata "$BASKET" 2022-09 ;;
@@ -128,6 +132,11 @@ jobs:
               export PYTHONPATH=$PWD/stubs
               python ft_batch.py --strategies /tmp/packs/s_ssssi /tmp/packs/s_nate --assets BTC,ETH --fee 0.001 --tfs 5m,15m,30m \
                 --fallback 5m --only-native 1m,5m,15m,30m --datadir /tmp/data --out /tmp/out | tee /tmp/out.log ;;
+            cluc_basket)
+              # ClucHAnix_5m last changed 2022-12-08 (ssssi history), so 2023+ is out of sample; 12 coins, 6 slots
+              B=$(echo "$BASKET" | sed 's/USDT//g; s/,/+/g')
+              python ft_batch.py --strategies /tmp/cluc --assets "$B" --fee 0.001 --tfs 5m --max-open-trades 6 \
+                --timerange 20230101- --datadir /tmp/data --out /tmp/out | tee /tmp/out.log ;;
             ports3)
               [ -f /tmp/out/rows_ports3.csv ] || python run_ports3.py ci /tmp/data /tmp/out/rows_ports3.csv /tmp/bdata | tee /tmp/out.log ;;
           esac
