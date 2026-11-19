@@ -1,0 +1,7 @@
+freqtrade==2026.10
+technical
+ta
+scikit-learn
+scipy
+statsmodels
+pyarrow

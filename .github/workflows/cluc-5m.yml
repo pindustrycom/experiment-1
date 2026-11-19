@@ -1,0 +1,91 @@
+name: ClucHAnix pot, hourly runs
+
+# The crypto dip-buyer pot (experiments/strategies/strats/cluc.py) runs freqtrade's ClucHAnix_5m on 12 coins' 5-minute
+# bars, the one open-source bot in research/bot_edge that beat random timing and holding out of sample. Each run adds
+# the bars since the last one (Binance's public market data, no key), reruns freqtrade's backtester from the pots'
+# first close (2026-10-16, 16:00 New York) to the last finished bar, and keeps freqtrade's 5-minute equity and trades.
+# The strategy decides on every 5-minute bar; the backtest only uses finished bars, so earlier trades never change.
+# Paper only, no orders anywhere. Bars, equity and trades live in the "cluc-live" release (encrypted like the other
+# states); strategies.yml marks the pot at each US close from that equity and shows the trades on the pot's page.
+
+on:
+  pull_request:   # tests, plus a trial run that saves nothing
+    paths: ["experiments/strategies/strats/cluc.py", "experiments/strategies/strats/cluc_ftrun.py",
+            "experiments/strategies/requirements-cluc.txt", ".github/workflows/cluc-5m.yml"]
+  schedule:
+    - cron: "5 * * * *"   # every hour, a few minutes past; the 21:05 UTC run has the bars for strategies.yml at 21:40
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the state release
+
+concurrency:
+  group: cluc-5m-${{ github.event_name == 'pull_request' && github.ref || 'live' }}
+  cancel-in-progress: false
+
+env:
+  STATE_TAG: cluc-live
+  TRIAL: ${{ github.event_name == 'pull_request' }}
+  SSSSI_SHA: 3ed699f6773bd3db4526eb31bd6d459b95fd2bc2   # ssssi/freqtrade_strs, the commit research/bot_edge tested
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      STATE_KEY: ${{ secrets.STATE_KEY || secrets.PASSWORD }}
+      CRYPT: ${{ github.workspace }}/experiments/hub/state_crypt.sh
+    defaults:
+      run:
+        working-directory: experiments/strategies
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: experiments/strategies/requirements-cluc.txt
+      - run: pip install -r requirements-cluc.txt
+      - name: Tests (the pot's own)
+        if: env.TRIAL == 'true'
+        run: python -m pytest -q tests/test_cluc.py -p no:cacheprovider
+
+      - name: The strategy file (pinned commit)
+        run: |
+          git clone -q https://github.com/ssssi/freqtrade_strs /tmp/ssssi && git -C /tmp/ssssi checkout -q "$SSSSI_SHA"
+          mkdir -p /tmp/cluc_strategy && cp /tmp/ssssi/ClucHAnix/ClucHAnix_5m.py /tmp/cluc_strategy/
+          sha256sum /tmp/cluc_strategy/ClucHAnix_5m.py
+
+      - name: Restore the bars, equity and trades
+        run: |
+          mkdir -p state
+          if [ "$TRIAL" != "true" ] && gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | grep -qx cluc-live.tar.gz; then
+            gh release download "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --pattern cluc-live.tar.gz --dir /tmp/prev
+            "$CRYPT" open /tmp/prev/cluc-live.tar.gz
+            tar xzf /tmp/prev/cluc-live.tar.gz -C state
+          fi
+          ls -la state/cluc/bars 2>/dev/null | head -3 || echo "first run: bars from 2026-10-07"
+
+      - name: Update the bars and rerun freqtrade
+        run: |
+          set -o pipefail
+          python -m strats.cluc --data state --strategy-path /tmp/cluc_strategy | tee /tmp/run.json
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          r = json.load(open("/tmp/run.json"))
+          src = sorted({v["source"] for v in r["bars"].values()})
+          print(f"Bars from {', '.join(src)}; last common bar {r.get('last_bar')}; equity {r.get('equity')} (from 1000); "
+                f"{r.get('trades_closed')} trades closed, open: {r.get('open')}")
+          PY
+
+      - name: Save the bars, equity and trades
+        if: env.TRIAL != 'true'
+        run: |
+          mkdir -p /tmp/out
+          tar czf /tmp/out/cluc-live.tar.gz -C state cluc
+          "$CRYPT" seal /tmp/out/cluc-live.tar.gz
+          gh release view "$STATE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$STATE_TAG" --repo "$GITHUB_REPOSITORY" --title "ClucHAnix pot state" --latest=false \
+              --notes "Bars, freqtrade equity and trades of the ClucHAnix paper pot's hourly runs. Not a software release."
+          gh release upload "$STATE_TAG" /tmp/out/cluc-live.tar.gz --repo "$GITHUB_REPOSITORY" --clobber

@@ -1,0 +1,3 @@
+# The ClucHAnix pot's hourly run (strats/cluc.py, cluc-5m.yml): freqtrade brings pandas, requests and TA-Lib.
+freqtrade==2026.10
+pytest==9.1.1

@@ -116,6 +116,7 @@ POTS = [("exp2", "Exp2 volatility", LONG, "exp2/index.html"), ("trend", "Trend f
         ("reversal_stop", "Weekly reversal, 5% stop", SHORT, "strategies/index.html#reversal_stop"),
         ("btc_donchian", "BTC breakout", SHORT, "strategies/index.html#btc_donchian"),
         ("btc_donchian_vol", "BTC breakout, vol-sized", SHORT, "strategies/index.html#btc_donchian_vol"),
+        ("cluc_basket", "Crypto dip buyer (ClucHAnix)", SHORT, "strategies/index.html#cluc_basket"),
         ("straddle8", "8% day straddles", SHORT, "strategies/index.html#straddle8"),
         ("straddle8_news", "8% day straddles, news-tilted", SHORT, "strategies/index.html#straddle8_news")]
 # (category, anchor, colour, moving background, description)

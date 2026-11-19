@@ -26,6 +26,7 @@ STOPS = {                    # stop distance from the previous close, per positi
     "reversal_stop": REVERSAL_CAP,   # the plain "reversal" pot keeps no stop, to compare the two
     "btc_donchian": 0.06,    # BTC from its price at the last US close, checked on 4-hour bars (crypto.py)
     "btc_donchian_vol": 0.06,
+    # cluc_basket has none here: ClucHAnix_5m keeps its own stop and trailing exit on every 5-minute bar (cluc.py)
 }
 
 

@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from . import copy, copy_data, crypto, data, live, news, rules, site, stops, straddle
+from . import cluc, copy, copy_data, crypto, data, live, news, rules, site, stops, straddle
 
 
 def closed(px: pd.DataFrame, now: pd.Timestamp | None = None) -> pd.DataFrame:
@@ -76,7 +76,8 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
         rep["straddle_chains"] = {t: (f"{c[2]}: {len(c[0])} contracts" if c else "none") for t, c in chains.items()}
     except Exception as ex:  # noqa: BLE001 - the other pots still trade
         rep["straddle_flags"] = f"failed: {type(ex).__name__}: {str(ex)[:300]}"
-    rep["step"] = live.step(state, px, d, members, earnings, insiders, cp, btc, bars=bars, straddle_in=straddle_in)
+    cluc_eq = cluc.load_equity(data_dir)          # cluc-5m.yml's freqtrade equity (strategies.yml copies it in)
+    rep["step"] = live.step(state, px, d, members, earnings, insiders, cp, btc, bars=bars, straddle_in=straddle_in, cluc_eq=cluc_eq)
     rep["what_moved"] = {str(x.date()): stops.explain(state, px, x) for x in px.index[-2:]}
     if os.environ.get("STOP_BACKTEST"):       # pull requests: how the stop levels would have done since 2019
         try:
@@ -95,7 +96,8 @@ def run(data_dir: Path, state_f: Path, out: Path, fetch: bool = True) -> dict:
     jf = data_dir / "crypto" / "journal.json"
     journal = json.loads(jf.read_text()) if jf.exists() else None
     rep["site"] = site.write(out, state, rp, {"members": len(members), "priced": int(px.loc[d].notna().sum())},
-                             btc_trades=crypto.journal_rows(journal, btc), btc_journal=journal)
+                             btc_trades=crypto.journal_rows(journal, btc), btc_journal=journal,
+                             cluc_trades=cluc.load_trades(data_dir))
     return rep
 
 

@@ -13,6 +13,7 @@ Long-term (positions held for weeks or months):
 Short-term (positions held for days):
   btc_donchian  Bitcoin 4-hour breakout: see crypto.py.
   btc_donchian_vol  The same breakout, sized by BTC's 30-day volatility: see crypto.py.
+  cluc_basket  ClucHAnix_5m, a freqtrade dip buyer, on 12 coins' 5-minute bars: see cluc.py.
   reversal Weekly reversal: at each week's last close, buy the 20 S&P 500 stocks that fell the most over the past 5
            sessions, 5% each, and hold them for the week.
 """
@@ -53,6 +54,10 @@ STRATEGIES = {
     "btc_donchian_vol": ("BTC breakout, vol-sized", SHORT_TERM, "The same Bitcoin breakout signal, but the position is sized "
                          "to a steady risk: 2.5% of daily volatility over BTC's past 30 days, up to 2x the pot when BTC is "
                          "calm and less in wild markets. See crypto.py."),
+    "cluc_basket": ("Crypto dip buyer (ClucHAnix)", SHORT_TERM, "freqtrade's ClucHAnix_5m strategy (ssssi/freqtrade_strs) on 12 "
+                    "big coins' 5-minute bars: buys a coin when its Heikin-Ashi close dips under the lower Bollinger band "
+                    "while its hourly trend is not falling, sells on a bounce or its trailing stop, usually within hours. Up "
+                    "to 6 coins at once, one sixth of the pot each, mostly in cash; 10 bp a side. See cluc.py."),
     "straddle8": ("8% day straddles", SHORT_TERM, "Each close, buys at-the-money option straddles (a call and a put) on the 5 "
                   "S&P 500 stocks the time-scale ladder rates most likely to move 8% the next day, either way, and sells them "
                   "at the next close. 20% of the pot goes in, bought at the ask and sold at the bid. See straddle.py."),
