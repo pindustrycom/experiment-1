@@ -18,6 +18,12 @@ with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     pd.options.future.infer_string = False
 
+import numpy as np  # noqa: E402
+
+for _k, _v in (("NAN", np.nan), ("NaN", np.nan), ("Inf", np.inf), ("PINF", np.inf), ("NINF", -np.inf)):
+    if not hasattr(np, _k):          # numpy 2 removed these aliases; 2021-22 strategies still use them
+        setattr(np, _k, _v)
+
 import freqtrade.exchange.exchange as E  # noqa: E402
 from freqtrade.enums import TradingMode
 
