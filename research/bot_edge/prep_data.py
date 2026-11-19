@@ -3,6 +3,7 @@
   python prep_data.py releases RELEASE_DIR OUT   # project data: btc-ssm-data (BTC 1h), kronos-results (ETH 1h),
                                                  # exp7-data (SPY/QQQ Tiingo 1-min, regular hours)
   python prep_data.py binance OUT SYM,SYM START  # CI: Binance spot 5m monthly files from data.binance.vision
+  python prep_data.py binance1m OUT SYM START    # the same, 1-minute bars (for freqtrade's --timeframe-detail)
 
 Stocks are stored as BASE/USDT pairs only so freqtrade can read them; prices are SPY/QQQ in dollars, not dividend
 adjusted (the benchmark uses the same bars). Funding for the futures copies is zero (see README).
@@ -45,7 +46,7 @@ def save(df, out, base, tf):
 def crypto_frames(d, out, base, tfs):
     d = d[~d.index.duplicated()].sort_index()
     for tf in tfs:
-        rule = {"5m": "5min", "15m": "15min", "30m": "30min", "1h": "1h", "4h": "4h", "12h": "12h", "1d": "1D"}[tf]
+        rule = {"1m": "1min", "5m": "5min", "15m": "15min", "30m": "30min", "1h": "1h", "4h": "4h", "12h": "12h", "1d": "1D"}[tf]
         save(d.resample(rule, label="left", closed="left").agg(AGG).dropna(), out, base, tf)
 
 
@@ -77,9 +78,9 @@ def from_releases(rel, out):
         stock_frames(m, out, s)
 
 
-def binance(out, syms, start):
+def binance(out, syms, start, interval="5m"):
     os.makedirs(out, exist_ok=True)
-    url = "https://data.binance.vision/data/spot/monthly/klines/{s}/5m/{s}-5m-{m}.zip"
+    url = "https://data.binance.vision/data/spot/monthly/klines/{s}/%s/{s}-%s-{m}.zip" % (interval, interval)
     last = pd.Timestamp.now("UTC").tz_localize(None).to_period("M") - 1
     for sym in syms:
         frames = []
@@ -104,12 +105,14 @@ def binance(out, syms, start):
         d = pd.concat(frames)
         d["t"] = pd.to_datetime(d.t.where(d.t > 1e14, d.t * 1000), unit="us")   # ms before 2025, us after
         base = sym.replace("USDT", "")
-        crypto_frames(d.set_index("t"), out, base, ("5m", "15m", "30m", "1h", "4h", "1d"))
+        crypto_frames(d.set_index("t"), out, base, ("1m",) if interval == "1m" else ("5m", "15m", "30m", "1h", "4h", "1d"))
         print(sym, len(d), d.t.min(), d.t.max(), flush=True)
 
 
 if __name__ == "__main__":
     if sys.argv[1] == "releases":
         from_releases(sys.argv[2], sys.argv[3])
+    elif sys.argv[1] == "binance1m":                # 1-minute bars, for --timeframe-detail fills
+        binance(sys.argv[2], sys.argv[3].split(","), sys.argv[4], "1m")
     else:
         binance(sys.argv[2], sys.argv[3].split(","), sys.argv[4])

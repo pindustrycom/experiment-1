@@ -33,6 +33,7 @@ ap.add_argument("--out", default="ftout")
 ap.add_argument("--datadir", required=True)
 ap.add_argument("--max-open-trades", type=int, default=1)
 ap.add_argument("--tag", default="")
+ap.add_argument("--detail", default="", help="--timeframe-detail for freqtrade (fills checked on smaller bars)")
 ap.add_argument("--run-timeout", type=int, default=None, help="seconds per backtest")
 ap.add_argument("--mem-gb", type=float, default=None, help="memory cap per backtest (one runaway strategy got the CI runner killed)")
 a = ap.parse_args()
@@ -89,7 +90,7 @@ for asset in a.assets.split(","):
         cmd = [sys.executable, f"{HERE}/ftrun.py", "backtesting", "-c", cpath, "-s", cls, "--strategy-path", sdir,
                "--timeframe", run_tf, "--timerange", a.timerange, "--export", "trades", "--cache", "none",
                "--backtest-directory", f"{a.out}/res_{label}_{mode}_{run_tf}", "--datadir", os.path.abspath(a.datadir),
-               "--userdir", os.path.abspath(a.out)]
+               "--userdir", os.path.abspath(a.out)] + (["--timeframe-detail", a.detail] if a.detail else [])
         env = dict(os.environ, FT_BASES=",".join(x for x in asset.split("+")))
         try:   # one strategy that hangs or crawls must not use up the whole job
             r = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=a.run_timeout, preexec_fn=_limit)
