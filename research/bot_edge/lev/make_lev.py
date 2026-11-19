@@ -20,7 +20,7 @@ for old, new in (("use_sell_signal", "use_exit_signal"), ("sell_profit_only", "e
                  ("\n            'sell'\n", "\n            'exit_long'\n")):
     assert old in s, old
     s = s.replace(old, new)
-for x in (2, 3, 5):
+for x in (1, 2, 3, 5):  # x1 = futures control
     t = re.sub(r"^class ClucHAnix_5m\(IStrategy\):", f"class ClucHAnix_5m_x{x}(IStrategy):\n    can_short = True   # futures mode; the rules only go long", s, flags=re.M)
     t += f'''
 
