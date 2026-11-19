@@ -34,7 +34,14 @@ ap.add_argument("--datadir", required=True)
 ap.add_argument("--max-open-trades", type=int, default=1)
 ap.add_argument("--tag", default="")
 ap.add_argument("--run-timeout", type=int, default=None, help="seconds per backtest")
+ap.add_argument("--mem-gb", type=float, default=None, help="memory cap per backtest (one runaway strategy got the CI runner killed)")
 a = ap.parse_args()
+
+
+def _limit():
+    if a.mem_gb:
+        import resource
+        resource.setrlimit(resource.RLIMIT_AS, (int(a.mem_gb * 2 ** 30), int(a.mem_gb * 2 ** 30)))
 os.makedirs(a.out, exist_ok=True)
 tfs = set(a.tfs.split(","))
 only = set(filter(None, a.only_native.split(",")))
@@ -85,7 +92,7 @@ for asset in a.assets.split(","):
                "--userdir", os.path.abspath(a.out)]
         env = dict(os.environ, FT_BASES=",".join(x for x in asset.split("+")))
         try:   # one strategy that hangs or crawls must not use up the whole job
-            r = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=a.run_timeout)
+            r = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=a.run_timeout, preexec_fn=_limit)
         except subprocess.TimeoutExpired:
             r = subprocess.CompletedProcess(cmd, 124, "", f"timed out after {a.run_timeout}s")
         new = sorted(set(glob.glob(f"{a.out}/{prefix}*.zip")) - before)
