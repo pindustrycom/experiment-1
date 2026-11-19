@@ -10,7 +10,7 @@ import html
 import json
 from pathlib import Path
 
-from . import crypto, rules, straddle
+from . import cluc, crypto, rules, straddle
 
 e = html.escape
 CSS = """
@@ -34,6 +34,8 @@ def pct(v: float | None, sign: bool = True, digits: int = 1) -> str:
 def position_text(key: str, row: dict | None, events: dict) -> str:
     if key in crypto.KEYS:
         return crypto.position_text(row)
+    if key in cluc.KEYS:
+        return cluc.position_text(row)
     if key in straddle.KEYS:
         return straddle.position_text(row)
     if not row:
@@ -53,7 +55,7 @@ def position_text(key: str, row: dict | None, events: dict) -> str:
 
 
 def write(out: Path, state: dict, summary_replay: dict | None, info: dict, btc_trades: list[dict] | None = None,
-          btc_journal: dict | None = None) -> dict:
+          btc_journal: dict | None = None, cluc_trades: dict | None = None) -> dict:
     (out / "data").mkdir(parents=True, exist_ok=True)
     pots = state.get("pots", {})
     dates = sorted({r["date"] for rows in pots.values() for r in rows})
@@ -69,7 +71,7 @@ def write(out: Path, state: dict, summary_replay: dict | None, info: dict, btc_t
                               for k, (n, c, w) in rules.STRATEGIES.items()},
                "replay": summary_replay}
     (out / "data" / "summary.json").write_text(json.dumps(summary, indent=1))
-    (out / "index.html").write_text(page(summary, pots, _btc_live(btc_trades or [], btc_journal)))
+    (out / "index.html").write_text(page(summary, pots, _btc_live(btc_trades or [], btc_journal), _cluc_log(cluc_trades)))
     return {"sessions": len(dates), "last": summary["last"]}
 
 
@@ -83,6 +85,12 @@ def _replay_block(key: str, rp: dict | None) -> str:
                 '6% daily stop): +53.8% a year, Sharpe 1.31, worst drop -40%, against the plain breakout pot +36.2%, 1.00, -50%. '
                 'From 2021: +18.7% a year against +7.6% (research/btc_ssm, round 2). Average size while in BTC is about 1x; '
                 'it holds up to 2x in calm stretches and as little as a third in wild ones.</p>')
+    if key == cluc.KEY:
+        return ('<p class="small muted">Out-of-sample backtest January 2023 to October 2026 (research/bot_edge; the strategy file '
+                'has not changed since December 2022), same 12 coins, 6 slots, 10 bp a side: +21.7% a year, Sharpe 1.64, worst '
+                'drop -11.7%, against holding the 12 coins equally +24.1%, 0.66, -68.6%. In coins about a fifth of the time; it '
+                'beat 20,000 random-timing shuffles (z 8.8) in both halves. The five best days gave a quarter of the profit, '
+                'mostly crash rebounds where fills at the next 5-minute open are the least certain.</p>')
     if key == "reversal_stop":
         return ('<p class="small muted">Replay 2019 to October 2026 with the 5% stop (research/stop_losses): +22.4% a year '
                 'against +28.1% without it; days below -5% fell from 23 to 11, worst day -17% (overnight gaps) against -24%.</p>')
@@ -148,7 +156,23 @@ def _straddle_log(rows: list[dict]) -> str:
             'ask after the close, sold at the bid the next close (Cboe delayed quotes); a leg with no bid counts at its exercise value.</p>')
 
 
-def page(summary: dict, pots: dict, btc_live: str = "") -> str:
+def _cluc_log(trades: dict | None) -> str:
+    rows = cluc.trade_rows(trades)
+    if not rows:
+        return '<p class="small muted">No trades yet: they appear after the first hourly run (cluc-5m.yml).</p>'
+    body = ""
+    for t in rows:
+        sold = "" if t["close_rate"] is None else f'{t["close_rate"]:,.6g}'
+        net = pct(t["profit"], digits=2) if t["profit"] is not None else "–"
+        body += (f'<tr><td>{e(t["coin"])}</td><td>{e(t["open_date"])}</td><td>{t["open_rate"]:,.6g}</td>'
+                 f'<td>{e(t["close_date"] or "still open")}</td><td>{sold}</td><td>{net}</td><td>{e(t["exit"] or "")}</td></tr>')
+    n = len([t for t in trades.get("trades", []) if not t["open"]])
+    return (f'<p class="small">Trades (UTC, freqtrade\'s fills at the next 5-minute open; {n} closed so far, bars up to '
+            f'{e(str(trades.get("end", "?")))} UTC):</p><div class="scroll"><table><tr><th>Coin</th><th>Bought</th><th>Price</th>'
+            f'<th>Sold</th><th>Price</th><th>Net</th><th>Exit</th></tr>{body}</table></div>')
+
+
+def page(summary: dict, pots: dict, btc_live: str = "", cluc_log: str = "") -> str:
     rp = summary.get("replay")
     parts = []
     for cat in (rules.LONG_TERM, rules.SHORT_TERM):
@@ -164,7 +188,7 @@ def page(summary: dict, pots: dict, btc_live: str = "") -> str:
             parts.append(f'<section class="panel" id="{k}"><h3>{e(s["name"])}</h3><p class="muted">{e(s["what"])}</p>'
                          f'<p class="small">Total return since the {e(rows[0]["date"]) if rows else "next"} close: <b>{pct(live, digits=2)}</b> in USD{since} '
                          f'(the Markets page shows it in CAD)</p>'
-                         f'<p class="small">{e(s["position"])}</p>{btc_live if k == crypto.KEY else ""}'
+                         f'<p class="small">{e(s["position"])}</p>{btc_live if k == crypto.KEY else ""}{cluc_log if k == cluc.KEY else ""}'
                          f'{_straddle_log(rows) if k in straddle.KEYS else ""}{_replay_block(k, rp)}</section>')
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>Strategy pots</title><style>{CSS}</style></head><body>

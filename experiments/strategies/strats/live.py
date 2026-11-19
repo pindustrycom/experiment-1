@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import copy, crypto, rules, stops, straddle
+from . import cluc, copy, crypto, rules, stops, straddle
 
 COST = 0.0001          # 1 bp of the traded amount, each side
 REPLAY_FROM = "2019-01-01"
@@ -36,11 +36,12 @@ def _last(rows: list[dict]) -> dict | None:
 
 def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], earnings: pd.DataFrame, insiders: pd.DataFrame,
          cp: dict | None = None, btc: pd.DataFrame | None = None, origin: str = ORIGIN,
-         bars: dict[str, pd.DataFrame] | None = None, straddle_in: dict | None = None) -> dict:
+         bars: dict[str, pd.DataFrame] | None = None, straddle_in: dict | None = None, cluc_eq: pd.DataFrame | None = None) -> dict:
     """Move every pot to the close of d. Safe to repeat: a pot already at d is left alone. A pot that does not reach back to
     the origin close (a new pot, or one added after the first) is first rebuilt from there, session by session, with only
     what was known at each close; those rows are marked as replayed (except FORWARD_ONLY pots). bars: the day's
-    open/low/high for the stop losses. straddle_in: today's flags and option chains for the straddle pot (cli.py)."""
+    open/low/high for the stop losses. straddle_in: today's flags and option chains for the straddle pot (cli.py).
+    cluc_eq: freqtrade's 5-minute equity for the ClucHAnix pot (cluc.py, from cluc-5m.yml)."""
     pots = state.setdefault("pots", {k: [] for k in rules.STRATEGIES})
     state.setdefault("events", {"pead": {}, "insider": {}})
     state.setdefault("seen", {"pead": []})
@@ -51,9 +52,9 @@ def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], ear
     for key in rules.STRATEGIES:
         rows = pots.get(key) or []
         if key not in FORWARD_ONLY and o is not None and (not rows or rows[0]["date"] > o.strftime("%Y-%m-%d")):
-            if (done := catch_up(state, key, px, after, members, earnings, insiders, cp, btc, bars)):
+            if (done := catch_up(state, key, px, after, members, earnings, insiders, cp, btc, bars, cluc_eq)):
                 rep[f"{key}_replayed"] = done
-        rep[key] = step_pot(state, key, px, d, ds, members, earnings, insiders, cp, btc, bars, straddle_in)
+        rep[key] = step_pot(state, key, px, d, ds, members, earnings, insiders, cp, btc, bars, straddle_in, cluc_eq)
     state["seen"]["pead"] = state["seen"]["pead"][-3000:]
     firsts = [r[0]["date"] for r in pots.values() if r]
     if firsts:
@@ -62,7 +63,8 @@ def step(state: dict, px: pd.DataFrame, d: pd.Timestamp, members: list[str], ear
 
 
 def catch_up(state: dict, key: str, px: pd.DataFrame, sessions: pd.DatetimeIndex, members: list[str], earnings: pd.DataFrame,
-             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None, bars: dict | None = None) -> str:
+             insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None, bars: dict | None = None,
+             cluc_eq: pd.DataFrame | None = None) -> str:
     """Rebuild one pot from the first of sessions, each step seeing prices only up to its own close."""
     state["pots"][key] = []
     if key in state["events"]:
@@ -70,7 +72,7 @@ def catch_up(state: dict, key: str, px: pd.DataFrame, sessions: pd.DatetimeIndex
     if key == "pead":
         state["seen"]["pead"] = []
     for s in sessions:
-        step_pot(state, key, px.loc[:s], s, s.strftime("%Y-%m-%d"), members, earnings, insiders, cp, btc, bars)
+        step_pot(state, key, px.loc[:s], s, s.strftime("%Y-%m-%d"), members, earnings, insiders, cp, btc, bars, cluc_eq=cluc_eq)
     rows = state["pots"].get(key) or []
     for r in rows:
         r["replayed"] = True
@@ -79,7 +81,7 @@ def catch_up(state: dict, key: str, px: pd.DataFrame, sessions: pd.DatetimeIndex
 
 def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, members: list[str], earnings: pd.DataFrame,
              insiders: pd.DataFrame, cp: dict | None, btc: pd.DataFrame | None, bars: dict | None = None,
-             straddle_in: dict | None = None) -> str:
+             straddle_in: dict | None = None, cluc_eq: pd.DataFrame | None = None) -> str:
     """Move one pot to the close of d."""
     pots, events, seen = state["pots"], state["events"], state["seen"]
     rows = pots.setdefault(key, [])
@@ -88,6 +90,11 @@ def step_pot(state: dict, key: str, px: pd.DataFrame, d: pd.Timestamp, ds: str, 
         return f"already at {last['date']}"
     if key in crypto.KEYS:
         out = step_btc(rows, last, btc, d, ds, key)
+        if not rows:
+            pots.pop(key, None)
+        return out
+    if key in cluc.KEYS:
+        out = cluc.step(rows, last, cluc_eq, d, ds)
         if not rows:
             pots.pop(key, None)
         return out

@@ -276,8 +276,9 @@ moments, but they earn +0.9% and +5.1%/yr with 0.3-0.4% exposure: less than T-bi
 ETH +21%/yr over 2021-26). After Holm across all rows none passes. Comparison rows with all trades:
 `results/rows_meta_*.csv`.
 
-ClucHAnix_5m passes, including the out-of-sample basket, so a paper pot is offered, not started: the 12-coin basket,
-6 slots, 10bp fees, run on 5-minute bars. Caveats: backtest fills (no slippage beyond fees), one strategy chosen from
+ClucHAnix_5m passes, including the out-of-sample basket, so it now runs as a paper pot (Joaquin's choice, 2026-11-19):
+`cluc_basket` in experiments/strategies (strats/cluc.py, .github/workflows/cluc-5m.yml), the 12-coin basket, 6 slots,
+10bp fees, freqtrade's own backtester over Binance 5-minute bars from the pots' first close (2026-10-16), rerun hourly. Caveats: backtest fills (no slippage beyond fees), one strategy chosen from
 968 rows (Holm p 0.048 is just under the line), and its trade count on BTC alone has dried up since 2025.
 
 ## Files

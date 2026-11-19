@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from strats import cli, copy, crypto, data, live, rules, site, stops
+from strats import cli, cluc, copy, crypto, data, live, rules, site, stops
 
 
 def prices(n=600, seed=0, tickers=None):
@@ -97,7 +97,7 @@ def test_replay_and_site(tmp_path):
     out = site.write(tmp_path, st, rp, {})
     assert out["sessions"] == 1
     head = (tmp_path / "data" / "daily.csv").read_text().splitlines()[0]
-    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,reversal_stop,btc_donchian,btc_donchian_vol,straddle8,straddle8_news"
+    assert head == "date,trend,pead,insider,best_ideas,conviction,pelosi,reversal,reversal_stop,btc_donchian,btc_donchian_vol,cluc_basket,straddle8,straddle8_news"
     s = json.loads((tmp_path / "data" / "summary.json").read_text())
     assert s["strategies"]["pead"]["category"] == rules.LONG_TERM and "cash" in s["strategies"]["pead"]["position"]
     page = (tmp_path / "index.html").read_text()
@@ -470,3 +470,45 @@ def test_news_mask_hides_name_and_ticker():
     from strats import news
     assert news.mask("Intel's (INTC) shares jump as Intel beats; $INTC", "Intel", "INTC") == \
         "the company (the company) shares jump as the company beats; the company"
+
+
+def cluc_equity(end="2026-11-20"):
+    """A fake freqtrade equity capture every 5 minutes from just after START, with one coin held part of the time."""
+    idx = pd.date_range(cluc.START + cluc.BAR, end, freq="5min")
+    eq = pd.DataFrame({"equity": 1000 * np.exp(np.cumsum(np.random.default_rng(3).normal(0, 1e-4, len(idx))))}, index=idx)
+    for b in cluc.BASES:
+        eq[b] = 0.0
+    eq.loc[idx.hour < 12, "SOL"] = 1 / 6
+    return eq
+
+
+def test_cluc_pot_marks_freqtrade_equity_at_each_us_close_from_origin():
+    eq = cluc_equity()
+    px = prices(tickers=["SPY"])
+    px.index = pd.bdate_range("2026-10-01", periods=len(px))
+    px = px.loc[:"2026-11-18"]
+    st = {}
+    live.step(st, px.loc[:"2026-11-17"], pd.Timestamp("2026-11-17"), [], pd.DataFrame(), pd.DataFrame(), cluc_eq=eq)
+    rows = st["pots"]["cluc_basket"]
+    assert rows[0]["date"] == live.ORIGIN and rows[0]["ret"] == 0.0 and rows[0]["replayed"]     # rebuilt from the origin
+    live.step(st, px, pd.Timestamp("2026-11-18"), [], pd.DataFrame(), pd.DataFrame(), cluc_eq=eq)
+    last = rows[-1]
+    t = cluc.mark_time(pd.Timestamp("2026-11-18"))
+    assert last["date"] == "2026-11-18" and pd.Timestamp(last["bar"]) == t == pd.Timestamp("2026-11-18 21:00")   # 16:00 New York
+    assert last["index"] == pytest.approx(eq.at[t, "equity"] / cluc.WALLET)          # the daily returns chain to freqtrade's equity
+    assert last["w"] == {} and "cash" in site.position_text("cluc_basket", last, {})
+    st2 = {}
+    live.step(st2, px, pd.Timestamp("2026-11-18"), [], pd.DataFrame(), pd.DataFrame(), cluc_eq=None)
+    assert "cluc_basket" not in st2["pots"]                  # no equity yet: the pot waits
+
+
+def test_cluc_mark_uses_only_captures_up_to_the_close():
+    eq = cluc_equity("2026-10-21 03:00")
+    assert cluc.mark(eq, pd.Timestamp("2026-10-16")) == cluc.START                     # before any capture: starting cash
+    assert cluc.mark(eq, pd.Timestamp("2026-10-20")) == pd.Timestamp("2026-10-20 20:00")   # EDT
+    assert cluc.mark(eq, pd.Timestamp("2026-10-21")) == eq.index[-1]                   # captures stop early: the last one
+    rows = []
+    cluc.step(rows, None, eq, pd.Timestamp("2026-10-16"), "2026-10-16")
+    cluc.step(rows, rows[-1], eq, pd.Timestamp("2026-10-20"), "2026-10-20")
+    assert rows[1]["ret"] == pytest.approx(eq.at[pd.Timestamp("2026-10-20 20:00"), "equity"] / 1000 - 1)
+

@@ -101,6 +101,17 @@ jobs:
             cp /tmp/btc/x/crypto/journal.json state/data/crypto/journal.json
           fi
 
+      - name: ClucHAnix equity and trades from the hourly runs (cluc-5m.yml)
+        if: env.TRIAL != 'true'
+        run: |
+          if gh release view cluc-live --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null | grep -qx cluc-live.tar.gz; then
+            gh release download cluc-live --repo "$GITHUB_REPOSITORY" --pattern cluc-live.tar.gz --dir /tmp/cluc
+            "$CRYPT" open /tmp/cluc/cluc-live.tar.gz
+            mkdir -p /tmp/cluc/x state/data/cluc
+            tar xzf /tmp/cluc/cluc-live.tar.gz -C /tmp/cluc/x cluc/equity.csv cluc/trades.json
+            cp /tmp/cluc/x/cluc/equity.csv /tmp/cluc/x/cluc/trades.json state/data/cluc/
+          fi
+
       - name: Trade the close
         run: |
           set -o pipefail
