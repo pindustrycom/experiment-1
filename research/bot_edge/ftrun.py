@@ -25,7 +25,7 @@ for _k, _v in (("NAN", np.nan), ("NaN", np.nan), ("Inf", np.inf), ("PINF", np.in
         setattr(np, _k, _v)
 
 import freqtrade.exchange.exchange as E  # noqa: E402
-from freqtrade.enums import TradingMode
+from freqtrade.enums import TradingMode  # noqa: E402
 
 BASES = os.environ.get("FT_BASES", "BTC,ETH,SPY,QQQ").split(",")
 MAXLEV = float(os.environ.get("FT_MAXLEV", "1"))   # futures leverage allowed (round 4 leverage runs)
