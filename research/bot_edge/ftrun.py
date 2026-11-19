@@ -22,6 +22,7 @@ import freqtrade.exchange.exchange as E  # noqa: E402
 from freqtrade.enums import TradingMode
 
 BASES = os.environ.get("FT_BASES", "BTC,ETH,SPY,QQQ").split(",")
+MAXLEV = float(os.environ.get("FT_MAXLEV", "1"))   # futures leverage allowed (round 4 leverage runs)
 
 
 def _market(base, futures):
@@ -32,7 +33,7 @@ def _market(base, futures):
             "future": False, "option": False, "active": True, "contract": futures, "linear": True if futures else None,
             "inverse": False if futures else None, "contractSize": 1.0 if futures else None, "taker": 0.001, "maker": 0.001,
             "precision": {"amount": 1e-8, "price": 1e-8}, "limits": {"amount": {"min": 1e-8, "max": None},
-            "price": {"min": None, "max": None}, "cost": {"min": 1.0, "max": None}, "leverage": {"min": 1, "max": 1}},
+            "price": {"min": None, "max": None}, "cost": {"min": 1.0, "max": None}, "leverage": {"min": 1, "max": MAXLEV}},
             "info": {}}
 
 
@@ -45,7 +46,7 @@ def reload_markets(self, force=False, *, load_leverage_tiers=True):
     self._last_markets_refresh = E.dt_ts()
     if fut:
         self._leverage_tiers = {m["symbol"]: [{"minNotional": 0, "maxNotional": 1e12, "maintenanceMarginRate": 0.004,
-                                              "maxLeverage": 1.0, "maintAmt": 0.0}] for m in mk}
+                                              "maxLeverage": MAXLEV, "maintAmt": 0.0}] for m in mk}
 
 
 E.Exchange.reload_markets = reload_markets
