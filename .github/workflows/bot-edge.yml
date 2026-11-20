@@ -185,8 +185,11 @@ jobs:
               export PYTHONPATH=$PWD/stubs
               python ft_batch.py --strategies /tmp/r4fix --assets BTC --fee 0.001 --tfs 5m,15m,30m,1h,4h,1d \
                 --fallback 5m --timerange 20210101- --run-timeout 1800 --mem-gb 9 --datadir /tmp/data --out /tmp/out | tee /tmp/out.log
-              python ft_batch.py --strategies /tmp/mm --assets BTC --fee 0.001 --tfs 5m --detail 1m --tag _d1m \
-                --timerange 20210101- --run-timeout 5400 --mem-gb 12 --datadir /tmp/data --out /tmp/out | tee -a /tmp/out.log ;;
+              python ft_batch.py --strategies /tmp/mm --assets BTC --fee 0.001 --tfs 5m --fallback 5m --detail 1m --tag _d1m \
+                --timerange 20210101- --run-timeout 5400 --mem-gb 12 --datadir /tmp/data --out /tmp/out | tee -a /tmp/out.log
+              # and at its own 1-minute timeframe (2024+ to fit the runner)
+              python ft_batch.py --strategies /tmp/mm --assets BTC --fee 0.001 --tfs 1m --tag _1m \
+                --timerange 20240101- --run-timeout 5400 --mem-gb 12 --datadir /tmp/data --out /tmp/out | tee -a /tmp/out.log ;;
             ports3)
               [ -f /tmp/out/rows_ports3.csv ] || python run_ports3.py ci /tmp/data /tmp/out/rows_ports3.csv /tmp/bdata | tee /tmp/out.log ;;
           esac
