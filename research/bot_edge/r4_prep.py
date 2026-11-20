@@ -19,7 +19,8 @@ import pandas as pd
 UPNAN = re.compile(r"(['\"]up['\"]\s*\)\s*,\s*)np\.(?:NaN|NAN|nan)(\s*\))")
 
 out, results, repos = sys.argv[1], sys.argv[2], sys.argv[3:]
-done = set(pd.read_csv(results).strategy.astype(str))
+_r = pd.read_csv(results)
+done = set(_r[_r["round"] != 4].strategy.astype(str))  # round-4 rows are this round's own output
 seen, rows = set(), []
 for repo in repos:
     for f in sorted(glob.glob(f"{repo}/**/*.py", recursive=True)):
