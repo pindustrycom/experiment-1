@@ -206,6 +206,8 @@ jobs:
         if: always()
         run: |
           cp /tmp/out.log /tmp/out/out.log 2>/dev/null || true
+          # never replace the saved exports with nothing (a failed prep once deleted them)
+          [ -d /tmp/out ] && ls /tmp/out/*.done >/dev/null 2>&1 || { echo "no exports, release left as it is"; exit 1; }
           cd /tmp/out && tar czf /tmp/bot-edge-${{ matrix.part }}.tar.gz $(ls *.zip *.done *.csv out.log 2>/dev/null)
           gh release view bot-edge-results --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create bot-edge-results --repo "$GITHUB_REPOSITORY" --title "Bot edge test results" \
