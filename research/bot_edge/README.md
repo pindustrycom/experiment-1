@@ -281,6 +281,31 @@ ClucHAnix_5m passes, including the out-of-sample basket, so it now runs as a pap
 10bp fees, freqtrade's own backtester over Binance 5-minute bars from the pots' first close (2026-10-16), rerun hourly. Caveats: backtest fills (no slippage beyond fees), one strategy chosen from
 968 rows (Holm p 0.048 is just under the line), and its trade count on BTC alone has dried up since 2025.
 
+### Round 4 (2026-11-19): looking for 20% a month
+
+Joaquin asked for anything that makes about 20% a month. About 280 new freqtrade strategies were backtested on Binance BTC 5m
+bars, 2021-2026, with 10bp fees (futures 5bp). They come from TheoBrigitte, shah-zaib, djienne and Bustillo
+(`r4_prep.py`, part `r4_*` in bot-edge.yml). That makes 226 rows, 141 with 10+ trades. 43% lost money, and the median
+was about 0% a month. Holding BTC made 36%/yr, which is 2.6% a month.
+
+| strategy | per month | worst drop | what happened |
+|---|---|---|---|
+| NOTankAi_15_Cleaned_v2 | +26.5% | -3% | looks ahead: `argrelextrema(order=5)` marks a low using the next 5 bars. The fixed copy (`r4_fix.py`) makes -0.8% a month (-49%). On random-walk bars the original still made +114% in a month. |
+| NOTankAi_15 | +17.8% | -57% | same look-ahead; fixed copy +0.2% a month (-75%) |
+| Market_Making | +16.2% | -19% | fill artefact: a limit order counts as filled whenever the 5m bar touches it. With 1m fills it makes -11.6% a month (-100%). At its own 1m timeframe (2024+) it makes -0.2% a month (-50%). |
+| RsiquiV5 (futures) | +7.4% | -99% | no better than random entries (z -1.9) |
+| FastSupertrend family (1h) | +5-7% | -35 to -49% | about the same as random entries with the same time in market |
+| ClucHAnix_5m basket 1x / 2x / 3x / 5x futures (2023+) | +2.0 / -1.7 / -3.4 / -7.6% | -11 / -84 / -86 / -97% | with leverage the stop-loss is hit at a smaller move, so leverage turns a winner into a loser |
+
+Seven rows pass every check after Holm across all 1,368 rows. They are ClucHAnix_5m and three variants of it,
+E0V1E_DCA3, GeneStrategy_v2 and BB_RPB_TSL. They make +0.3% to +1.2% a month and are in the market a small share of
+the time. All of them earn less than holding BTC, and round 4 is in-sample only.
+
+Real forward results tell the same story. TheoBrigitte published 34 dry-run (paper) databases (`r4_dryruns.py`,
+`results/r4_theo_dryruns.csv`). 27 of the 29 runs with a known wallet lost money, even though they won 85-95% of
+trades. The longest run, SMAOffset_Hippocritical_dca, lost 72.5% over 484 days. NOTankAi's own dry runs went -13% in
+12 days and +11% in 13 days.
+
 ## Files
 
 | file | what |
