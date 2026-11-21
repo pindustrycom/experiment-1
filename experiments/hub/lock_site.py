@@ -62,16 +62,19 @@ transition:border-color .2s,box-shadow .2s,color .2s}
 input::placeholder{color:rgba(245,245,247,.38);letter-spacing:.02em}
 input:focus{border-color:rgba(165,147,212,.55);box-shadow:0 20px 50px rgba(0,0,0,.55),0 0 0 3px rgba(122,98,179,.22)}
 body.bad input{color:var(--hi);border-color:var(--hi);box-shadow:0 0 0 3px rgba(255,69,58,.25),0 0 40px rgba(255,69,58,.25);animation:shake .4s}
-body.busy input{opacity:.6}
+body.busy input{opacity:.6;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.3}}
 @keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 body.bad input::selection{background:rgba(255,69,58,.35)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style></head><body class="wait"><canvas id="c" aria-hidden="true"></canvas>
 <form id="f"><label class="sr" for="p">Password</label>
-<input id="p" type="password" name="password" autocomplete="current-password" placeholder="Password" required autofocus></form>
+<input id="p" type="password" name="password" autocomplete="current-password" placeholder="Password" required autofocus
+enterkeyhint="go" autocapitalize="off" autocorrect="off" spellcheck="false"><button type="submit" class="sr" tabindex="-1">Unlock</button>
+<div id="w" class="sr" role="status" aria-live="polite"></div></form>
 <script type="application/json" id="d">{{DATA}}</script>
 <script>(()=>{const S="exp1-site-key",d=JSON.parse(document.getElementById("d").textContent),B=document.body,
-u=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0)),f=document.getElementById("f"),p=document.getElementById("p");
+u=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0)),f=document.getElementById("f"),p=document.getElementById("p"),w=document.getElementById("w");
 // torus: points on the surface, rotated about two axes, perspective-projected, lit by their normal
 const cv=document.getElementById("c"),g=cv.getContext("2d"),still=matchMedia("(prefers-reduced-motion: reduce)").matches;let A=0.5,Bt=0,red=0,run=true;
 const size=()=>{const r=devicePixelRatio||1;cv.width=innerWidth*r;cv.height=innerHeight*r};size();addEventListener("resize",size);
@@ -90,11 +93,15 @@ run=false;document.open();document.write(html);document.close()};
 const saved=(()=>{try{const k=JSON.parse(sessionStorage.getItem(S));return k&&k.salt===d.salt?u(k.key):null}catch(_){return null}})();
 (saved?show(saved):Promise.reject()).catch(()=>{B.classList.remove("wait");p.focus()});
 p.addEventListener("input",()=>B.classList.remove("bad"));
-f.addEventListener("submit",async ev=>{ev.preventDefault();if(B.classList.contains("busy"))return;B.classList.remove("bad");B.classList.add("busy");
+// Enter (and the phone keyboard's Go/return key) unlocks: the form's submit event, plus a keydown fallback for
+// browsers and in-app web views that skip implicit submission. The busy flag keeps it to one attempt at a time.
+const unlock=async()=>{if(B.classList.contains("busy")||!p.value)return;B.classList.remove("bad");B.classList.add("busy");w.textContent="Unlocking";
 try{const pw=await crypto.subtle.importKey("raw",new TextEncoder().encode(p.value),"PBKDF2",false,["deriveBits"]);
 const raw=new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt:u(d.salt),iterations:d.iter},pw,256));
 await show(raw)}
-catch(_){B.classList.remove("busy");void B.offsetWidth;B.classList.add("bad");p.select()}})})();</script>
+catch(_){B.classList.remove("busy");w.textContent="Wrong password";void B.offsetWidth;B.classList.add("bad");p.select()}};
+f.addEventListener("submit",ev=>{ev.preventDefault();unlock()});
+p.addEventListener("keydown",ev=>{if((ev.key==="Enter"||ev.keyCode===13)&&!ev.isComposing){ev.preventDefault();unlock()}})})();</script>
 <noscript><p style="position:relative;text-align:center;color:#98989f">This page needs JavaScript to unlock.</p></noscript></body></html>"""
 
 
