@@ -3,8 +3,8 @@
     python reddit_study.py PANEL.pkl POSTS_DIR OUT_DIR
 
 POSTS_DIR holds posts_*.jsonl.gz from collect_reddit.py. Steps:
-1. Clean: keep a post only if its title has the ticker in capitals as a word ("TSLA", "$tsla"), which drops most
-   false hits of keyword search ("Meta" the word, "coin"). One post per (id, ticker).
+1. Tickers: a post names a stock if its title has the ticker in capitals as a word ("TSLA") or as $ticker ("$tsla");
+   tickers that are everyday words (ALL, NOW, LOW...) count only as $ticker. One row per (post, ticker).
 2. Time: a post counts for trading day d if made before 15:30 New York on d (or after 15:30 on the previous trading
    day); we trade at d's close. Archived scores / comment counts are never used (recorded after the post).
 3. Signals per stock-day, over all point-in-time S&P 500 members (unmentioned = 0 posts):
@@ -51,8 +51,19 @@ EMOJI_BULL = ("🚀", "💎", "🌙", "📈", "🐂")
 EMOJI_BEAR = ("📉", "🌈🐻", "🐻", "🩸")
 
 
-def load_posts(d: Path) -> pd.DataFrame:
-    rows = []
+# tickers that are also everyday words or common all-caps words: counted only when written as $TICKER
+WORDS = set("""ALL ARE BALL BEN CAT COST DAY DOC DOW ECHO FAST FIX FLEX GAP GEN HAS HUM ICE KEY KEYS KIM LOW NOW PEG POOL
+SEE TAP TECH TEL TRIP WAT WELL AMP APP ARES BRO COO EXE LEG LEN MET MOS PSA UPS USB VAR RTX DTE TXT PPL ROL INFO MAT MAR MAS
+DASH NVR BIO AWK COP COR DIS FANG HON MAC MMM CASH EXPE IEX CEO CFO IPO ETF USA FED SEC GDP CPI EPS ATH YOLO FOMO IMO TLDR
+EOD AMA LOL WTF FYI EDIT UPDATE BUY SELL HOLD PUT PUTS CALL CALLS LONG SHORT BIG NEW ONE TWO OUT WAY RUN""".split())
+
+
+def load_posts(d: Path, universe: set[str]) -> pd.DataFrame:
+    """One row per (post, ticker named in its title). Plain capital tokens of 3+ letters count unless they are in
+    WORDS; $TICKER counts at any length."""
+    rows, n_all = [], 0
+    caps = re.compile(r"(?<![A-Za-z$])([A-Z]{3,5})(?![A-Za-z])")
+    dollar = re.compile(r"\$([A-Za-z]{1,5})(?![A-Za-z])")
     for f in sorted(glob.glob(str(d / "posts_*.jsonl.gz"))):
         with gzip.open(f, "rt") as fh:
             for line in fh:
@@ -60,12 +71,13 @@ def load_posts(d: Path) -> pd.DataFrame:
                     p = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                rows.append((p["tk"], p["id"], p["ts"], p["sub"], p.get("title") or "", p.get("flair") or ""))
-    df = pd.DataFrame(rows, columns=["tk", "id", "ts", "sub", "title", "flair"])
-    df = df.drop_duplicates(["id", "tk"])
-    keep = np.array([bool(re.search(rf"(?<![A-Za-z]){re.escape(t)}(?![A-Za-z])", ti)) or bool(re.search(rf"\${re.escape(t)}(?![A-Za-z])", ti, re.I))
-                     for t, ti in zip(df["tk"], df["title"])])
-    df["kept"] = keep
+                n_all += 1
+                ti = p.get("title") or ""
+                tk = {t for t in caps.findall(ti) if t not in WORDS} | {t.upper() for t in dollar.findall(ti)}
+                for t in tk & universe:
+                    rows.append((t, p["id"], p["ts"], p["sub"], ti, p.get("flair") or ""))
+    df = pd.DataFrame(rows, columns=["tk", "id", "ts", "sub", "title", "flair"]).drop_duplicates(["id", "tk"])
+    df.attrs["n_all"] = n_all
     return df
 
 
@@ -155,13 +167,34 @@ def main(panel: str, posts_dir: str, out: Path) -> None:
     mem = P["member"].loc[close.index]
     dates = close.index
     base = {re.sub(r"-\d{6}$", "", c): c for c in close.columns}
-    df = load_posts(Path(posts_dir))
-    res = {"posts_raw": int(len(df)), "posts_kept_after_caps_filter": int(df["kept"].sum())}
-    df = df[df["kept"]]
+    universe = set(base) | {t.replace("-B", "") for t in base if t.endswith("-B")}
+    df = load_posts(Path(posts_dir), universe)
+    res = {"posts_all": int(df.attrs["n_all"]), "post_ticker_mentions": int(len(df))}
     df["tk"] = df["tk"].map(lambda t: base.get(t, base.get(t + "-B", t)))
+    df = df[df["tk"].isin(close.columns)]
     res["posts_by_sub"] = df["sub"].value_counts().to_dict()
     res["posts_by_year"] = pd.to_datetime(df["ts"], unit="s").dt.year.value_counts().sort_index().to_dict()
     res["top_tickers"] = df["tk"].value_counts().head(25).to_dict()
+    # coverage: the collector fills each year in time order, subreddit by subreddit (state_<year>.json = how far it got).
+    # Use only subreddits that cover most of r/wallstreetbets' span, and only days with 65 covered days behind them.
+    cov = {}
+    for f in glob.glob(str(Path(posts_dir) / "state_*.json")):
+        y = int(Path(f).stem.split("_")[1])
+        st = json.loads(Path(f).read_text())
+        y0 = pd.Timestamp(f"{y}-06-01" if y == 2018 else f"{y}-01-01")
+        for sub, t in st.items():
+            m = cov.setdefault(sub, pd.Series(False, index=dates))
+            m[(dates >= y0) & (dates < pd.Timestamp(int(t), unit="s").normalize())] = True
+    if cov:
+        wsb = cov.get("wallstreetbets", pd.Series(False, index=dates))
+        subs = [k for k, m in cov.items() if (m & wsb).sum() >= 0.9 * wsb.sum()]
+        df = df[df["sub"].isin(subs)]
+        covered = pd.concat([cov[k] for k in subs], axis=1).all(axis=1)
+        covered = covered.astype(int).rolling(65).min().fillna(0).astype(bool)
+        res["coverage_subs_used"] = subs
+        res["coverage_days_usable"] = int(covered.sum())
+    else:
+        covered = pd.Series(True, index=dates)
     D = daily(df, dates)
     D = {k: v.reindex(columns=close.columns).fillna(0) for k, v in D.items()}
 
@@ -185,7 +218,8 @@ def main(panel: str, posts_dir: str, out: Path) -> None:
     Cn = {"ret1": r, "ret5": close.pct_change(5, fill_method=None), "ret21": close.pct_change(21, fill_method=None),
           "vol21": r.rolling(21).std(), "ldvol": np.log(dvol.rolling(20).mean()), "adv": np.log(dvol / dvol.rolling(20).mean()),
           "lvl20": np.log1p(D["one"].shift(5).rolling(60).mean())}  # how talked-about the stock usually is
-    ok = mem & close.notna() & y1.notna()
+    ok = mem & close.notna() & y1.notna() & pd.DataFrame({c: covered for c in close.columns}, index=dates)
+    mem = mem & ok
     Z = {k: zs(v, ok) for k, v in {**S, **Cn}.items()}
     # sentiment only means something where people talk: zero it where the stock had <3 posts in the window
     Z["sent5"] = Z["sent5"].where(n5 >= 3, 0).where(ok)
