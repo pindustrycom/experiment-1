@@ -7,7 +7,7 @@ name: Reddit sentiment and scandal events (research data)
 
 on:
   pull_request:
-    paths: ["research/reddit_sentiment/collect_*.py", "research/reddit_sentiment/data/**", ".github/workflows/reddit-sentiment.yml"]
+    paths: ["research/reddit_sentiment/collect_*.py", ".github/workflows/reddit-sentiment.yml"]
   workflow_dispatch:
 
 permissions:
@@ -24,9 +24,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        year: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
     env:
       GH_TOKEN: ${{ github.token }}
+      Y: ${{ matrix.year }}
     defaults:
       run:
         working-directory: research/reddit_sentiment
@@ -39,26 +40,28 @@ jobs:
       - name: Restore earlier posts
         run: |
           mkdir -p /tmp/out
-          if gh release download reddit-sentiment-data --repo "$GITHUB_REPOSITORY" -p "posts_${{ matrix.shard }}.jsonl.gz" -p "done_${{ matrix.shard }}.txt" -D /tmp/out; then
-            gunzip -f /tmp/out/posts_${{ matrix.shard }}.jsonl.gz
+          if gh release download reddit-sentiment-data --repo "$GITHUB_REPOSITORY" -p "posts_$Y.jsonl.gz" -p "state_$Y.json" -D /tmp/out; then
+            gunzip -f /tmp/out/posts_$Y.jsonl.gz
           else echo "nothing earlier"; fi
       - name: Probe the archive
-        run: curl -s -m 60 "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=wallstreetbets&title=NVDA&after=2021-01-04&before=2021-01-05&limit=3&fields=id,created_utc,title" | head -c 600
+        run: |
+          sleep $(( (Y - 2018) * 7 ))
+          curl -s -m 90 "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=wallstreetbets&after=2021-01-04&before=2021-01-05&limit=3&sort=asc&fields=id,created_utc,title" | head -c 400; echo
       - name: Collect
         timeout-minutes: 320
         continue-on-error: true
         run: |
+          save() { cd /tmp/out && [ -s state_$Y.json ] || echo '{}' > state_$Y.json; gzip -kf posts_$Y.jsonl && gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" posts_$Y.jsonl.gz state_$Y.json --clobber; }
           # save progress to the release every 30 minutes, so the analysis can start on partial data
-          ( while sleep 1800; do cd /tmp/out && gzip -kf posts_${{ matrix.shard }}.jsonl && gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" posts_${{ matrix.shard }}.jsonl.gz done_${{ matrix.shard }}.txt --clobber >/dev/null 2>&1; done ) &
-          python collect_reddit.py data/tickers.txt /tmp/out --shard ${{ matrix.shard }} --shards 4 --max-minutes 310
+          ( while sleep 1800; do save >/dev/null 2>&1; done ) &
+          python collect_reddit.py /tmp/out --year $Y --max-minutes 310
       - name: Save to release
         if: always()
         run: |
-          cd /tmp/out && touch posts_${{ matrix.shard }}.jsonl done_${{ matrix.shard }}.txt
-          wc -l posts_${{ matrix.shard }}.jsonl done_${{ matrix.shard }}.txt
-          gzip -kf posts_${{ matrix.shard }}.jsonl
-          gh release view reddit-sentiment-data --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create reddit-sentiment-data --repo "$GITHUB_REPOSITORY" --title "Reddit sentiment (research data)" --notes "Reddit posts naming S&P 500 tickers (Arctic Shift) and CEO scandal events (Google News + Haiku) for research/reddit_sentiment. Paper research only." || true
-          gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" posts_${{ matrix.shard }}.jsonl.gz done_${{ matrix.shard }}.txt --clobber
+          cd /tmp/out && touch posts_$Y.jsonl && { [ -s state_$Y.json ] || echo '{}' > state_$Y.json; }
+          wc -l posts_$Y.jsonl; cat state_$Y.json; echo
+          gzip -kf posts_$Y.jsonl
+          gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" posts_$Y.jsonl.gz state_$Y.json --clobber
 
   scandals:
     runs-on: ubuntu-latest
