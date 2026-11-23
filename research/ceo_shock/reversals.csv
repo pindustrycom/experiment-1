@@ -1,0 +1,21 @@
+ticker,date,type,event
+TSLA,2018-10-01,undone,Musk settles SEC fraud suit (announced Sat Sep 29)
+TSLA,2019-04-29,undone,Musk and SEC settle contempt fight over tweets (filed Fri Apr 26 evening)
+MSFT,2023-11-20,undone,Altman and Brockman to join Microsoft (announced Sun Nov 19)
+MSFT,2023-11-22,undone,Altman reinstated as OpenAI CEO (announced late Nov 21)
+DIS,2022-11-21,undone,Bob Iger returns as CEO after Chapek fired (announced Sun Nov 20)
+SBUX,2022-03-16,undone,Howard Schultz returns as interim CEO
+TSLA,2025-04-23,undone,Musk says he will cut DOGE time (Apr 22 after close)
+TSLA,2025-06-06,undone,Musk-Trump feud cools a day after the blow-up
+TSLA,2025-06-11,undone,Musk says he regrets some posts about Trump
+INTC,2025-03-13,filled,Lip-Bu Tan named CEO after Gelsinger ouster (Mar 12 after close)
+INTC,2019-01-31,filled,Bob Swan named permanent CEO after Krzanich exit
+WFC,2019-09-27,filled,Charlie Scharf named CEO after Sloan exit
+HPQ,2010-09-30,filled,Leo Apotheker named CEO after Hurd exit
+BBY,2012-08-20,filled,Hubert Joly named CEO after Dunn exit
+AABA,2012-07-17,filled,Marissa Mayer named CEO after Thompson exit (Jul 16 after close)
+WYNN,2018-02-07,removed,Steve Wynn resigns after misconduct reports (Feb 6 evening)
+AABA,2012-05-14,removed,Scott Thompson out over false resume (announced Sun May 13)
+CHK,2012-04-26,removed,McClendon stripped of chairman role after loans reports
+BA,2019-12-23,removed,Dennis Muilenburg fired over 737 MAX (announced Dec 23 pre-market)
+NVDA,2026-11-23,live,Board reinstates Jensen Huang (not in data yet)

@@ -1,0 +1,42 @@
+ticker,date,category,event,sym,ar0,car1,car5,car10,car20,car60,trade_ret,spy_ret,trade_excess
+HPQ,2010-08-09,scandal,Mark Hurd resigns over harassment claim and expense reports (announced Fri Aug 6 after close),HPQ,-0.08464,-0.00156,-0.01099,-0.03910,-0.03764,-0.04077,-0.06391,-0.02965,-0.03426
+INTC,2018-06-21,scandal,Brian Krzanich resigns over past relationship with employee,INTC,-0.01617,0.00373,-0.04222,-0.01965,-0.02740,-0.19071,-0.00636,0.01984,-0.02620
+MCD,2019-11-04,scandal,Steve Easterbrook fired over relationship with employee (announced Sun Nov 3),MCD,-0.02927,0.01922,0.01951,0.02212,0.02672,0.10871,0.02922,0.00709,0.02213
+WYNN,2018-01-26,scandal,WSJ reports sexual misconduct allegations against Steve Wynn,WYNN,-0.11836,-0.08343,-0.01429,0.06214,-0.00875,0.18315,-0.06077,-0.03029,-0.03048
+WYNN,2018-02-07,scandal,Steve Wynn resigns as CEO (announced Feb 6 evening),WYNN,0.09434,0.00988,-0.08488,-0.08904,-0.02031,0.08901,0.01217,0.02402,-0.01185
+TXN,2018-07-17,scandal,Brian Crutcher resigns for conduct violations,TXN,0.00588,-0.00361,-0.02234,-0.03759,-0.05649,-0.13996,-0.04282,0.01223,-0.05505
+BBY,2012-04-10,scandal,Brian Dunn resigns amid probe of relationship with employee,BBY,-0.04191,0.02192,0.01246,0.01537,-0.05323,0.03589,-0.05040,0.00478,-0.05518
+LMT,2012-11-09,scandal,CEO-elect Chris Kubasik ousted over relationship with subordinate,LMT,0.00007,-0.00243,-0.00786,0.02266,0.01890,-0.07809,0.03870,0.03120,0.00750
+BA,2005-03-07,scandal,Harry Stonecipher forced out over affair with executive,BA,-0.00183,0.00096,0.00256,0.00798,0.03369,0.11172,-0.00049,-0.03367,0.03318
+ATVI,2021-11-16,scandal,WSJ report that Bobby Kotick knew of misconduct claims,ATVI,-0.06395,-0.02747,-0.06582,-0.11191,-0.09396,0.28529,-0.08990,0.00281,-0.09272
+AABA,2012-05-03,scandal,Third Point says Scott Thompson resume is false (letter May 3 midday),AABA,-0.00953,0.00005,0.02633,0.02792,0.05258,0.03763,-0.03217,-0.07964,0.04747
+KR,2025-03-03,scandal,Rodney McMullen resigns over personal conduct probe,KR,-0.02442,0.00822,0.08806,0.06514,0.08880,0.08238,0.07532,-0.03888,0.11421
+TSLA,2018-09-28,legal,SEC sues Elon Musk for fraud over funding secured tweet (Sep 27 after close),TSLA,-0.13915,0.16908,0.01966,0.06294,0.37292,0.46004,0.24876,-0.08733,0.33610
+ENRNQ,2001-08-15,legal,Jeff Skilling resigns abruptly (Aug 14 after close),ENRNQ-200411,-0.05792,-0.08628,-0.06792,-0.05906,-0.32071,-1.19059,-0.34254,-0.13777,-0.20477
+AIG,2005-03-14,legal,Hank Greenberg forced out amid accounting and regulatory probes,AIG,-0.02093,-0.02010,-0.06981,-0.04717,-0.15439,-0.12917,-0.16780,-0.01628,-0.15152
+BA,2003-12-01,legal,Phil Condit resigns over Druyun ethics scandal,BA,-0.01976,-0.00263,0.02988,0.03186,0.07264,0.07242,0.11105,0.03817,0.07288
+CHK,2012-04-18,legal,Reuters reports Aubrey McClendon personal loans against company wells,CHK,-0.05056,0.00596,-0.00123,-0.07780,-0.15919,0.14355,-0.22359,-0.04170,-0.18189
+FNMA,2004-12-22,legal,Franklin Raines forced out over accounting (announced Dec 21 evening),FNMA,0.02051,-0.03254,-0.01041,-0.00829,-0.07707,-0.24630,-0.09930,-0.03232,-0.06699
+CA,2004-04-21,legal,Sanjay Kumar resigns amid accounting fraud probe,CA-201811,0.03196,0.01857,0.05537,0.04193,0.03563,-0.03477,-0.01863,-0.03018,0.01155
+CHK,2012-04-26,legal,McClendon stripped of chairman role,CHK,-0.04157,0.00672,0.00293,0.03701,-0.00585,0.10448,-0.11376,-0.05444,-0.05932
+UNH,2025-05-13,departure,Andrew Witty resigns and 2025 guidance suspended,UNH,-0.18032,-0.01129,0.04034,-0.03029,0.00332,-0.20782,-0.00363,0.02474,-0.02838
+CMG,2024-08-13,departure,Brian Niccol leaves for Starbucks,CMG,-0.09322,-0.00408,-0.02744,0.04564,0.05464,0.02249,0.07853,0.02284,0.05569
+CRM,2022-12-01,departure,Co-CEO Bret Taylor to leave (announced Nov 30 after close),CRM,-0.08180,-0.01521,-0.08581,-0.06291,-0.02931,0.17182,-0.09903,-0.05688,-0.04214
+INTC,2024-12-02,departure,Pat Gelsinger forced out by board,INTC,-0.00744,-0.06165,-0.13839,-0.14078,-0.13324,0.03132,-0.16314,-0.02585,-0.13729
+BRK-B,2025-05-05,departure,Warren Buffett says he will step down as CEO (announced Sat May 3),BRK-B,-0.04725,0.00630,-0.01951,-0.03688,-0.06718,-0.16281,-0.02896,0.05782,-0.08678
+WFC,2016-10-13,departure,John Stumpf retires amid fake accounts scandal (announced Oct 12 after close),WFC,-0.00890,-0.00147,-0.00048,0.03574,0.13533,0.14047,0.16243,0.01836,0.14408
+WFC,2019-03-29,departure,Tim Sloan resigns (announced Mar 28 after close),WFC,-0.02207,-0.00184,-0.01179,-0.06484,-0.03963,-0.06741,-0.00203,0.04032,-0.04236
+DIS,2020-02-26,departure,Bob Iger steps down as CEO (announced Feb 25 after close),DIS,-0.03471,-0.00671,-0.03888,-0.05008,0.00118,0.01297,-0.18445,-0.20287,0.01842
+AMZN,2021-02-03,departure,Jeff Bezos to step down as CEO (announced Feb 2 after close),AMZN,-0.02070,-0.00504,-0.02776,-0.01658,-0.09253,-0.03704,-0.10212,-0.01349,-0.08863
+MSFT,2023-11-17,departure,OpenAI board fires Sam Altman (3:28pm ET; Microsoft key partner),MSFT,-0.01836,0.01091,0.01354,-0.01760,-0.05356,-0.04006,0.00657,0.05124,-0.04467
+AAPL,2009-01-15,health,Steve Jobs takes medical leave (announced Jan 14),AAPL,-0.02321,-0.02035,0.07611,0.09936,0.19696,0.35117,0.18825,-0.01943,0.20769
+AAPL,2011-01-18,health,Steve Jobs second medical leave (announced Mon Jan 17 holiday),AAPL,-0.02407,0.00393,0.00564,0.00498,0.03136,-0.02693,0.05551,0.02695,0.02856
+AAPL,2011-08-25,health,Steve Jobs resigns as CEO (Aug 24 after close),AAPL,0.00762,0.01288,-0.01706,0.01220,0.09524,-0.04415,0.08083,-0.01854,0.09937
+AAPL,2011-10-06,health,Steve Jobs dies (Oct 5 evening),AAPL,-0.01902,-0.01389,0.04934,0.00964,-0.00442,0.00063,0.06710,0.08378,-0.01668
+MCD,2004-04-19,health,CEO Jim Cantalupo dies suddenly,MCD,-0.02586,0.00195,0.01945,0.04593,-0.00830,0.05836,-0.03390,-0.04155,0.00766
+UNH,2024-12-04,health,UnitedHealthcare CEO Brian Thompson shot dead in New York,UNH,0.00636,-0.05134,-0.12671,-0.17345,-0.15264,-0.21259,-0.15796,-0.02261,-0.13534
+TSLA,2018-09-07,founder,Musk smokes on podcast and two executives quit,TSLA,-0.06053,0.08231,0.10451,0.10875,0.02317,0.39481,-0.00590,0.00530,-0.01120
+TSLA,2025-06-05,founder,Musk and Trump public feud,TSLA,-0.13275,0.01576,0.08095,0.11737,-0.05311,0.00950,0.03146,0.04969,-0.01824
+TSLA,2025-07-07,founder,Musk announces new political party (Sat Jul 5),TSLA,-0.05292,0.01427,0.06307,0.08748,0.02447,0.28667,0.05112,0.01690,0.03422
+NVDA,2026-11-09,live,Huang confirms affair; board probes foreign intelligence angle (holdout),NVDA,-0.09112,-0.04721,-0.09640,,,,,,
+NVDA,2026-11-12,live,Jensen Huang resigns; CFO Colette Kress interim CEO (holdout),NVDA,-0.03614,-0.01265,-0.01374,,,,,,

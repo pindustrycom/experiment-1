@@ -1,0 +1,45 @@
+ticker,date,category,event
+HPQ,2010-08-09,scandal,Mark Hurd resigns over harassment claim and expense reports (announced Fri Aug 6 after close)
+INTC,2018-06-21,scandal,Brian Krzanich resigns over past relationship with employee
+MCD,2019-11-04,scandal,Steve Easterbrook fired over relationship with employee (announced Sun Nov 3)
+WYNN,2018-01-26,scandal,WSJ reports sexual misconduct allegations against Steve Wynn
+WYNN,2018-02-07,scandal,Steve Wynn resigns as CEO (announced Feb 6 evening)
+CBS,2018-07-27,scandal,New Yorker misconduct report on Les Moonves
+CBS,2018-09-10,scandal,Les Moonves resigns (announced Sun Sep 9)
+TXN,2018-07-17,scandal,Brian Crutcher resigns for conduct violations
+BBY,2012-04-10,scandal,Brian Dunn resigns amid probe of relationship with employee
+LMT,2012-11-09,scandal,CEO-elect Chris Kubasik ousted over relationship with subordinate
+BA,2005-03-07,scandal,Harry Stonecipher forced out over affair with executive
+ATVI,2021-11-16,scandal,WSJ report that Bobby Kotick knew of misconduct claims
+AABA,2012-05-03,scandal,Third Point says Scott Thompson resume is false (letter May 3 midday)
+KR,2025-03-03,scandal,Rodney McMullen resigns over personal conduct probe
+TSLA,2018-09-28,legal,SEC sues Elon Musk for fraud over funding secured tweet (Sep 27 after close)
+TYC,2002-06-03,legal,Dennis Kozlowski resigns ahead of sales tax evasion indictment
+ENRNQ,2001-08-15,legal,Jeff Skilling resigns abruptly (Aug 14 after close)
+AIG,2005-03-14,legal,Hank Greenberg forced out amid accounting and regulatory probes
+BA,2003-12-01,legal,Phil Condit resigns over Druyun ethics scandal
+CHK,2012-04-18,legal,Reuters reports Aubrey McClendon personal loans against company wells
+FNMA,2004-12-22,legal,Franklin Raines forced out over accounting (announced Dec 21 evening)
+CA,2004-04-21,legal,Sanjay Kumar resigns amid accounting fraud probe
+CHK,2012-04-26,legal,McClendon stripped of chairman role
+UNH,2025-05-13,departure,Andrew Witty resigns and 2025 guidance suspended
+CMG,2024-08-13,departure,Brian Niccol leaves for Starbucks
+CRM,2022-12-01,departure,Co-CEO Bret Taylor to leave (announced Nov 30 after close)
+INTC,2024-12-02,departure,Pat Gelsinger forced out by board
+BRK-B,2025-05-05,departure,Warren Buffett says he will step down as CEO (announced Sat May 3)
+WFC,2016-10-13,departure,John Stumpf retires amid fake accounts scandal (announced Oct 12 after close)
+WFC,2019-03-29,departure,Tim Sloan resigns (announced Mar 28 after close)
+DIS,2020-02-26,departure,Bob Iger steps down as CEO (announced Feb 25 after close)
+AMZN,2021-02-03,departure,Jeff Bezos to step down as CEO (announced Feb 2 after close)
+MSFT,2023-11-17,departure,OpenAI board fires Sam Altman (3:28pm ET; Microsoft key partner)
+AAPL,2009-01-15,health,Steve Jobs takes medical leave (announced Jan 14)
+AAPL,2011-01-18,health,Steve Jobs second medical leave (announced Mon Jan 17 holiday)
+AAPL,2011-08-25,health,Steve Jobs resigns as CEO (Aug 24 after close)
+AAPL,2011-10-06,health,Steve Jobs dies (Oct 5 evening)
+MCD,2004-04-19,health,CEO Jim Cantalupo dies suddenly
+UNH,2024-12-04,health,UnitedHealthcare CEO Brian Thompson shot dead in New York
+TSLA,2018-09-07,founder,Musk smokes on podcast and two executives quit
+TSLA,2025-06-05,founder,Musk and Trump public feud
+TSLA,2025-07-07,founder,Musk announces new political party (Sat Jul 5)
+NVDA,2026-11-09,live,Huang confirms affair; board probes foreign intelligence angle (holdout)
+NVDA,2026-11-12,live,Jensen Huang resigns; CFO Colette Kress interim CEO (holdout)
