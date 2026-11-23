@@ -1,0 +1,87 @@
+name: Reddit sentiment and scandal events (research data)
+
+# Research only, paper only (research/reddit_sentiment). Collects (1) Reddit posts naming S&P 500 tickers from the
+# public Arctic Shift archive and (2) a week-by-week list of CEO scandal events from Google News headlines, read by
+# Claude Haiku. Everything is kept in the "reddit-sentiment-data" release; each run resumes where the last stopped.
+# The analysis runs offline on that release. Nothing is traded or deployed.
+
+on:
+  pull_request:
+    paths: ["research/reddit_sentiment/collect_*.py", "research/reddit_sentiment/data/**", ".github/workflows/reddit-sentiment.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the data release
+
+concurrency:
+  group: reddit-sentiment-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reddit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        working-directory: research/reddit_sentiment
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Restore earlier posts
+        run: |
+          mkdir -p /tmp/out
+          if gh release download reddit-sentiment-data --repo "$GITHUB_REPOSITORY" -p "posts_${{ matrix.shard }}.jsonl.gz" -p "done_${{ matrix.shard }}.txt" -D /tmp/out; then
+            gunzip -f /tmp/out/posts_${{ matrix.shard }}.jsonl.gz
+          else echo "nothing earlier"; fi
+      - name: Collect
+        timeout-minutes: 320
+        continue-on-error: true
+        run: python collect_reddit.py data/tickers.txt /tmp/out --shard ${{ matrix.shard }} --shards 4 --max-minutes 310
+      - name: Save to release
+        if: always()
+        run: |
+          cd /tmp/out && touch posts_${{ matrix.shard }}.jsonl done_${{ matrix.shard }}.txt
+          wc -l posts_${{ matrix.shard }}.jsonl done_${{ matrix.shard }}.txt
+          gzip -kf posts_${{ matrix.shard }}.jsonl
+          gh release view reddit-sentiment-data --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create reddit-sentiment-data --repo "$GITHUB_REPOSITORY" --title "Reddit sentiment (research data)" --notes "Reddit posts naming S&P 500 tickers (Arctic Shift) and CEO scandal events (Google News + Haiku) for research/reddit_sentiment. Paper research only." || true
+          gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" posts_${{ matrix.shard }}.jsonl.gz done_${{ matrix.shard }}.txt --clobber
+
+  scandals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    defaults:
+      run:
+        working-directory: research/reddit_sentiment
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install requests pandas anthropic
+      - name: Restore earlier weeks
+        run: |
+          mkdir -p /tmp/out
+          gh release download reddit-sentiment-data --repo "$GITHUB_REPOSITORY" -p scandal_weeks.jsonl -D /tmp/out || echo "nothing earlier"
+      - name: Collect
+        timeout-minutes: 215
+        continue-on-error: true
+        run: python collect_scandals.py /tmp/out --max-minutes 205 --budget-usd 8
+      - name: Save to release
+        if: always()
+        run: |
+          cd /tmp/out && touch scandal_weeks.jsonl && wc -l scandal_weeks.jsonl
+          sleep 20   # let a reddit shard create the release first
+          gh release view reddit-sentiment-data --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create reddit-sentiment-data --repo "$GITHUB_REPOSITORY" --title "Reddit sentiment (research data)" --notes "Paper research only." || true
+          gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" scandal_weeks.jsonl $(ls wti.csv 2>/dev/null) --clobber
