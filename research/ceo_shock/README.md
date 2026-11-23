@@ -93,6 +93,41 @@ traded on the headline day, which matches this result.
 Not adopted. No paper pot. If we come back to it, the useful version is not "buy the scandal drop" but "buy when the
 shock is reversed" (settlement, reinstatement, charges dropped), which is a different and much rarer event.
 
+## Follow-up: buy once the shock is reversed (2026-11-23)
+
+Joaquin asked to test the better version: wait for the shock to be undone, then buy. `reversals.csv` has 19
+resolutions at S&P 500 companies 2010-2025, in three kinds:
+
+- **Undone (9):** Musk-SEC settlements (Oct 2018, Apr 2019), Altman joining Microsoft and then reinstated at OpenAI
+  (MSFT, Nov 2023), Iger back at Disney, Schultz back at Starbucks, Musk cutting DOGE time, the Musk-Trump feud cooling
+  (twice). This is the NVIDIA reinstatement type. NVIDIA itself isn't in the data yet (prices end Nov 19).
+- **Seat filled (6):** a credible new CEO after a shock exit (Lip-Bu Tan at Intel, Scharf at Wells Fargo, Apotheker at
+  HP, Joly at Best Buy, Mayer at Yahoo, Swan at Intel).
+- **Tainted person removed (4):** Wynn resigns, Thompson out at Yahoo, McClendon stripped of chairman, Muilenburg fired.
+
+Same model as above (beta-adjusted, 10 bp round trip, 20-day hold vs SPY). Entry at the day-0 open, because most of these
+are announced outside market hours, or at the day-0 close.
+
+| Group | n | Gap at open | 20d after close | Buy at open, 20d vs SPY | Beat SPY |
+|---|---|---|---|---|---|
+| Undone | 9 | +5.2% | -3.3% | -2.2% | 2 of 9 |
+| All resolutions | 19 | +3.7% | -3.0% | -3.1% | 6 of 19 |
+
+Buying at the close instead: -1.8% (undone) and -2.6% (all) vs SPY. Every p-value is above 0.17, and every Holm p is 1.0.
+
+**The reversal is priced in the overnight gap.** On average the stock opens about 5% higher, and after that it drifts
+down. Only 2 of the 9 "undone" cases kept going: Tesla after the 2018 SEC settlement (+19% from the open) and Tesla
+after Musk cut his DOGE time (+23%). Disney after Iger's return opened +9% and then lost 10% vs SPY in 20 days. Intel
+after Lip-Bu Tan opened +14% and lost 10%. For comparison, ordinary 3%+ up days outside crisis years do nothing
+afterwards (-0.0% over 20 days), so this group is, if anything, slightly worse than an ordinary good-news day.
+
+So the only money in the NVIDIA-type story is in owning the stock **before** the reversal, which is the shock-day bet
+from the first part. That bet loses on average, because you can't know a reversal is coming. NVIDIA is one of the rare
+cases where it came. Not adopted.
+
+Files: `reversals.csv`, `reversal.py` (`python reversal.py SP500_DIR results`), `results/reversals_car.csv`,
+`results/reversals.json`.
+
 ## Files
 
 - `events.csv`: the 45 hand-collected events

@@ -1,0 +1,20 @@
+ticker,date,type,event,sym,ar0,car1,car5,car10,car20,car60,open_entry,close_entry,spy_from_open,spy_from_close,gap_open,open_excess,close_excess
+TSLA,2018-10-01,undone,Musk settles SEC fraud suit (announced Sat Sep 29),TSLA,0.16908,-0.03042,-0.19291,-0.09584,0.22282,0.25052,0.09410,0.07673,-0.09671,-0.09553,0.15485,0.19081,0.17226
+TSLA,2019-04-29,undone,Musk and SEC settle contempt fight over tweets (filed Fri Apr 26 evening),TSLA,0.02498,-0.01215,0.06235,-0.00159,-0.17752,0.07458,-0.20095,-0.21954,-0.04552,-0.04669,0.00306,-0.15543,-0.17285
+MSFT,2023-11-20,undone,Altman and Brockman to join Microsoft (announced Sun Nov 19),MSFT,0.01091,-0.00886,0.01220,-0.01911,-0.07038,-0.05095,0.00450,-0.01207,0.05824,0.04955,0.00370,-0.05374,-0.06162
+MSFT,2023-11-22,undone,Altman reinstated as OpenAI CEO (announced late Nov 21),MSFT,0.00799,-0.00188,-0.00085,-0.02684,-0.06328,-0.04904,-0.01280,-0.01241,0.04317,0.04307,0.01321,-0.05596,-0.05548
+DIS,2022-11-21,undone,Bob Iger returns as CEO after Chapek fired (announced Sun Nov 20),DIS,0.06690,-0.02858,-0.03101,-0.05163,-0.07640,0.04368,-0.13184,-0.10922,-0.03125,-0.03113,0.09063,-0.10060,-0.07809
+SBUX,2022-03-16,undone,Howard Schultz returns as interim CEO,SBUX,0.02739,-0.01081,-0.03673,-0.01818,-0.09675,-0.00216,-0.08156,-0.07525,0.03439,0.02078,0.05883,-0.11595,-0.09603
+TSLA,2025-04-23,undone,Musk says he will cut DOGE time (Apr 22 after close),TSLA,0.02234,-0.00754,0.05255,0.00741,0.12838,-0.01872,0.31196,0.33353,0.07851,0.08860,0.07098,0.23344,0.24493
+TSLA,2025-06-06,undone,Musk-Trump feud cools a day after the blow-up,TSLA,0.01576,0.04370,0.10734,0.16402,-0.05460,-0.00283,-0.00441,0.00805,0.03928,0.03845,0.04963,-0.04370,-0.03041
+TSLA,2025-06-11,undone,Musk says he regrets some posts about Trump,TSLA,0.00685,-0.03053,0.00082,-0.03784,-0.10851,-0.07751,-0.06347,-0.04058,0.03522,0.04009,0.02548,-0.09869,-0.08067
+INTC,2025-03-13,filled,Lip-Bu Tan named CEO after Gelsinger ouster (Mar 12 after close),INTC,0.16511,-0.01473,-0.02074,-0.04300,-0.08487,-0.23878,-0.15504,-0.16218,-0.05789,-0.04581,0.13636,-0.09715,-0.11637
+INTC,2019-01-31,filled,Bob Swan named permanent CEO after Krzanich exit,INTC,-0.02040,0.03353,0.04986,0.06097,0.08033,-0.02325,0.14753,0.13730,0.04826,0.03886,-0.01767,0.09927,0.09843
+WFC,2019-09-27,filled,Charlie Scharf named CEO after Sloan exit,WFC,0.04285,-0.00981,-0.02642,-0.03263,-0.00287,-0.01538,0.02221,0.01596,0.01266,0.02099,0.03131,0.00956,-0.00503
+HPQ,2010-09-30,filled,Leo Apotheker named CEO after Hurd exit,HPQ,-0.00820,-0.03460,-0.04357,-0.02334,-0.01749,-0.08983,-0.00798,0.01302,0.02912,0.03741,0.01011,-0.03710,-0.02439
+BBY,2012-08-20,filled,Hubert Joly named CEO after Dunn exit,BBY,-0.10416,-0.01084,-0.01014,0.00225,-0.04516,-0.11078,-0.06286,-0.01946,0.03268,0.03116,-0.06265,-0.09554,-0.05062
+AABA,2012-07-17,filled,Marissa Mayer named CEO after Thompson exit (Jul 16 after close),AABA,-0.00968,-0.00094,0.00670,0.00585,-0.08650,-0.03566,-0.07166,-0.05677,0.03545,0.03249,0.01310,-0.10711,-0.08926
+WYNN,2018-02-07,removed,Steve Wynn resigns after misconduct reports (Feb 6 evening),WYNN,0.09434,0.00988,-0.08488,-0.08904,-0.02031,0.08901,0.02233,0.01217,0.02086,0.02402,0.07560,0.00147,-0.01185
+AABA,2012-05-14,removed,Scott Thompson out over false resume (announced Sun May 13),AABA,0.03149,-0.00071,0.02207,0.00227,0.00786,-0.00769,-0.00165,-0.00294,-0.01035,-0.00887,0.01909,0.00870,0.00594
+CHK,2012-04-26,removed,McClendon stripped of chairman role after loans reports,CHK,-0.04157,0.00672,0.00293,0.03701,-0.00585,0.10448,-0.13544,-0.11376,-0.04579,-0.05444,-0.00717,-0.08965,-0.05932
+BA,2019-12-23,removed,Dennis Muilenburg fired over 737 MAX (announced Dec 23 pre-market),BA,0.02733,-0.01352,-0.03773,-0.02971,-0.09597,-0.79088,-0.05730,-0.05954,0.03150,0.03269,0.02668,-0.08880,-0.09223
