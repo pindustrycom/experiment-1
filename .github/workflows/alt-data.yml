@@ -1,0 +1,30 @@
+name: Alt data checks
+
+# Quick data checks behind research/alt_data/README.md (oil shocks vs tech, memory prices vs Micron).
+# Paper research only. Runs on pull requests that touch it and by hand; prints the summary to the job log.
+
+on:
+  pull_request:
+    paths: ["research/alt_data/**", ".github/workflows/alt-data.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install yfinance pandas numpy
+      - run: python research/alt_data/oil_memory.py --out /tmp/alt_results
+      - run: |
+          echo '```json' >> "$GITHUB_STEP_SUMMARY"; cat /tmp/alt_results/summary.json >> "$GITHUB_STEP_SUMMARY"; echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: alt-data-results
+          path: /tmp/alt_results
