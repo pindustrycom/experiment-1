@@ -1,0 +1,103 @@
+name: Reddit sentiment and scandal events (research data)
+
+# Research only, paper only (research/reddit_sentiment). Collects (1) Reddit posts naming S&P 500 tickers from the
+# public Arctic Shift archive and (2) a week-by-week list of CEO scandal events from Google News headlines, read by
+# Claude Haiku. Everything is kept in the "reddit-sentiment-data" release; each run resumes where the last stopped.
+# The analysis runs offline on that release. Nothing is traded or deployed.
+
+on:
+  pull_request:
+    paths: ["research/reddit_sentiment/collect_*.py", ".github/workflows/reddit-sentiment.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the data release
+
+concurrency:
+  group: reddit-sentiment-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reddit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        # 2018-19 and 2022-26 are complete in the release; r/wallstreetbets in 2021 is so busy that each month gets a job
+        part: ["2020", "2021", "2021-02", "2021-03", "2021-04", "2021-05", "2021-06", "2021-07", "2021-08", "2021-09", "2021-10", "2021-11", "2021-12"]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      Y: ${{ matrix.part }}
+    defaults:
+      run:
+        working-directory: research/reddit_sentiment
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Restore earlier posts
+        run: |
+          mkdir -p /tmp/out
+          if gh release download reddit-sentiment-data --repo "$GITHUB_REPOSITORY" -p "posts_$Y.jsonl.gz" -p "state_$Y.json" -D /tmp/out; then
+            gunzip -f /tmp/out/posts_$Y.jsonl.gz
+          else echo "nothing earlier"; fi
+      - name: Probe the archive
+        run: |
+          sleep $(( RANDOM % 60 ))
+          curl -s -m 90 "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=wallstreetbets&after=2021-01-04&before=2021-01-05&limit=3&sort=asc&fields=id,created_utc,title" | head -c 400; echo
+      - name: Collect
+        timeout-minutes: 320
+        continue-on-error: true
+        run: |
+          save() { cd /tmp/out && [ -s state_$Y.json ] || echo '{}' > state_$Y.json; gzip -kf posts_$Y.jsonl && gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" posts_$Y.jsonl.gz state_$Y.json --clobber; }
+          # save progress to the release every 30 minutes, so the analysis can start on partial data
+          ( while sleep 1800; do save >/dev/null 2>&1; done ) &
+          case "$Y" in
+            2021) args="--year 2021 --until-month 2" ;;   # January only; later months have their own jobs
+            *-*) args="--year ${Y%-*} --month $((10#${Y#*-}))" ;;
+            *) args="--year $Y" ;;
+          esac
+          python collect_reddit.py /tmp/out $args --max-minutes 310
+      - name: Save to release
+        if: always()
+        run: |
+          cd /tmp/out && touch posts_$Y.jsonl && { [ -s state_$Y.json ] || echo '{}' > state_$Y.json; }
+          wc -l posts_$Y.jsonl; cat state_$Y.json; echo
+          gzip -kf posts_$Y.jsonl
+          gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" posts_$Y.jsonl.gz state_$Y.json --clobber
+
+  scandals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    defaults:
+      run:
+        working-directory: research/reddit_sentiment
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install requests pandas anthropic
+      - name: Restore earlier weeks
+        run: |
+          mkdir -p /tmp/out
+          gh release download reddit-sentiment-data --repo "$GITHUB_REPOSITORY" -p scandal_weeks.jsonl -D /tmp/out || echo "nothing earlier"
+      - name: Collect
+        timeout-minutes: 215
+        continue-on-error: true
+        run: |
+          ( while sleep 1800; do gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" /tmp/out/scandal_weeks.jsonl --clobber >/dev/null 2>&1; done ) &
+          python collect_scandals.py /tmp/out --max-minutes 205 --budget-usd 8
+      - name: Save to release
+        if: always()
+        run: |
+          cd /tmp/out && touch scandal_weeks.jsonl && wc -l scandal_weeks.jsonl
+          sleep 20   # let a reddit shard create the release first
+          gh release view reddit-sentiment-data --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create reddit-sentiment-data --repo "$GITHUB_REPOSITORY" --title "Reddit sentiment (research data)" --notes "Paper research only." || true
+          gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" scandal_weeks.jsonl $(ls wti.csv 2>/dev/null) --clobber
