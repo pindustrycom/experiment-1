@@ -8,7 +8,8 @@ and comment count are not kept: they were recorded after the post (look-ahead).
 
 Resumable: OUT/state_<year>.json holds the last timestamp reached per subreddit; posts go to OUT/posts_<year>.jsonl.
 
-    python collect_reddit.py OUT --year 2021 --max-minutes 300
+    python collect_reddit.py OUT --year 2020 --max-minutes 300
+    python collect_reddit.py OUT --year 2021 --month 3   (state_2021-03.json, posts_2021-03.jsonl)
 """
 from __future__ import annotations
 
@@ -44,18 +45,27 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("out", type=Path)
     ap.add_argument("--year", type=int, required=True)
+    ap.add_argument("--month", type=int, default=0, help="1-12: only that month (busy months get their own job)")
+    ap.add_argument("--until-month", type=int, default=0, help="stop the year job at the start of this month")
     ap.add_argument("--max-minutes", type=float, default=300)
     ap.add_argument("--pause", type=float, default=1.0)
     a = ap.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
     start = datetime(a.year, 6 if a.year == 2018 else 1, 1, tzinfo=timezone.utc)
     end = min(datetime(a.year + 1, 1, 1, tzinfo=timezone.utc), datetime(2026, 11, 22, tzinfo=timezone.utc))
-    sf = a.out / f"state_{a.year}.json"
+    key = str(a.year)
+    if a.month:
+        key = f"{a.year}-{a.month:02d}"
+        start = datetime(a.year, a.month, 1, tzinfo=timezone.utc)
+        end = datetime(a.year + (a.month == 12), a.month % 12 + 1, 1, tzinfo=timezone.utc)
+    elif a.until_month:
+        end = datetime(a.year, a.until_month, 1, tzinfo=timezone.utc)
+    sf = a.out / f"state_{key}.json"
     state = json.loads(sf.read_text()) if sf.exists() else {}
     s = requests.Session()
     s.headers["User-Agent"] = "experiment-1 research (paper study of Reddit attention)"
     t0, calls, n = time.time(), 0, 0
-    with (a.out / f"posts_{a.year}.jsonl").open("a") as fh:
+    with (a.out / f"posts_{key}.jsonl").open("a") as fh:
         for sub in SUBS:
             after = int(state.get(sub, start.timestamp()))
             while after < end.timestamp():
@@ -88,7 +98,7 @@ def main() -> None:
             fh.flush()
             sf.write_text(json.dumps(state))
             print(f"{sub} {a.year} done: {n} posts so far, {calls} calls", flush=True)
-    print(f"year {a.year} finished: {calls} calls, {n} posts")
+    print(f"{key} finished: {calls} calls, {n} posts")
 
 
 if __name__ == "__main__":

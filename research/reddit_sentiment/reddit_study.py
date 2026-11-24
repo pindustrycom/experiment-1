@@ -179,9 +179,9 @@ def main(panel: str, posts_dir: str, out: Path) -> None:
     # Use only subreddits that cover most of r/wallstreetbets' span, and only days with 65 covered days behind them.
     cov = {}
     for f in glob.glob(str(Path(posts_dir) / "state_*.json")):
-        y = int(Path(f).stem.split("_")[1])
+        key = Path(f).stem.split("_")[1]
         st = json.loads(Path(f).read_text())
-        y0 = pd.Timestamp(f"{y}-06-01" if y == 2018 else f"{y}-01-01")
+        y0 = pd.Timestamp(f"{key}-01" if "-" in key else ("2018-06-01" if key == "2018" else f"{key}-01-01"))
         for sub, t in st.items():
             m = cov.setdefault(sub, pd.Series(False, index=dates))
             m[(dates >= y0) & (dates < pd.Timestamp(int(t), unit="s").normalize())] = True

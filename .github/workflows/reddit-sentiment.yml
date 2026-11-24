@@ -24,10 +24,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        year: [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
+        # 2018-19 and 2022-26 are complete in the release; r/wallstreetbets in 2021 is so busy that each month gets a job
+        part: ["2020", "2021", "2021-02", "2021-03", "2021-04", "2021-05", "2021-06", "2021-07", "2021-08", "2021-09", "2021-10", "2021-11", "2021-12"]
     env:
       GH_TOKEN: ${{ github.token }}
-      Y: ${{ matrix.year }}
+      Y: ${{ matrix.part }}
     defaults:
       run:
         working-directory: research/reddit_sentiment
@@ -45,7 +46,7 @@ jobs:
           else echo "nothing earlier"; fi
       - name: Probe the archive
         run: |
-          sleep $(( (Y - 2018) * 7 ))
+          sleep $(( RANDOM % 60 ))
           curl -s -m 90 "https://arctic-shift.photon-reddit.com/api/posts/search?subreddit=wallstreetbets&after=2021-01-04&before=2021-01-05&limit=3&sort=asc&fields=id,created_utc,title" | head -c 400; echo
       - name: Collect
         timeout-minutes: 320
@@ -54,7 +55,12 @@ jobs:
           save() { cd /tmp/out && [ -s state_$Y.json ] || echo '{}' > state_$Y.json; gzip -kf posts_$Y.jsonl && gh release upload reddit-sentiment-data --repo "$GITHUB_REPOSITORY" posts_$Y.jsonl.gz state_$Y.json --clobber; }
           # save progress to the release every 30 minutes, so the analysis can start on partial data
           ( while sleep 1800; do save >/dev/null 2>&1; done ) &
-          python collect_reddit.py /tmp/out --year $Y --max-minutes 310
+          case "$Y" in
+            2021) args="--year 2021 --until-month 2" ;;   # January only; later months have their own jobs
+            *-*) args="--year ${Y%-*} --month $((10#${Y#*-}))" ;;
+            *) args="--year $Y" ;;
+          esac
+          python collect_reddit.py /tmp/out $args --max-minutes 310
       - name: Save to release
         if: always()
         run: |
