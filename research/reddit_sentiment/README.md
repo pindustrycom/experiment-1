@@ -66,8 +66,8 @@ mean -4.6%, **median -0.1%**, t -1.6, half went up.
 
 Google News headlines week by week 2012-2026, with CEO scandal events extracted by Claude Haiku (`collect_scandals.py`).
 170 events matched to S&P 500 members, 43 with a 3%+ market-adjusted drop (average -6.4%). Buying the close the day
-after the drop and holding 20 days: **-1.2% per trade, 40% winners**. That is no better than an ordinary drop of the
-same size (-1.5%, t -1.2). Arrests and harassment cases kept falling (-10% and -4% over 20 days). This agrees with
+after the drop and holding 20 days: **-1.2% per trade, 40% winners**. That is 1.5 points worse than ordinary drops of
+the same size (t -1.2), so not overdone. Arrests and harassment cases kept falling (-10% and -4% over 20 days). This agrees with
 PR #61: scandal drops are not reliably overdone. They bounce only when the cause is reversed, as in Huang's
 reinstatement or Musk's SEC settlement, and that reversal is the unpredictable news itself.
 Baseline: all S&P 500 drops of 10%+ since 2012 regain ~3% vs the market over 60 days.
