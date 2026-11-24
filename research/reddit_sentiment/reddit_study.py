@@ -55,7 +55,7 @@ EMOJI_BEAR = ("📉", "🌈🐻", "🐻", "🩸")
 WORDS = set("""ALL ARE BALL BEN CAT COST DAY DOC DOW ECHO FAST FIX FLEX GAP GEN HAS HUM ICE KEY KEYS KIM LOW NOW PEG POOL
 SEE TAP TECH TEL TRIP WAT WELL AMP APP ARES BRO COO EXE LEG LEN MET MOS PSA UPS USB VAR RTX DTE TXT PPL ROL INFO MAT MAR MAS
 DASH NVR BIO AWK COP COR DIS FANG HON MAC MMM CASH EXPE IEX CEO CFO IPO ETF USA FED SEC GDP CPI EPS ATH YOLO FOMO IMO TLDR
-EOD AMA LOL WTF FYI EDIT UPDATE BUY SELL HOLD PUT PUTS CALL CALLS LONG SHORT BIG NEW ONE TWO OUT WAY RUN""".split())
+EOD AMA LOL WTF FYI EDIT UPDATE BUY SELL HOLD PUT PUTS CALL CALLS LONG SHORT BIG NEW ONE TWO OUT WAY RUN WIN""".split())
 
 
 def load_posts(d: Path, universe: set[str]) -> pd.DataFrame:
@@ -279,6 +279,28 @@ def main(panel: str, posts_dir: str, out: Path) -> None:
         spy5 = (P["etf"]["SPY"].reindex(dates).shift(-5) / P["etf"]["SPY"].reindex(dates) - 1).reindex(lo.index)
         rules[f"{sig} long-only {'top' if sign > 0 else 'bottom'} quintile weekly, net, vs SPY"] = perf(lo, spy5, per_year=52)
     res["rules_test_2023plus"] = rules
+    # plain view: next-week market-adjusted return by attention / sentiment quintile, stocks with >=5 posts in 20 days
+    tab = {}
+    for sig in ["att5", "sent5"]:
+        x = S[sig].where(mem & (D["one"].rolling(20).sum() >= 5))
+        q = x.rank(axis=1, pct=True)
+        for per, ds in [("train", tr), ("test", te)]:
+            row = {}
+            for i, (lo, hi) in enumerate([(0, .2), (.2, .4), (.4, .6), (.6, .8), (.8, 1.01)]):
+                v = y5.where((q > lo) & (q <= hi)).loc[ds[::5]].stack().dropna()
+                row[f"Q{i + 1}"] = round(100 * float(v.mean()), 3)
+            tab[f"{sig}|{per}"] = row
+    res["next_5d_excess_%_by_quintile"] = tab
+    # the biggest hype events: top 1% attention spikes with >=20 posts that day, market-adjusted path afterwards
+    big = (S["att1"] >= 2.0) & (D["one"] >= 20) & mem
+    ev = {}
+    for h in (1, 5, 20):
+        f = (np.log1p(r).rolling(h).sum().shift(-h)) - np.log1p(spy).rolling(h).sum().shift(-h).to_numpy()[:, None]
+        for per, ds in [("train", tr), ("test", te)]:
+            v = f.where(big).loc[ds].stack().dropna()
+            ev[f"{per}|next_{h}d"] = {"n": int(len(v)), "mean_%": round(100 * float(v.mean()), 2),
+                                      "t": round(float(v.mean() / v.std() * np.sqrt(len(v))), 2) if len(v) > 2 else None}
+    res["hype_spikes_att1>=2_and_20posts"] = ev
     res["holm_p_rules"] = holm(pvals)
     fm_p = {k: float(2 * stats.norm.sf(abs(v["t"]))) for k, v in fm.items() if "|test|with_controls" in k}
     res["holm_p_fm_test_with_controls"] = holm(fm_p)

@@ -1,0 +1,113 @@
+{
+ "oil_proxy": "equal-weight energy producers XOM,CVX,COP,OXY,EOG,DVN,APA,HES,MRO",
+ "oil_same_week": {
+  "QQQ": {
+   "n": 880,
+   "b_wti": 0.216,
+   "t_wti": 8.07,
+   "r2_%": 14.35
+  },
+  "tech_vs_mkt": {
+   "n": 880,
+   "b_wti": -0.051,
+   "t_wti": -5.79,
+   "r2_%": 5.18
+  },
+  "NVDA": {
+   "n": 880,
+   "b_wti": 0.308,
+   "t_wti": 6.64,
+   "r2_%": 5.93
+  }
+ },
+ "oil_predicts_next_week": {
+  "QQQ": {
+   "n": 879,
+   "b_wti_last_week": -0.033,
+   "t_wti_last_week": -0.9,
+   "r2_%": 0.33
+  },
+  "tech_vs_mkt": {
+   "n": 879,
+   "b_wti_last_week": -0.012,
+   "t_wti_last_week": -1.09,
+   "r2_%": 0.29
+  },
+  "NVDA": {
+   "n": 879,
+   "b_wti_last_week": -0.097,
+   "t_wti_last_week": -1.76,
+   "r2_%": 0.59
+  }
+ },
+ "oil_shock_days": {
+  "n_days_|wti|>5%": 114,
+  "QQQ_same_day_when_oil_up_%": 1.4,
+  "QQQ_same_day_when_oil_down_%": -2.15,
+  "QQQ_next_5d_after_oil_up_%": 0.2,
+  "QQQ_next_5d_after_oil_down_%": 1.09,
+  "QQQ_next_5d_all_days_%": 0.33
+ },
+ "oil_2026_same_week": {
+  "QQQ": {
+   "n": 47,
+   "b_wti": -0.18,
+   "t_wti": -1.01,
+   "r2_%": 8.95
+  },
+  "tech_vs_mkt": {
+   "n": 47,
+   "b_wti": -0.089,
+   "t_wti": -1.41,
+   "r2_%": 9.68
+  }
+ },
+ "memory_same_week": {
+  "QQQ": {
+   "n": 880,
+   "b_memory": 0.301,
+   "t_memory": 15.94,
+   "r2_%": 40.69
+  },
+  "NVDA": {
+   "n": 880,
+   "b_memory": 0.53,
+   "t_memory": 13.31,
+   "r2_%": 25.54
+  }
+ },
+ "memory_predicts_next_week": {
+  "QQQ": {
+   "n": 879,
+   "b_memory_last_week": -0.032,
+   "t_memory_last_week": -2.02,
+   "r2_%": 0.47
+  },
+  "NVDA": {
+   "n": 879,
+   "b_memory_last_week": -0.066,
+   "t_memory_last_week": -1.72,
+   "r2_%": 0.4
+  },
+  "tech_vs_mkt": {
+   "n": 879,
+   "b_memory_last_week": -0.003,
+   "t_memory_last_week": -0.5,
+   "r2_%": 0.03
+  }
+ },
+ "memory_predicts_next_week_2023plus": {
+  "QQQ": {
+   "n": 203,
+   "b_memory_last_week": -0.043,
+   "t_memory_last_week": -1.55,
+   "r2_%": 1.31
+  },
+  "NVDA": {
+   "n": 203,
+   "b_memory_last_week": -0.047,
+   "t_memory_last_week": -0.64,
+   "r2_%": 0.3
+  }
+ }
+}
