@@ -1,4 +1,6 @@
 name: Update dashboard
+# Publish-only runs get their own title so catch-up.yml can tell them from full rebuilds.
+run-name: ${{ inputs.publish_only && 'Update dashboard (publish only)' || 'Update dashboard' }}
 
 # Runs the research pipeline after each US market close and publishes the read-only dashboard to
 # GitHub Pages. The site root is the combined 1000 CAD paper portfolio (experiments/hub/portfolio.py); Experiment 1 (this pipeline) is under /exp1/ and

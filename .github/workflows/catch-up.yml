@@ -1,0 +1,94 @@
+name: After-close catch-up
+
+# GitHub's scheduler sometimes drops or delays scheduled runs by hours (on Mon 2026-11-23 strategies.yml, exp7.yml and
+# pages.yml never started). This watchdog checks, a few times each evening, that today's after-close runs happened:
+#   1. strategies.yml (the paper pots) and exp7.yml: a successful or still-running run since 16:15 New York today;
+#      if not, it starts one. Both are safe to repeat: a pot already at today's close is left alone.
+#   2. pages.yml full rebuild (not a publish-only run): one started after those two finished; if not, it starts one,
+#      so the dashboard picks up today's pots.
+# When everything already ran it does nothing. A failed run is not retried: the watchdog goes red (GitHub emails) instead.
+# The watchdog's own schedule can be dropped too, which is why it has three times.
+
+on:
+  schedule:
+    # UTC, Tue-Sat = New York Mon-Fri evening. 00:20 / 01:50 / 03:20 UTC = 19:20 / 20:50 / 22:20 New York in winter.
+    - cron: "20 0 * * 2-6"
+    - cron: "50 1 * * 2-6"
+    - cron: "20 3 * * 2-6"
+  workflow_dispatch:
+
+permissions:
+  actions: write    # start the missing runs
+  contents: read
+
+concurrency:
+  group: after-close-catch-up
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      REF: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Start whatever today's close is missing
+        run: |
+          set -euo pipefail
+          today=$(TZ=America/New_York date +%F)
+          dow=$(TZ=America/New_York date +%u)
+          if [ "$dow" -gt 5 ]; then echo "Weekend in New York ($today), nothing to check."; exit 0; fi
+          close=$(date -u -d "TZ=\"America/New_York\" $today 16:15" +%FT%TZ)
+          echo "New York date $today, after-close runs count from $close"
+
+          # state <workflow> <since> [title], main-branch runs only (not PR trial runs): prints "success <updatedAt>", "running -" or "missing -"
+          state() {
+            gh run list --workflow "$1" --branch "$REF" --limit 30 --json createdAt,updatedAt,status,conclusion,displayTitle \
+              | jq -r --arg since "$2" --arg title "${3:-}" '
+                  [.[] | select(.createdAt >= $since and ($title == "" or .displayTitle == $title))] as $r
+                  | if any($r[]; .status != "completed") then "running -"
+                    elif any($r[]; .conclusion == "success") then "success \([$r[] | select(.conclusion == "success") | .updatedAt] | max)"
+                    elif ($r | length) > 0 then "failed -"
+                    else "missing -" end'
+          }
+
+          bad=0
+          for wf in strategies.yml exp7.yml; do
+            read -r s _ <<<"$(state "$wf" "$close")"
+            echo "$wf: $s"
+            if [ "$s" = missing ]; then
+              echo "::notice::$wf did not run after today's close; starting it"
+              gh workflow run "$wf" --ref "$REF"
+            fi   # a failed run is reported below, not retried
+          done
+          sleep 20   # let the new runs show up in the list
+
+          # Wait (up to ~60 min) for both to finish, then note when the later one did.
+          ready="$close"
+          for i in $(seq 1 60); do
+            pending=0
+            for wf in strategies.yml exp7.yml; do
+              read -r s t <<<"$(state "$wf" "$close")"
+              [ "$s" = running ] && pending=1
+            done
+            [ "$pending" = 0 ] && break
+            sleep 60
+          done
+          for wf in strategies.yml exp7.yml; do
+            read -r s t <<<"$(state "$wf" "$close")"
+            echo "$wf: $s $t"
+            if [ "$s" = success ]; then [[ "$t" > "$ready" ]] && ready="$t"; else echo "::error::$wf did not succeed after today's close ($s)"; bad=1; fi
+          done
+
+          # Full dashboard rebuild started after the pots were saved.
+          read -r s _ <<<"$(state pages.yml "$ready" "Update dashboard")"
+          echo "pages.yml full run since $ready: $s"
+          if [ "$s" = missing ]; then
+            echo "::notice::No full dashboard rebuild after today's pots; starting one"
+            gh workflow run pages.yml --ref "$REF"
+          elif [ "$s" = failed ]; then
+            echo "::error::Today's full dashboard rebuild failed"; bad=1
+          fi
+          exit "$bad"
