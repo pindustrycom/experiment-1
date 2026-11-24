@@ -36,11 +36,15 @@ def main(panel: str, wti: str, out: Path) -> None:
         w = w.set_index("date")["wti"]
         w = w[w > 0]  # April 2020's negative print breaks log returns
         px = px.join(w, how="left")
+    else:  # FRED unreachable: oil producers' shares (S&P 500 energy names) stand in for the oil price
+        en = [c for c in ["XOM", "CVX", "COP", "OXY", "EOG", "DVN", "APA", "HES", "MRO"] if c in P["close"]]
+        px["wti"] = np.exp(np.log(P["close"][en].reindex(px.index)).diff().mean(axis=1).fillna(0).cumsum())
+        res["oil_proxy"] = "equal-weight energy producers " + ",".join(en)
     W = np.log(px.resample("W-FRI").last()).diff()
     D = np.log(px).diff()
     W["tech_vs_mkt"] = W["QQQ"] - W["SPY"]
     D["tech_vs_mkt"] = D["QQQ"] - D["SPY"]
-    if "wti" in W:
+    if "wti" in W.columns:
         res["oil_same_week"] = {k: nw(W[k], W[["wti"]]) for k in ["QQQ", "tech_vs_mkt", "NVDA"]}
         lag = W[["wti"]].shift(1).rename(columns={"wti": "wti_last_week"})
         res["oil_predicts_next_week"] = {k: nw(W[k], lag) for k in ["QQQ", "tech_vs_mkt", "NVDA"]}
